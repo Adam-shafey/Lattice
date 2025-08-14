@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Permission {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  label     String
+  plugin    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  rolePerms RolePermission[]
+  userPerms UserPermission[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  userRoles     UserRole[]
+  userPerms     UserPermission[]
+  contexts      UserContext[]
+  auditLogs     AuditLog[]
+}
+
+model Role {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  rolePerms RolePermission[]
+  userRoles UserRole[]
+}
+
+model Context {
+  id        String   @id
+  type      String
+  parentId  String?  // reserved for hierarchical contexts
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userContexts UserContext[]
+  userRoles    UserRole[]
+  rolePerms    RolePermission[]
+  userPerms    UserPermission[]
+  auditLogs    AuditLog[]
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  contextId String?  // null = global
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id])
+  role   Role    @relation(fields: [roleId], references: [id])
+  context Context? @relation(fields: [contextId], references: [id])
+
+  @@index([userId, contextId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  contextId    String?  // null = global
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+  context    Context?   @relation(fields: [contextId], references: [id])
+
+  @@unique([roleId, permissionId, contextId])
+  @@index([roleId, contextId])
+}
+
+model UserPermission {
+  id           String   @id @default(cuid())
+  userId       String
+  permissionId String
+  contextId    String?  // null = global
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+  context    Context?   @relation(fields: [contextId], references: [id])
+
+  @@unique([userId, permissionId, contextId])
+  @@index([userId, contextId])
+}
+
+model UserContext {
+  id        String   @id @default(cuid())
+  userId    String
+  contextId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  context Context @relation(fields: [contextId], references: [id])
+
+  @@unique([userId, contextId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  contextId   String?
+  success     Boolean
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id])
+  context Context? @relation(fields: [contextId], references: [id])
+}
+
+
