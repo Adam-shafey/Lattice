@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { CoreSaaSApp } from '../../index';
-import { getDbClient } from '../db/db-client';
+import { db } from '../db/db-client';
 import { createJwtUtil } from './jwt';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
@@ -49,7 +49,6 @@ export function requireAuthMiddleware() {
 }
 
 export function createAuthRoutes(app: CoreSaaSApp) {
-  const db = getDbClient();
   const jwt = getJwt();
 
   app.route({

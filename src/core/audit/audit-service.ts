@@ -1,4 +1,4 @@
-import { getDbClient } from '../db/db-client';
+import { db } from '../db/db-client';
 
 export interface AuditConfig {
   enabled: boolean;
@@ -36,7 +36,7 @@ export class AuditService {
 
   async log(params: { actorId?: string | null; targetUserId?: string | null; contextId?: string | null; action: string; success: boolean; requestId?: string | null; ip?: string | null; userAgent?: string | null; resourceType?: string | null; resourceId?: string | null; plugin?: string | null; error?: string | null; metadata?: unknown }) {
     if (!this.shouldLog()) return;
-    const db = getDbClient();
+
     const data = {
       actorId: params.actorId ?? null,
       targetUserId: params.targetUserId ?? null,

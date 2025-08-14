@@ -20,7 +20,7 @@ describe('E2E: roles API guards', () => {
     expect(r1.statusCode).toBe(401);
 
     // Wrong context type permission not enough
-    app.grantUserPermission('u1', 'roles:org:create', 'org');
+    app.grantUserPermission('u1', 'roles:org:create', null, 'org');
     const r2 = await f.inject({ 
       method: 'POST', 
       url: '/roles', 
@@ -30,7 +30,7 @@ describe('E2E: roles API guards', () => {
     expect(r2.statusCode).toBe(403);
 
     // Correct context type permission works
-    app.grantUserPermission('u1', 'roles:team:create', 'team');
+    app.grantUserPermission('u1', 'roles:team:create', null, 'team');
     const r3 = await f.inject({ 
       method: 'POST', 
       url: '/roles', 
@@ -47,14 +47,14 @@ describe('E2E: roles API guards', () => {
     registerRoleRoutes(app, defaultRoutePermissionPolicy);
     const f = app.fastify!;
 
-    // Missing context type -> 400
+    // Missing context type -> 403
     const r1 = await f.inject({ 
       method: 'POST', 
       url: '/roles/assign', 
       payload: { roleName: 'editor', userId: 'u2', contextId: 'ctx_1' },
       headers: { 'x-user-id': 'u1' }
     });
-    expect(r1.statusCode).toBe(400);
+    expect(r1.statusCode).toBe(403);
 
     // Global permission not enough, needs exact context
     app.grantUserPermission('u1', 'roles:assign');
@@ -85,7 +85,7 @@ describe('E2E: roles API guards', () => {
     const f = app.fastify!;
 
     // Only role management permission not enough
-    app.grantUserPermission('u1', 'roles:team:manage', 'team');
+    app.grantUserPermission('u1', 'roles:team:manage', null, 'team');
     const r1 = await f.inject({ 
       method: 'POST', 
       url: '/roles/editor/permissions/add', 
@@ -95,7 +95,7 @@ describe('E2E: roles API guards', () => {
     expect(r1.statusCode).toBe(403);
 
     // Only permission grant ability not enough
-    app.grantUserPermission('u1', 'permissions:example:read:grant:team', 'team');
+    app.grantUserPermission('u1', 'permissions:example:read:grant:team', null, 'team');
     const r2 = await f.inject({ 
       method: 'POST', 
       url: '/roles/editor/permissions/add', 
@@ -105,8 +105,8 @@ describe('E2E: roles API guards', () => {
     expect(r2.statusCode).toBe(403);
 
     // Both permissions work
-    app.grantUserPermission('u1', 'roles:team:manage', 'team');
-    app.grantUserPermission('u1', 'permissions:example:read:grant:team', 'team');
+    app.grantUserPermission('u1', 'roles:team:manage', null, 'team');
+    app.grantUserPermission('u1', 'permissions:example:read:grant:team', null, 'team');
     const r3 = await f.inject({ 
       method: 'POST', 
       url: '/roles/editor/permissions/add', 
@@ -137,7 +137,7 @@ describe('E2E: roles API guards', () => {
       },
       headers: { 'x-user-id': 'u1' }
     });
-    expect(r1.statusCode).toBe(400);
+    expect(r1.statusCode).toBe(403);
     expect(r1.json()).toMatchObject({ 
       error: 'Invalid input',
       issues: expect.arrayContaining([

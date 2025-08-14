@@ -1,5 +1,5 @@
 import { isAllowedByWildcard } from './wildcard-utils';
-import { getDbClient } from '../db/db-client';
+import { db } from '../db/db-client';
 
 export interface RegisteredPermission {
   key: string;
@@ -28,7 +28,6 @@ export class PermissionRegistry {
 
   async initFromDatabase(): Promise<void> {
     if (this.initialized) return;
-    const db = getDbClient();
     const rows = await db.permission.findMany();
     for (const row of rows) {
       this.registry.set(row.key, { key: row.key, label: row.label, plugin: row.plugin ?? undefined });
@@ -37,7 +36,6 @@ export class PermissionRegistry {
   }
 
   async syncToDatabase(): Promise<void> {
-    const db = getDbClient();
     const inDb = new Set((await db.permission.findMany({ select: { key: true } })).map((r) => r.key));
     for (const p of this.registry.values()) {
       if (!inDb.has(p.key)) {

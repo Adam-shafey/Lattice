@@ -37,7 +37,7 @@ describe('E2E: protected routes via authorize()', () => {
       handler: async () => ({ ok: true }),
     });
     // Context-specific permission not enough
-    app.grantUserPermission('u2', 'admin:users:create', 'ctx_1');
+    app.grantUserPermission('u2', 'admin:users:create', 'ctx_1', 'team');
     const r1 = await app.fastify!.inject({ method: 'GET', url: '/global', headers: { 'x-user-id': 'u2' } });
     expect(r1.statusCode).toBe(403);
     // Global permission works
@@ -61,7 +61,7 @@ describe('E2E: protected routes via authorize()', () => {
     const r1 = await app.fastify!.inject({ method: 'GET', url: '/type-wide', headers: { 'x-user-id': 'u3' } });
     expect(r1.statusCode).toBe(400);
     // Context-specific permission not enough
-    app.grantUserPermission('u3', 'team:settings:read', 'team_1');
+    app.grantUserPermission('u3', 'team:settings:read', 'team_1', 'team');
     const r2 = await app.fastify!.inject({ method: 'GET', url: '/type-wide', headers: { 'x-user-id': 'u3', 'x-context-type': 'team' } });
     expect(r2.statusCode).toBe(403);
     // Global permission works
@@ -87,8 +87,8 @@ describe('E2E: protected routes via authorize()', () => {
     });
 
     // Setup permissions
-    app.grantUserPermission('u4', 'admin:manage'); // global
-    app.grantUserPermission('u4', 'context:write', 'ctx_1'); // exact
+    app.grantUserPermission('u4', 'admin:manage', null, null); // global
+    app.grantUserPermission('u4', 'context:write', 'ctx_1', 'team'); // exact
 
     // Both permissions present -> 200
     const r1 = await app.fastify!.inject({ 

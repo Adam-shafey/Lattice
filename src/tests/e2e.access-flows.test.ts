@@ -93,7 +93,7 @@ describe('E2E: access flows (roles, permissions, contexts, bearer)', () => {
 
     // Assigning with correct type should work
     await expect(
-      roleService.assignRoleToUser({ roleName: 'member', userId, contextId: 'team_1', contextType: 'team' })
+      roleService.assignRoleToUser({ roleName: 'member', userId, contextId: 'org_1', contextType: 'org' })
     ).resolves.toBeDefined();
   });
 

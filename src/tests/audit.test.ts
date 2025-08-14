@@ -7,6 +7,7 @@ describe('audit logging toggle', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+    await db.auditLog.deleteMany();
   });
 
   it('logs when enabled', async () => {

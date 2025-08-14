@@ -1,4 +1,4 @@
-import { db } from '../db/db-client';
+import { db, type Prisma } from '../db/db-client';
 import { AuditService } from '../audit/audit-service';
 import { randomUUID } from 'crypto';
 import { type RoutePermissionPolicy } from '../policy/policy';
@@ -19,12 +19,12 @@ export class RoleService {
     key?: string;
     contextType: string;
   }) {
-    const role = await db.role.create({ 
-      data: { 
-        name, 
+    const role = await db.role.create({
+      data: {
+        name,
         key: options?.key ?? randomUUID(),
-        contextType: options?.contextType
-      } 
+        contextType: options?.contextType ?? 'global'
+      }
     });
     await this.audit.log({
       actorId: options?.actorId ?? null,
@@ -58,43 +58,46 @@ export class RoleService {
   }
 
   async assignRoleToUser(params: { roleName?: string; roleKey?: string; userId: string; contextId?: string | null; contextType?: string | null; actorId?: string | null; source?: string; reason?: string }) {
+    // Find the role
     const role = params.roleKey
       ? await db.role.findUnique({ where: { key: params.roleKey } })
       : await db.role.findFirst({ where: { name: params.roleName ?? '' } });
-    const ensuredRole = role ?? (await db.role.create({ data: { name: params.roleName ?? params.roleKey ?? 'role', key: randomUUID() } }));
-    // Validate context exists and type matches
+    if (!role) throw new Error('Role not found');
+
+    // Validate context type matches
     if (params.contextId) {
       const context = await db.context.findUnique({ where: { id: params.contextId } });
-      if (!context) {
-        throw new Error(`Context ${params.contextId} not found`);
-      }
-      if (params.contextType && context.type !== params.contextType) {
-        throw new Error(`Context ${params.contextId} has type ${context.type}, expected ${params.contextType}`);
+      if (!context) throw new Error(`Context ${params.contextId} not found`);
+      if (context.type !== role.contextType) {
+        throw new Error(`Role ${role.name} has type ${role.contextType}, cannot be assigned in ${context.type} context`);
       }
     }
-
-    const id = `${params.userId}-${ensuredRole.id}-${params.contextId ?? 'global'}`;
+    // Create the user-role link
+    const id = `${role.id}-${params.userId}-${params.contextId ?? 'global'}`;
     const res = await db.userRole.upsert({
       where: { id },
       update: {},
-      create: { 
-        id, 
-        userId: params.userId, 
-        roleId: ensuredRole.id, 
+      create: {
+        id,
+        userId: params.userId,
+        roleId: role.id,
         contextId: params.contextId ?? null,
-        contextType: params.contextType ?? null
-      },
+        contextType: params.contextId ? null : (params.contextType ?? null)
+      }
     });
+
     await this.audit.log({
       actorId: params.actorId ?? null,
       targetUserId: params.userId,
       contextId: params.contextId ?? null,
-      action: 'role.assigned',
+      action: 'role.user.assigned',
       success: true,
-      metadata: { roleName: ensuredRole.name, roleKey: ensuredRole.key, source: params.source, reason: params.reason },
+      metadata: { roleName: role.name, roleKey: role.key, source: params.source, reason: params.reason },
     });
+
     return res;
   }
+
 
   async removeRoleFromUser(params: { roleName?: string; roleKey?: string; userId: string; contextId?: string | null; contextType?: string | null; actorId?: string | null; source?: string; reason?: string }) {
     const role = params.roleKey
