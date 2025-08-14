@@ -1,5 +1,5 @@
 import { CoreSaaSApp } from '../../../index';
-import { UserPermissionService } from '../../permissions/user-permission-service';
+import { UserPermissionService } from '../../services/user-permission-service';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 
