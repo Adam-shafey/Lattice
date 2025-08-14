@@ -1,7 +1,14 @@
 import { getDbClient } from '../db/db-client';
 
 export class AuditService {
+  private readonly enabled: boolean;
+
+  constructor(enabled: boolean = true) {
+    this.enabled = enabled;
+  }
+
   async log(params: { userId?: string | null; contextId?: string | null; action: string; success: boolean; metadata?: unknown }) {
+    if (!this.enabled) return;
     const db = getDbClient();
     await db.auditLog.create({
       data: {

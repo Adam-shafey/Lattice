@@ -2,6 +2,8 @@
 import minimist from 'minimist';
 import { CoreSaaS } from '../../index';
 import { RoleService } from '../roles/role-service';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 function getApp() {
   const app = CoreSaaS({
@@ -37,6 +39,17 @@ async function checkAccess(argv: minimist.ParsedArgs) {
 async function main() {
   const argv = minimist(process.argv.slice(2));
   const cmd = argv._[0];
+
+  async function resolveUserIdFromArgs(): Promise<string> {
+    const explicit = argv.userId || argv.u;
+    if (explicit) return String(explicit);
+    const email = argv.email || argv.e;
+    if (!email) throw new Error('Provide --userId <id> or --email <email>');
+    const db = new PrismaClient();
+    const user = await db.user.findUnique({ where: { email: String(email) } });
+    if (!user) throw new Error(`User not found for email ${email}. Create it first with: lattice users:create --email <email> --password <pw>`);
+    return user.id;
+  }
   switch (cmd) {
     case 'list-permissions':
       await listPermissions();
@@ -44,6 +57,16 @@ async function main() {
     case 'check-access':
       await checkAccess(argv);
       break;
+    case 'users:create': {
+      const email = String(argv.email || argv.e);
+      const password = String(argv.password || argv.p);
+      if (!email || !password) throw new Error('Usage: users:create --email <email> --password <pw>');
+      const db = new PrismaClient();
+      const passwordHash = await bcrypt.hash(password, 10);
+      const user = await db.user.upsert({ where: { email }, update: {}, create: { email, passwordHash } });
+      console.log(user);
+      break;
+    }
     case 'roles:create': {
       const rs = new RoleService();
       const name = String(argv.name || argv.n);
@@ -59,7 +82,7 @@ async function main() {
     case 'roles:assign': {
       const rs = new RoleService();
       const roleName = String(argv.role || argv.r);
-      const userId = String(argv.userId || argv.u);
+      const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
       await rs.assignRoleToUser({ roleName, userId, contextId });
       console.log('OK');
@@ -68,7 +91,7 @@ async function main() {
     case 'roles:remove': {
       const rs = new RoleService();
       const roleName = String(argv.role || argv.r);
-      const userId = String(argv.userId || argv.u);
+      const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
       await rs.removeRoleFromUser({ roleName, userId, contextId });
       console.log('OK');
@@ -94,7 +117,7 @@ async function main() {
     }
     case 'roles:user-roles': {
       const rs = new RoleService();
-      const userId = String(argv.userId || argv.u);
+      const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
       console.log(await rs.listUserRoles({ userId, contextId }));
       break;
@@ -109,13 +132,14 @@ async function main() {
       console.log('  list-permissions');
       // eslint-disable-next-line no-console
       console.log('  check-access --userId <id> --contextId <ctx?> --permission <perm>');
+      console.log('  users:create --email <email> --password <pw>');
       console.log('  roles:create --name <name>');
       console.log('  roles:list');
-      console.log('  roles:assign --role <name> --userId <id> [--contextId <ctx>]');
-      console.log('  roles:remove --role <name> --userId <id> [--contextId <ctx>]');
+      console.log('  roles:assign --role <name> (--userId <id> | --email <email>) [--contextId <ctx>]');
+      console.log('  roles:remove --role <name> (--userId <id> | --email <email>) [--contextId <ctx>]');
       console.log('  roles:add-perm --role <name> --permission <key> [--contextId <ctx>]');
       console.log('  roles:remove-perm --role <name> --permission <key> [--contextId <ctx>]');
-      console.log('  roles:user-roles --userId <id> [--contextId <ctx>]');
+      console.log('  roles:user-roles (--userId <id> | --email <email>) [--contextId <ctx>]');
   }
 }
 

@@ -13,6 +13,7 @@ export interface CoreConfig {
   db: { provider: 'postgres' | 'sqlite'; url?: string };
   adapter: SupportedAdapter;
   jwt: { accessTTL: string; refreshTTL: string; secret?: string };
+  audit?: { enabled: boolean };
 }
 
 export interface RouteDefinition<Body = unknown> {
@@ -67,7 +68,7 @@ export class CoreSaaSApp {
     this.permissionRegistry = new PermissionRegistry();
     this.PermissionRegistry = this.permissionRegistry;
     this.contextService = new ContextService();
-    this.auditService = new AuditService();
+    this.auditService = new AuditService(config.audit?.enabled !== false);
     this.adapterKind = config.adapter;
     this.httpAdapter =
       config.adapter === 'fastify'
