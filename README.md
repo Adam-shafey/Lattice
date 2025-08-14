@@ -350,3 +350,19 @@ Notes
 - Plugin system currently registers permissions and routes; generator/discovery arrive in Phase 1.5.
 - Adapter parity features (error normalization, streaming, uploads) are post-MVP.
 
+### Production Readiness Checklist (What we did vs next)
+
+Done now:
+- Built-in REST APIs guarded by policy (Users, Contexts, Roles, User-Permissions)
+- E2E tests for auth/login/refresh, protected routes, role/permission flows, context membership
+- Full audit logging with config and request metadata
+- Policy overrides for route permissions
+
+Next to consider:
+- Validation on all endpoints (add zod) and better error normalization
+- Hierarchical contexts with inheritance
+- Prisma migrations for all environments, plus indexes for hot queries
+- Rate limiting, password policy, secure reset delivery
+- Caching (Redis) for effective permissions and ancestor chains
+- CLI additions (generate-plugin, audit queries) and docs for Roles API and route-permission matrix
+

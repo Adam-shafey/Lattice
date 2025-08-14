@@ -26,6 +26,7 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
         body: (request.body ?? {}) as unknown,
         params: (request.params as Record<string, string>) ?? {},
         query: (request.query as Record<string, string | string[]>) ?? {},
+        req: request,
       });
       reply.send(result);
     };

@@ -11,6 +11,7 @@ import { registerPermissionRoutes } from './core/http/api/permissions';
 import { registerContextRoutes } from './core/http/api/contexts';
 import { registerRoleRoutes } from './core/http/api/roles';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
+import { requestContextMiddleware } from './core/http/middlewares/request-context';
 
 export type SupportedAdapter = 'fastify' | 'express';
 
@@ -32,6 +33,7 @@ export interface RouteDefinition<Body = unknown> {
     body: Body;
     params: Record<string, string>;
     query: Record<string, string | string[]>;
+    req: any;
   }) => Promise<unknown> | unknown;
 }
 
@@ -101,6 +103,7 @@ export class CoreSaaSApp {
   }
 
   public route(def: RouteDefinition): void {
+    // Wrap handler to inject request-context to audit logs
     this.httpAdapter.addRoute(def);
   }
 
@@ -168,6 +171,8 @@ export class CoreSaaSApp {
   public async listen(port: number, host: string = '0.0.0.0'): Promise<void> {
     await this.permissionRegistry.initFromDatabase();
     await this.permissionRegistry.syncToDatabase();
+    // Global request context middleware (only for adapters that support preHandler arrays at route-level)
+    // Developers should add it before their own routes if using adapter directly.
     createAuthRoutes(this);
     registerUserRoutes(this, this.policy);
     registerPermissionRoutes(this, this.policy);

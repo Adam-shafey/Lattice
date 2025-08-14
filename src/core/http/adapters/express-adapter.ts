@@ -31,6 +31,7 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
         body: (req.body ?? {}) as unknown,
         params: (req.params as Record<string, string>) ?? {},
         query: (req.query as Record<string, string | string[]>) ?? {},
+        req,
       });
       res.send(result);
     };
