@@ -180,23 +180,20 @@ Tests: added src/tests/audit.test.ts to verify enabled/disabled behavior.
 
 ## **7️⃣ Lifecycle Hooks**
 
-Hook	Trigger	Purpose / Example Use Cases
-onUserCreated(user, context?)	After a new user is added	Assign default permissions, add user to default contexts, send welcome emails, trigger analytics
-onUserDeleted(user)	After a user is removed	Clean up related contexts, revoke tokens, remove plugin data, audit logging
-onRoleCreated(role)	After a new role is added	Initialize default permissions, sync role to external services
-onRoleDeleted(role)	After a role is removed	Remove role associations from users, audit logs
-onPermissionAdded(permission, plugin?)	After a permission is registered	Update caches, log changes, notify admin UI
-onPermissionRemoved(permission, plugin?)	After a permission is deleted	Revoke related user permissions, invalidate caches
-onContextCreated(context)	After a new context is created	Create default roles, assign default users, trigger notifications
-onContextDeleted(context)	After a context is deleted	Revoke permissions, clean up associated plugin data
-onUserAddedToContext(user, context)	After a user is added to a context	Assign context-specific permissions, trigger onboarding flows
-onUserRemovedFromContext(user, context)	After a user is removed from a context	Revoke context-specific permissions, audit logging
-onTokenIssued(user, tokenType)	After issuing access or refresh token	Audit login, notify external monitoring services
-onTokenRevoked(user, tokenType)	After revoking tokens	Audit security events, clear caches
-onPluginRegistered(plugin)	After a plugin is registered	Sync plugin permissions, register plugin-specific hooks, initialize plugin context types
-onPluginUnregistered(plugin)	After a plugin is removed	Clean up plugin data, revoke plugin permissions
+| **Hook**                                     | **Trigger**                             | **Purpose / Example Use Cases**                                           |
+| -------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------- |
+| **onUserUpdated(user, changes)**             | When a user's profile changes           | Sync profile data to external CRMs, refresh caches, update search indexes |
+| **onRoleUpdated(role, changes)**             | When a role's metadata changes          | Update caches, re-sync permissions, notify admins                         |
+| **onPermissionUpdated(permission, changes)** | When a permission's metadata changes    | Update caches, re-sync with plugins, notify admins                        |
+| **onContextUpdated(context, changes)**       | When a context changes name or settings | Recalculate derived data, update UI, notify affected users                |
+| **onSessionCreated(user, session)**          | When a new login session starts         | Real-time monitoring, analytics, anomaly detection                        |
+| **onSessionTerminated(user, session)**       | When a session ends (logout, timeout)   | Audit logging, trigger cleanup jobs                                       |
+| **onAuthFailed(userIdentifier, reason)**     | When an authentication attempt fails    | Track brute-force attempts, send security alerts                          |
+| **onRateLimitExceeded(user, endpoint)**      | When a user hits an API rate limit      | Alert admins, log abuse, temporarily throttle                             |
+| **onPluginUpdated(plugin, changes)**         | When plugin metadata changes            | Update plugin registry, re-register permissions                           |
+| **onSystemStartup()**                        | When Lattice Core boots                 | Warm caches, register all permissions, run health checks                  |
+| **onSystemShutdown()**                       | When Lattice Core shuts down            | Flush logs, cleanup temporary data, notify monitoring tools               |
 
-What about when user is assigned or revoked role or permission?
 
 
 
