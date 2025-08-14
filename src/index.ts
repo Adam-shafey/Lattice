@@ -1,17 +1,16 @@
 import { createFastifyAdapter, type FastifyHttpAdapter } from './core/http/adapters/fastify-adapter';
 import { createExpressAdapter, type ExpressHttpAdapter } from './core/http/adapters/express-adapter';
 import { PermissionRegistry } from './core/permissions/permission-registry';
-import { ContextService } from './core/context/context-service';
-import { createAuthorize, type AuthorizeOptions } from './core/http/middlewares/authz-middleware';
+import { ContextService } from './core/services/context-service';
+import { createAuthorize, type AuthorizeOptions } from './core/http/authorize';
 import { fetchEffectivePermissions } from './core/permissions/effective-permissions';
-import { createAuthRoutes, requireAuthMiddleware } from './core/auth/routes';
-import { AuditService } from './core/audit/audit-service';
+import { createAuthRoutes, requireAuthMiddleware } from './core/http/api/auth';
+import { AuditService } from './core/services/audit-service';
 import { registerUserRoutes } from './core/http/api/users';
 import { registerPermissionRoutes } from './core/http/api/permissions';
 import { registerContextRoutes } from './core/http/api/contexts';
 import { registerRoleRoutes } from './core/http/api/roles';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
-import { requestContextMiddleware } from './core/http/middlewares/request-context';
 
 export type SupportedAdapter = 'fastify' | 'express';
 

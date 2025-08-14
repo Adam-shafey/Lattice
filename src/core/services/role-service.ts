@@ -1,5 +1,5 @@
 import { db, type Prisma } from '../db/db-client';
-import { AuditService } from '../audit/audit-service';
+import { AuditService } from './audit-service';
 import { randomUUID } from 'crypto';
 import { type RoutePermissionPolicy } from '../policy/policy';
 import { CoreSaaS } from '../../index';

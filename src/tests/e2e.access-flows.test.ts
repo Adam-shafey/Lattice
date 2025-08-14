@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { CoreSaaS } from '../index';
 import { PrismaClient } from '@prisma/client';
-import { RoleService } from '../core/roles/role-service';
-import { createAuthRoutes, requireAuthMiddleware } from '../core/auth/routes';
+import { RoleService } from '../core/services/role-service';
+import { createAuthRoutes, requireAuthMiddleware } from '../core/http/api/auth';
 import { defaultRoutePermissionPolicy } from '../core/policy/policy';
 
 describe('E2E: access flows (roles, permissions, contexts, bearer)', () => {

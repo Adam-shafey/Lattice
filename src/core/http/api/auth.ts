@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
-import { CoreSaaSApp } from '../../index';
-import { db } from '../db/db-client';
-import { createJwtUtil } from './jwt';
+import { CoreSaaSApp } from '../../../index';
+import { db } from '../../db/db-client';
+import { createJwtUtil } from '../../auth/jwt';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 

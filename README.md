@@ -1,23 +1,23 @@
 
 ---
 
-# **Product Requirements Document — Lattice Core**
+# Lattice Core
 
-## **1️⃣ Purpose / Vision**
+## Vision
 
-Lattice Core is the **foundation of a permission-first SaaS backend**, providing:
+Lattice Core is the foundation of a permission-first SaaS backend, providing:
 
-* Context-aware access control (multi-tenant, hierarchical)
-* Roles and user-level permissions, with wildcard support
-* Extensible plugin architecture for routes, contexts, and permissions
-* Developer-first experience: CLI, TypeScript types, hot-reloadable permissions
-* Minimal core routes: focus on auth and infrastructure, not business logic
+- Context-aware access control (multi-tenant, hierarchical)
+- Roles and user-level permissions, with wildcard support
+- Extensible plugin architecture for routes, contexts, and permissions
+- Developer-first experience: CLI, TypeScript types, hot-reloadable permissions
+- Minimal core routes: focus on auth and infrastructure, not business logic
 
 **Goal:** Enable developers to spin up secure, modular SaaS apps quickly while leaving domain-specific features to plugins.
 
 ---
 
-## **2️⃣ Key Principles**
+## Key Principles
 
 1. **Permission-first:** All access flows through the core permission registry.
 2. **Context-aware:** Every action is scoped to a context (org, team, project, or arbitrary plugin-defined contexts).
@@ -27,220 +27,153 @@ Lattice Core is the **foundation of a permission-first SaaS backend**, providing
 
 ---
 
-## **3️⃣ Core Features**
+## Core Features
 
 | Feature                      | Description                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Auth**                     | Password, JWT (access + refresh), token revocation, password change/reset; placeholders for OAuth2, MFA, social login. |
-| **Permission Registry**      | In-memory + DB-backed. Wildcard expansion, plugin registration, hot-reloadable.                              |
+| **Auth**                     | Password, JWT (access + refresh), token revocation, Partially: password change/reset; WIP OAuth2, MFA, social login. |
+| **Permission Registry**      | In-memory + DB-backed. Wildcard expansion, WIP: plugin registration, WIP: hot-reloadable.                              |
 | **Roles & User Permissions** | RolePermission, UserPermission tables. Scoped per context.                                                   |
 | **Role Management**          | Role CRUD, assign/remove roles, grant/revoke role permissions via service + CLI.                             |
 | **Context Management**       | Resolve from route/query/header. Supports hierarchies (parent → child contexts).                             |
 | **AuthZ Middleware**         | Checks permissions per request, ensures context alignment. Works for both adapters.                          |
-| **Plugin System**            | Register plugins with contexts, permissions, and routes.                                                     |
+| **Plugin System**            | Register plugins with contexts, roles, permissions, and routes.                                                     |
 | **Built-in REST APIs**       | Users CRUD, Contexts CRUD + membership, Roles CRUD + assign/remove + role-perm ops, User permission grant/revoke; all guarded by a modifiable policy. |
 | **Audit Logging**            | Records permission checks, context resolutions, token issued/revoked, role and permission grants/revokes.    |
 | **Developer Tooling**        | CLI: list-permissions, check-access, roles commands, generate-plugin. TypeScript types for permissions, roles, and contexts. |
-| **Caching**                  | Optional Redis-backed cache for effective permissions to optimize performance.                               |
+| **Caching**                  | WIP: Optional Redis-backed cache for effective permissions to optimize performance.                               |
 
 ---
 
-## **4️⃣ Core Architecture**
+## Core Architecture
 
 ```
 /core
   /auth
-    jwt.ts
-    oauth2.ts
-    mfa.ts
-    social.ts
-  /permissions
-    permission-registry.ts
-    permission-sync.ts
-    wildcard-utils.ts
-    user-permission-service.ts
-  /context
-    context-service.ts
-    context-resolver.ts
-    hierarchy.ts
-  /db
-    db-client.ts
-  /http
-    adapters/
-      fastify-adapter.ts
-      express-adapter.ts
-    middlewares/
-      authz-middleware.ts
-      audit-logger.ts
-    api/
-      users.ts
-      permissions.ts
-      contexts.ts
-      roles.ts
-  /cache
-    redis-client.ts
-    permission-cache.ts
-  /hooks
-    hooks.ts
-  /policy
-    policy.ts
+    jwt.ts - Handles JSON Web Token (JWT) operations for authentication.
+    oauth2.ts - WIP: Will handle OAuth2 authentication flows.
+    mfa.ts - WIP: Will implement multi-factor authentication.
+    social.ts - WIP: Will manage social login integrations.
   /cli
-    index.ts
-    generate-plugin.ts
-    list-permissions.ts
-    check-access.ts
+    index.ts - Entry point for command-line interface (CLI) operations.
+  /db
+    db-client.ts - Provides database client setup and connections.
+  /http
+    /adapters
+      express-adapter.ts - Adapter for integrating with Express.js.
+      fastify-adapter.ts - Adapter for integrating with Fastify.
+    /api
+      auth.ts - Manages authentication-related API routes.
+      contexts.ts - Handles context-related API routes.
+      permissions.ts - Manages permission-related API routes.
+      roles.ts - Handles role-related API routes.
+      users.ts - Manages user-related API routes.
+    authorize.ts - Middleware for handling authorization logic.
+  /permissions
+    effective-permissions.ts - Calculates effective permissions for users.
+    permission-registry.ts - Manages the registration and lookup of permissions.
+    wildcard-utils.ts - Provides utilities for handling wildcard permissions.
+  /policy
+    policy.ts - Defines policies for route permissions and access control.
+  /services
+    audit-service.ts - Provides auditing capabilities for logging actions.
+    context-service.ts - Manages context operations and resolutions.
+    role-service.ts - Handles role management and operations.
+    user-permission-service.ts - Manages user permissions and operations.
+  /tests
+    audit.test.ts - Tests for auditing functionality.
+    auth.test.ts - Tests for authentication functionality.
+    authz.test.ts - Tests for authorization middleware.
+    context.test.ts - Tests for context management.
+    e2e.access-flows.test.ts - End-to-end tests for access flows.
+    e2e.auth.test.ts - End-to-end tests for authentication.
+    e2e.roles.test.ts - End-to-end tests for role management.
+    e2e.routes.test.ts - End-to-end tests for route handling.
+    permissions.test.ts - Tests for permission management.
+/dev.ts - Development script for bootstrapping the application.
+/index.ts - Main entry point for the application.
 /prisma
-  schema.prisma
-/types
-  permissions.ts
-  roles.ts
-  contexts.ts
-/tests
-  fixtures/
-  authz.test.ts
-  context.test.ts
-  plugin.test.ts
-index.ts
-package.json
+  schema.prisma - Defines the database schema using Prisma.
+index.ts - Main entry point for the application.
+package.json - Contains project metadata and dependencies.
 ```
 
 ---
 
-## **5️⃣ Core DB Schema (Prisma)**
+## Core DB Schema (Prisma)
 
-* Tables: `User`, `Role`, `Permission`, `UserPermission`, `RolePermission`, `UserRole`, `Context`, `UserContext`, `AuditLog`.
-* Row-level scoping and hierarchical contexts supported.
-* Plugin permissions synced at boot via `PermissionRegistry`.
-* MVP implemented now: `Permission` (DB-backed) with registry init/sync. Remaining tables are planned.
-
----
-
-## **6️⃣ Developer Experience Goals**
-
-* **Hot-reloadable permissions** for plugin devs.
-* **Type-safe permissions & roles** in TypeScript.
-* Minimal friction to add a plugin: `registerPlugin()`.
-* **CLI tooling** for inspecting permissions and simulating access.
-* Clear logging & audit trail for debugging and security.
+- Tables: `User`, `Role`, `Permission`, `UserPermission`, `RolePermission`, `UserRole`, `Context`, `UserContext`, `AuditLog`, `RevokedToken`, `PasswordResetToken`.
+- Row-level scoping and V2: hierarchical contexts supported.
+- Plugin permissions synced at boot via `PermissionRegistry`.
+- All tables implemented and functional.
 
 ---
 
-# **Lattice Core Roadmap Checklist (Prioritized)**
+## Developer Experience Goals
 
-### **Phase 1 — Core MVP**
-
-* [x] Prisma schema + SQLite dev DB setup (Postgres pending)
-* [x] User authentication (password + JWT access/refresh)
-* [x] Permission registry (in-memory + Prisma-backed with DB sync)
-* [x] Role & UserPermission tables + effective permission lookup
-* [x] Context service + resolver (route/query/header)
-* [x] AuthZ middleware (context + wildcard support)
-* [x] Plugin system skeleton (register plugins, register routes). Full plugin packaging/examples pending.
-* [x] Fastify + Express adapter skeleton (core features wired; parity features pending)
-* [x] CLI: list-permissions, check-access
-* [x] Minimal unit tests (auth, permissions, context)
-* [x] Input validation (Zod) on built-in REST APIs
+- WIP: **Hot-reloadable permissions** for plugin devs.
+- **Type-safe permissions & roles** in TypeScript.
+- WIP: Minimal friction to add a plugin: `registerPlugin()`.
+- **CLI tooling** for inspecting permissions and simulating access.
+- Clear logging & audit trail for debugging and security.
 
 ---
 
-### **Phase 1.5 — DX & Scalability**
+# Lattice Core Roadmap Checklist (Prioritized)
 
-* [ ] Hierarchical contexts (parent → child)
-* [ ] Hot-reloadable plugin permissions at runtime
-* [ ] Caching layer for effective permissions (Redis)
-* [x] Audit logging
- Implemented full-featured:
-Schema: added actorId, targetUserId, requestId, ip, userAgent, resourceType, resourceId, plugin, error, indexes.
-Config: audit in CoreSaaS supports enable/disable, sampleRate, redactKeys, sinks (db/stdout).
-Service: logs now accept enriched fields and respect config.
-Wired existing calls to use actorId vs targetUserId.
-Tests: added src/tests/audit.test.ts to verify enabled/disabled behavior.
-  - Implemented MVP: permission checks, token issued events, role assign/remove, role perm grant/revoke, user perm grant/revoke logged to `AuditLog`.
-* [ ] CLI: generate-plugin scaffolding
-* [ ] TypeScript types for permissions, roles, contexts
-* [ ] Testing utilities / fixtures for devs
-* [ ] Adapter parity improvements (Express vs Fastify features)
-* [ ] Lifecycle hooks framework (`core.hooks`) with typed registration and execution
-* [ ] Emit hooks for: onUserCreated/onUserDeleted, onRoleCreated/onRoleDeleted, onPermissionAdded/onPermissionRemoved, onContextCreated/onContextDeleted, onUserAddedToContext/onUserRemovedFromContext, onTokenIssued/onTokenRevoked, onPluginRegistered/onPluginUnregistered. Don't forget also hooks for role assignment, role removal, etc
-* [ ] Hook execution policy (sequential vs parallel where safe) and cancelation support
-* [ ] Hook tests and docs
+### Phase 1 — Core MVP
 
-### Context-type Aware Permissions (Implemented)
-
-- Updated `checkAccess` to accept `{ type, id }` for context scoping
-- Extended schema with `contextType` on `UserPermission`, `RolePermission`, and `UserRole`
-- Matching order: exact (type+id) → type-wide (type+null) → global (null+null)
-- Wildcards preserved in permission keys (e.g., `example:*`)
-- REST endpoints accept `{ contextType, contextId }` (backfills type from `Context` when only id is given)
-- E2E tests cover exact/type-wide/global flows
-- Role assignments are context-type aware (validates type matches context)
-- Type-wide operations (e.g., role-permission grants) require global scope
-- Scope enforcement in authorize middleware:
-  - `exact`: Requires permission in exact context (or global)
-  - `global`: Requires global permission (null context)
-  - `type-wide`: Requires permission for context type
-
-### Role Management & Permissions
-
-Core implements a context-type aware role management system with strict permission requirements:
-
-1. **Role Operations**:
-   - Creating/managing roles requires type-specific permission (e.g., `roles:team:create` for team roles)
-   - Role operations are scoped to their context type (team roles can only be used in team contexts)
-   - Global operations (like listing all roles) require type-wide permission
-
-2. **Role-Permission Grants**:
-   To grant a permission to a role, you need BOTH:
-   - Permission to manage roles of that type (`roles:team:manage`)
-   - Permission to grant the specific permission in that context type (`permissions:read:grant:team`)
-   
-3. **Role Assignments**:
-   - Assigning roles requires exact context permission
-   - Context type is validated (can't assign team role in org context)
-   - Role assignments are always context-specific
-
-Example policy configuration:
-```ts
-policy: {
-  roles: {
-    // Role management (type-scoped)
-    create: 'roles:{type}:create',     // Can create roles of type {type}
-    get: 'roles:{type}:read',         // Can read roles of type {type}
-    list: 'roles:{type}:list',        // Can list roles of type {type}
-    delete: 'roles:{type}:delete',    // Can delete roles of type {type}
-    manage: 'roles:{type}:manage',    // Can manage roles of type {type}
-    
-    // Role assignments (context-scoped)
-    assign: 'roles:assign',          // Can assign roles in specific contexts
-    remove: 'roles:remove',          // Can remove roles in specific contexts
-    
-    // Permission operations (requires both role management and permission grant)
-    addPerm: {
-      roleManage: 'roles:{type}:manage',                  // Must have role management
-      permissionGrant: 'permissions:{perm}:grant:{type}'  // Must have grant permission
-    },
-    removePerm: {
-      roleManage: 'roles:{type}:manage',                  // Must have role management
-      permissionRevoke: 'permissions:{perm}:revoke:{type}'// Must have revoke permission
-    }
-  }
-}
-```
-
-### **Phase 2 — Full End-State Core**
-
-* [ ] Versioned permissions (track plugin changes, deprecation)
-* [ ] Advanced auth integration (MFA, OTP, social login)
-* [ ] Multi-context requests (resolve conflicts hierarchically)
-* [ ] Metrics & observability for permission checks
-* [ ] Starter guide & visual request flow for devs
-* [ ] Optional hooks for admin/dashboard UI integration
-* [ ] Plugin ecosystem examples (Teams, Billing, Uploads, Metrics)
+- [x] Prisma schema + SQLite dev DB setup (Postgres pending)
+- [x] User authentication (password + JWT access/refresh)
+- [x] Permission registry (in-memory + Prisma-backed with DB sync)
+- [x] Role & UserPermission tables + effective permission lookup
+- [x] Context service + resolver (route/query/header)
+- [x] AuthZ middleware (context + wildcard support)
+- [x] Plugin system skeleton (register plugins, register routes). Full plugin packaging/examples pending.
+- [x] Fastify + Express adapter skeleton (core features wired; parity features pending)
+- [x] CLI: list-permissions, check-access
+- [x] Minimal unit tests (auth, permissions, context)
+- [x] Input validation (Zod) on built-in REST APIs
 
 ---
 
+### Phase 1.5 — DX & Scalability
 
-## **7️⃣ Lifecycle Hooks**
+- [ ] Hierarchical contexts (parent → child)
+- [ ] Hot-reloadable plugin permissions at runtime
+- [ ] Caching layer for effective permissions (Redis)
+- [x] Audit logging
+  - Implemented full-featured:
+    - Schema: added actorId, targetUserId, requestId, ip, userAgent, resourceType, resourceId, plugin, error, indexes.
+    - Config: audit in CoreSaaS supports enable/disable, sampleRate, redactKeys, sinks (db/stdout).
+    - Service: logs now accept enriched fields and respect config.
+    - Wired existing calls to use actorId vs targetUserId.
+    - Tests: added src/tests/audit.test.ts to verify enabled/disabled behavior.
+    - Permission checks, token issued events, role assign/remove, role perm grant/revoke, user perm grant/revoke logged to `AuditLog`.
+- [ ] CLI: generate-plugin scaffolding
+- [ ] TypeScript types for permissions, roles, contexts
+- [ ] Testing utilities / fixtures for devs
+- [ ] Adapter parity improvements (Express vs Fastify features)
+- [ ] Lifecycle hooks framework (`core.hooks`) with typed registration and execution
+- [ ] Emit hooks for: onUserCreated/onUserDeleted, onRoleCreated/onRoleDeleted, onPermissionAdded/onPermissionRemoved, onContextCreated/onContextDeleted, onUserAddedToContext/onUserRemovedFromContext, onTokenIssued/onTokenRevoked, onPluginRegistered/onPluginUnregistered. Don't forget also hooks for role assignment, role removal, etc
+- [ ] Hook execution policy (sequential vs parallel where safe) and cancelation support
+- [ ] Hook tests and docs
+
+---
+
+### Phase 2 — Full End-State Core
+
+- [ ] Versioned permissions (track plugin changes, deprecation)
+- [ ] Advanced auth integration (MFA, OTP, social login)
+- [ ] Multi-context requests (resolve conflicts hierarchically)
+- [ ] Metrics & observability for permission checks
+- [ ] Starter guide & visual request flow for devs
+- [ ] Optional hooks for admin/dashboard UI integration
+- [ ] Plugin ecosystem examples (Teams, Billing, Uploads, Metrics)
+
+---
+
+## Lifecycle Hooks (WIP)
 
 | **Hook**                                     | **Trigger**                             | **Purpose / Example Use Cases**                                           |
 | -------------------------------------------- | --------------------------------------- | ------------------------------------------------------------------------- |
@@ -256,10 +189,9 @@ policy: {
 | **onSystemStartup()**                        | When Lattice Core boots                 | Warm caches, register all permissions, run health checks                  |
 | **onSystemShutdown()**                       | When Lattice Core shuts down            | Flush logs, cleanup temporary data, notify monitoring tools               |
 
+---
 
-
-
-Implementation Notes
+## Implementation Notes
 
 - Hook registration is centralized in `core.hooks`:
 
@@ -299,7 +231,70 @@ Both hooks execute automatically when `createUser()` is called. Devs can mix per
 
 ---
 
-## **8️⃣ Roles Quickstart**
+## Context-type Aware Permissions (Implemented)
+
+- Updated `checkAccess` to accept `{ type, id }` for context scoping
+- Extended schema with `contextType` on `UserPermission`, `RolePermission`, and `UserRole`
+- Matching order: exact (type+id) → type-wide (type+null) → global (null+null)
+- Wildcards preserved in permission keys (e.g., `example:*`)
+- REST endpoints accept `{ contextType, contextId }` (backfills type from `Context` when only id is given)
+- E2E tests cover exact/type-wide/global flows
+- Role assignments are context-type aware (validates type matches context)
+- Type-wide operations (e.g., role-permission grants) require global scope
+- Scope enforcement in authorize middleware:
+  - `exact`: Requires permission in exact context (or global)
+  - `global`: Requires global permission (null context)
+  - `type-wide`: Requires permission for context type
+
+### Role Management & Permissions (Implemented)
+
+Core implements a context-type aware role management system with strict permission requirements:
+
+1. **Role Operations**:
+   - Creating/managing roles requires type-specific permission (e.g., `roles:team:create` for team roles)
+   - Role operations are scoped to their context type (team roles can only be used in team contexts)
+   - Global operations (like listing all roles) require type-wide permission
+
+2. **Role-Permission Grants**:
+   To grant a permission to a role, you need BOTH:
+   - Permission to manage roles of that type (`roles:team:manage`)
+   - Permission to grant the specific permission in that context type (`permissions:read:grant:team`)
+   
+3. **Role Assignments**:
+   - Assigning roles requires exact context permission
+   - Context type is validated (can't assign team role in org context)
+   - Role assignments are always context-specific
+
+Example policy configuration:
+
+```ts
+policy: {
+  roles: {
+    // Role management (type-scoped)
+    create: 'roles:{type}:create',     // Can create roles of type {type}
+    get: 'roles:{type}:read',         // Can read roles of type {type}
+    list: 'roles:{type}:list',        // Can list roles of type {type}
+    delete: 'roles:{type}:delete',    // Can delete roles of type {type}
+    manage: 'roles:{type}:manage',    // Can manage roles of type {type}
+    
+    // Role assignments (context-scoped)
+    assign: 'roles:assign',          // Can assign roles in specific contexts
+    remove: 'roles:remove',          // Can remove roles in specific contexts
+    
+    // Permission operations (requires both role management and permission grant)
+    addPerm: {
+      roleManage: 'roles:{type}:manage',                  // Must have role management
+      permissionGrant: 'permissions:{perm}:grant:{type}'  // Must have grant permission
+    },
+    removePerm: {
+      roleManage: 'roles:{type}:manage',                  // Must have role management
+      permissionRevoke: 'permissions:{perm}:revoke:{type}'// Must have revoke permission
+    }
+  }
+}
+```
+
+## Roles Quickstart
 
 CLI examples:
 
@@ -332,7 +327,7 @@ await roles.addPermissionToRole({ roleName: 'admin', permissionKey: 'example:rea
 
 ---
 
-## **9️⃣ Audit Logging (Full)**
+## Audit Logging (Full)
 
 Capabilities:
 - Events: permission.check (success/failure), context.resolve, token.issued/token.revoked, role.created/role.deleted, role.assigned/role.removed, permission.user.granted/permission.user.revoked, permission.role.granted/permission.role.revoked.
@@ -341,6 +336,7 @@ Capabilities:
 - Toggle via `audit` in `CoreSaaS` config.
 
 Example:
+
 ```ts
 const app = CoreSaaS({
   db: { provider: 'sqlite' },
@@ -352,7 +348,7 @@ const app = CoreSaaS({
 
 ---
 
-## **10️⃣ Setup & Quickstart (SQLite Dev)**
+## Setup & Quickstart (SQLite Dev)
 
 ### Route-level Permissions & Scoping
 
@@ -547,4 +543,3 @@ Next to consider:
 - CLI additions (generate-plugin, audit queries) and docs for Roles API and route-permission matrix
 - Proper email implementation for user reset and so on
 - Hooks
-

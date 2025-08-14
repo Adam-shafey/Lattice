@@ -1,5 +1,5 @@
 import { CoreSaaSApp } from '../../../index';
-import { RoleService } from '../../roles/role-service';
+import { RoleService } from '../../services/role-service';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 

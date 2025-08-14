@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import minimist from 'minimist';
 import { CoreSaaS } from '../../index';
-import { RoleService } from '../roles/role-service';
+import { RoleService } from '../services/role-service';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 

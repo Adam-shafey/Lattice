@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ContextService } from '../core/context/context-service';
+import { ContextService } from '../core/services/context-service';
 
 describe('context resolver', () => {
   const service = new ContextService();

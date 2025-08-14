@@ -1,4 +1,4 @@
-import { CoreSaaSApp } from '../../../index';
+import { CoreSaaSApp } from '../../index';
 
 type AuthorizeScope = 'exact' | 'global' | 'type-wide';
 

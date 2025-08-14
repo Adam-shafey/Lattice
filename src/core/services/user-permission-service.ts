@@ -1,5 +1,5 @@
 import { getDbClient } from '../db/db-client';
-import { AuditService } from '../audit/audit-service';
+import { AuditService } from '../../services/audit-service';
 
 export class UserPermissionService {
   private readonly audit = new AuditService();
