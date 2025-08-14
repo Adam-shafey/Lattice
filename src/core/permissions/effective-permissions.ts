@@ -2,18 +2,23 @@ import { getDbClient } from '../db/db-client';
 
 export interface EffectivePermissionsQuery {
   userId: string;
-  contextId?: string | null;
+  context?: { type: string; id: string } | null;
 }
 
-export async function fetchEffectivePermissions({ userId, contextId }: EffectivePermissionsQuery): Promise<Set<string>> {
+export async function fetchEffectivePermissions({ userId, context }: EffectivePermissionsQuery): Promise<Set<string>> {
   const db = getDbClient();
-  const targetContextId = contextId ?? null;
+  const targetContextId = context?.id ?? null;
+  const targetContextType = context?.type ?? null;
 
   // Gather user direct permissions (global and in-context)
   const userPerms = await db.userPermission.findMany({
     where: {
       userId,
-      OR: [{ contextId: null }, { contextId: targetContextId }],
+      OR: [
+        { contextId: null, contextType: null }, // global
+        { contextId: null, contextType: targetContextType }, // type-wide
+        { contextId: targetContextId }, // exact (FK)
+      ],
     },
     include: { permission: true },
   });
@@ -33,7 +38,11 @@ export async function fetchEffectivePermissions({ userId, contextId }: Effective
     ? await db.rolePermission.findMany({
         where: {
           roleId: { in: roleIds },
-          OR: [{ contextId: null }, { contextId: targetContextId }],
+          OR: [
+            { contextId: null, contextType: null },
+            { contextId: null, contextType: targetContextType },
+            { contextId: targetContextId },
+          ],
         },
         include: { permission: true },
       })

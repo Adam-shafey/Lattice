@@ -16,7 +16,7 @@ describe('E2E: access flows (roles, permissions, contexts, bearer)', () => {
     const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
     const f = app.fastify!;
 
-    // Protected routes
+    // Protected routes (pass type via header)
     app.route({ method: 'GET', path: '/read/:contextId', preHandler: app.authorize('example:read', { contextRequired: true }), handler: async () => ({ ok: true }) });
     app.route({ method: 'GET', path: '/write/:contextId', preHandler: app.authorize('example:write', { contextRequired: true }), handler: async () => ({ ok: true }) });
 
@@ -34,10 +34,10 @@ describe('E2E: access flows (roles, permissions, contexts, bearer)', () => {
     await roleService.assignRoleToUser({ roleName: 'viewer', userId, contextId: 'ctx_1' });
 
     // Access ctx_1 allowed
-    const r1 = await f.inject({ method: 'GET', url: '/read/ctx_1', headers: { 'x-user-id': userId } });
+    const r1 = await f.inject({ method: 'GET', url: '/read/ctx_1', headers: { 'x-user-id': userId, 'x-context-type': 'team' } });
     expect(r1.statusCode).toBe(200);
     // Access ctx_2 denied
-    const r2 = await f.inject({ method: 'GET', url: '/read/ctx_2', headers: { 'x-user-id': userId } });
+    const r2 = await f.inject({ method: 'GET', url: '/read/ctx_2', headers: { 'x-user-id': userId, 'x-context-type': 'team' } });
     expect(r2.statusCode).toBe(403);
 
     // Grant user-level write permission in ctx_2
@@ -45,7 +45,7 @@ describe('E2E: access flows (roles, permissions, contexts, bearer)', () => {
     const perm = await db.permission.findUniqueOrThrow({ where: { key: 'example:write' } });
     await db.userPermission.create({ data: { id: `${userId}-${perm.id}-ctx_2`, userId, permissionId: perm.id, contextId: 'ctx_2' } });
     // Now write on ctx_2 should pass
-    const r3 = await f.inject({ method: 'GET', url: '/write/ctx_2', headers: { 'x-user-id': userId } });
+    const r3 = await f.inject({ method: 'GET', url: '/write/ctx_2', headers: { 'x-user-id': userId, 'x-context-type': 'team' } });
     expect(r3.statusCode).toBe(200);
   });
 
@@ -63,7 +63,7 @@ describe('E2E: access flows (roles, permissions, contexts, bearer)', () => {
     });
 
     const email = `b_${Date.now()}@example.com`;
-    const user = await db.user.create({ data: { email, passwordHash: await (await import('bcryptjs')).default.hash('pw', 10) } });
+    const user = await db.user.create({ data: { email, passwordHash: await (await import('bcryptjs')).default.hash('secret1', 10) } });
 
     // Prepare permission via role (global)
     await roleService.createRole('viewer2');
@@ -71,7 +71,7 @@ describe('E2E: access flows (roles, permissions, contexts, bearer)', () => {
     await roleService.assignRoleToUser({ roleName: 'viewer2', userId: user.id, contextId: null });
 
     // Login to get tokens
-    const login = await f.inject({ method: 'POST', url: '/auth/login', payload: { email, password: 'pw' } });
+    const login = await f.inject({ method: 'POST', url: '/auth/login', payload: { email, password: 'secret1' } });
     const { accessToken } = login.json() as any;
 
     const okRes = await f.inject({ method: 'GET', url: '/bear/ctx_any', headers: { authorization: `Bearer ${accessToken}` } });

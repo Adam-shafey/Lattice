@@ -9,6 +9,11 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         (req?.headers?.['x-context-id'] as string) ||
         (req?.query?.['contextId'] as string) ||
         null;
+      const contextType: string | null =
+        (req?.params?.['contextType'] as string) ||
+        (req?.headers?.['x-context-type'] as string) ||
+        (req?.query?.['contextType'] as string) ||
+        null;
 
       const send = (statusCode: number, body: any) => {
         if (typeof res?.status === 'function') {
@@ -30,7 +35,7 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         return send(400, err);
       }
 
-      const allowed = await app.checkAccess({ userId, contextId: contextId ?? undefined, permission: requiredPermission });
+      const allowed = await app.checkAccess({ userId, context: contextId ? { id: contextId, type: contextType ?? 'unknown' } : null, permission: requiredPermission });
 
       if (!allowed) {
         try {

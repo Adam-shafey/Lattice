@@ -51,7 +51,7 @@ export interface LatticePlugin {
 
 export interface CheckAccessInput {
   userId: string;
-  contextId?: string | null;
+  context?: { type: string; id: string } | null;
   permission: string;
 }
 
@@ -116,10 +116,10 @@ export class CoreSaaSApp {
   }
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
-    const { userId, contextId, permission } = input;
+    const { userId, context, permission } = input;
     let effective: Set<string> = new Set();
     try {
-      effective = await fetchEffectivePermissions({ userId, contextId: contextId ?? null });
+      effective = await fetchEffectivePermissions({ userId, context: context ?? null });
     } catch {
       // If DB lookup fails (e.g., tests without DB), fall back to empty set
       effective = new Set();
@@ -127,8 +127,8 @@ export class CoreSaaSApp {
     const merged = new Set<string>([...effective]);
     const global = this.userGrants.get(userId);
     if (global) for (const p of global) merged.add(p);
-    if (contextId) {
-      const byUser = this.userContextGrants.get(userId)?.get(contextId);
+    if (context?.id) {
+      const byUser = this.userContextGrants.get(userId)?.get(context.id);
       if (byUser) for (const p of byUser) merged.add(p);
     }
     return this.permissionRegistry.isAllowed(permission, merged);

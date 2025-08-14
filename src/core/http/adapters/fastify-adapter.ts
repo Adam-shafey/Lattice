@@ -16,8 +16,13 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
         (request.headers['x-context-id'] as string) ||
         (request.query as Record<string, string | undefined>)?.['contextId'] ||
         null;
+      const contextType =
+        (request.params as Record<string, string | undefined>)?.['contextType'] ||
+        (request.headers['x-context-type'] as string) ||
+        (request.query as Record<string, string | undefined>)?.['contextType'] ||
+        null;
 
-      const context = contextId ? { id: contextId } : null;
+      const context = contextId ? { id: contextId, type: contextType ?? 'unknown' } : null;
       const user = userId ? { id: userId } : null;
 
       const result = await handler({

@@ -75,6 +75,7 @@ model RolePermission {
   roleId       String
   permissionId String
   contextId    String?  // null = global
+  contextType  String?  // e.g., 'team' for type-wide when contextId is null
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -84,6 +85,7 @@ model RolePermission {
 
   @@unique([roleId, permissionId, contextId])
   @@index([roleId, contextId])
+  @@index([roleId, contextType, contextId])
 }
 
 model UserPermission {
@@ -91,6 +93,7 @@ model UserPermission {
   userId       String
   permissionId String
   contextId    String?  // null = global
+  contextType  String?  // e.g., 'team' for type-wide when contextId is null
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -100,6 +103,7 @@ model UserPermission {
 
   @@unique([userId, permissionId, contextId])
   @@index([userId, contextId])
+  @@index([userId, contextType, contextId])
 }
 
 model UserContext {

@@ -21,8 +21,13 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
         (req.header('x-context-id') as string) ||
         (req.query?.['contextId'] as string) ||
         null;
+      const contextType =
+        (req.params?.['contextType'] as string) ||
+        (req.header('x-context-type') as string) ||
+        (req.query?.['contextType'] as string) ||
+        null;
 
-      const context = contextId ? { id: contextId } : null;
+      const context = contextId ? { id: contextId, type: contextType ?? 'unknown' } : null;
       const user = userId ? { id: userId } : null;
 
       const result = await handler({

@@ -76,6 +76,7 @@ Lattice Core is the **foundation of a permission-first SaaS backend**, providing
       users.ts
       permissions.ts
       contexts.ts
+      roles.ts
   /cache
     redis-client.ts
     permission-cache.ts
@@ -138,6 +139,7 @@ package.json
 * [x] Fastify + Express adapter skeleton (core features wired; parity features pending)
 * [x] CLI: list-permissions, check-access
 * [x] Minimal unit tests (auth, permissions, context)
+* [x] Input validation (Zod) on built-in REST APIs
 
 ---
 
@@ -162,6 +164,15 @@ Tests: added src/tests/audit.test.ts to verify enabled/disabled behavior.
 * [ ] Emit hooks for: onUserCreated/onUserDeleted, onRoleCreated/onRoleDeleted, onPermissionAdded/onPermissionRemoved, onContextCreated/onContextDeleted, onUserAddedToContext/onUserRemovedFromContext, onTokenIssued/onTokenRevoked, onPluginRegistered/onPluginUnregistered. Don't forget also hooks for role assignment, role removal, etc
 * [ ] Hook execution policy (sequential vs parallel where safe) and cancelation support
 * [ ] Hook tests and docs
+
+### Context-type Aware Permissions (Implemented)
+
+- Updated `checkAccess` to accept `{ type, id }` for context scoping
+- Extended schema with `contextType` on `UserPermission` and `RolePermission`
+- Matching order: exact (type+id) → type-wide (type+null) → global (null+null)
+- Wildcards preserved in permission keys (e.g., `example:*`)
+- REST endpoints accept `{ contextType, contextId }` (backfills type from `Context` when only id is given)
+- E2E tests cover exact/type-wide/global flows
 
 ---
 
@@ -300,6 +311,10 @@ Defaults:
 
 ```ts
 policy: {
+  roles: {
+    create: 'roles:create', get: 'roles:read', list: 'roles:read', delete: 'roles:delete',
+    assign: 'roles:assign', remove: 'roles:assign', addPerm: 'roles:permissions:grant', removePerm: 'roles:permissions:revoke'
+  },
   users: {
     create: 'users:create', list: 'users:read', get: 'users:read', update: 'users:update', delete: 'users:delete'
   },
@@ -316,13 +331,75 @@ Override example:
 
 ```ts
 const app = CoreSaaS({
-  ...,
+  // ...
   policy: {
     users: { create: 'admin:users:create' },
     permissions: { grantUser: 'security:grant' },
   }
 })
 ```
+
+### Route–Permission Matrix
+
+| Route | Method | Required permission key (default) |
+| ----- | ------ | ---------------------------------- |
+| `/users` | POST | `users:create` |
+| `/users` | GET | `users:read` |
+| `/users/:id` | GET | `users:read` |
+| `/users/:id` | PUT | `users:update` |
+| `/users/:id` | DELETE | `users:delete` |
+| `/permissions/user/grant` | POST | `permissions:grant` |
+| `/permissions/user/revoke` | POST | `permissions:revoke` |
+| `/contexts` | POST | `contexts:create` |
+| `/contexts/:id` | GET | `contexts:read` |
+| `/contexts/:id` | PUT | `contexts:update` |
+| `/contexts/:id` | DELETE | `contexts:delete` |
+| `/contexts/:id/users/add` | POST | `contexts:assign` |
+| `/contexts/:id/users/remove` | POST | `contexts:assign` |
+| `/roles` | POST | `roles:create` |
+| `/roles` | GET | `roles:read` |
+| `/roles/:name` | GET | `roles:read` |
+| `/roles/:name` | DELETE | `roles:delete` |
+| `/roles/assign` | POST | `roles:assign` |
+| `/roles/remove` | POST | `roles:assign` |
+| `/roles/:name/permissions/add` | POST | `roles:permissions:grant` |
+| `/roles/:name/permissions/remove` | POST | `roles:permissions:revoke` |
+
+All keys are developer-overridable via the `policy` option.
+
+### Input Validation (Zod)
+
+All REST inputs are validated with Zod. Invalid payloads return a consistent error shape:
+
+```json
+{
+  "error": "Invalid input",
+  "issues": [
+    {
+      "code": "invalid_string",
+      "path": ["email"],
+      "message": "Invalid email"
+    }
+  ]
+}
+```
+
+### Roles API
+
+Endpoints (all guarded by policy):
+- POST `/roles` { name }
+- GET `/roles`
+- GET `/roles/:name`
+- DELETE `/roles/:name`
+- POST `/roles/assign` { roleName, userId, contextId? }
+- POST `/roles/remove` { roleName, userId, contextId? }
+- POST `/roles/:name/permissions/add` { permissionKey, contextId? }
+- POST `/roles/:name/permissions/remove` { permissionKey, contextId? }
+
+Policy keys used:
+- `roles.create`, `roles.list`, `roles.get`, `roles.delete`, `roles.assign`, `roles.remove`, `roles.addPerm`, `roles.removePerm`
+
+All input is validated with Zod.
 
 1. Environment
    - Node.js 18+
@@ -357,12 +434,15 @@ Done now:
 - E2E tests for auth/login/refresh, protected routes, role/permission flows, context membership
 - Full audit logging with config and request metadata
 - Policy overrides for route permissions
+- Input validation on all REST endpoints (Zod)
 
 Next to consider:
-- Validation on all endpoints (add zod) and better error normalization
+- Better error normalization/translation
 - Hierarchical contexts with inheritance
 - Prisma migrations for all environments, plus indexes for hot queries
 - Rate limiting, password policy, secure reset delivery
 - Caching (Redis) for effective permissions and ancestor chains
 - CLI additions (generate-plugin, audit queries) and docs for Roles API and route-permission matrix
+- Proper email implementation for user reset and so on
+- Hooks
 

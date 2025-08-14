@@ -3,6 +3,7 @@ import { CoreSaaSApp } from '../../index';
 import { getDbClient } from '../db/db-client';
 import { createJwtUtil } from './jwt';
 import { randomUUID } from 'crypto';
+import { z } from 'zod';
 
 function getJwt() {
   const secret = process.env.JWT_SECRET || 'dev-secret';
@@ -55,7 +56,10 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     method: 'POST',
     path: '/auth/login',
     handler: async ({ body }) => {
-      const { email, password } = body as { email: string; password: string };
+      const schema = z.object({ email: z.string().email(), password: z.string().min(6) });
+      const parsed = schema.safeParse(body);
+      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+      const { email, password } = parsed.data;
       const user = await db.user.findUnique({ where: { email } });
       if (!user) return { error: 'Invalid credentials' };
       const ok = await bcrypt.compare(password, user.passwordHash);
@@ -72,7 +76,10 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     method: 'POST',
     path: '/auth/refresh',
     handler: async ({ body }) => {
-      const { refreshToken } = body as { refreshToken: string };
+      const schema = z.object({ refreshToken: z.string().min(1) });
+      const parsed = schema.safeParse(body);
+      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+      const { refreshToken } = parsed.data;
       const payload = jwt.verify(refreshToken) as any;
       const userId = payload?.sub as string | undefined;
       const jti = payload?.jti as string | undefined;
@@ -98,7 +105,10 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     path: '/auth/revoke',
     preHandler: requireAuthMiddleware(),
     handler: async ({ body, user }) => {
-      const { token } = body as { token: string };
+      const schema = z.object({ token: z.string().min(1) });
+      const parsed = schema.safeParse(body);
+      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+      const { token } = parsed.data;
       const payload = jwt.verify(token) as any;
       const jti = payload?.jti as string | undefined;
       if (!jti) return { ok: true };
@@ -114,7 +124,10 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     path: '/auth/password/change',
     preHandler: requireAuthMiddleware(),
     handler: async ({ body, user }) => {
-      const { oldPassword, newPassword } = body as { oldPassword: string; newPassword: string };
+      const schema = z.object({ oldPassword: z.string().min(6), newPassword: z.string().min(6) });
+      const parsed = schema.safeParse(body);
+      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+      const { oldPassword, newPassword } = parsed.data;
       const existing = await db.user.findUnique({ where: { id: user!.id } });
       if (!existing) return { error: 'Invalid user' };
       const ok = await bcrypt.compare(oldPassword, existing.passwordHash);
@@ -130,7 +143,10 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     method: 'POST',
     path: '/auth/password/reset/request',
     handler: async ({ body }) => {
-      const { email } = body as { email: string };
+      const schema = z.object({ email: z.string().email() });
+      const parsed = schema.safeParse(body);
+      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+      const { email } = parsed.data;
       const user = await db.user.findUnique({ where: { email } });
       if (!user) return { ok: true };
       const token = randomUUID();
@@ -146,7 +162,10 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     method: 'POST',
     path: '/auth/password/reset/confirm',
     handler: async ({ body }) => {
-      const { token, newPassword } = body as { token: string; newPassword: string };
+      const schema = z.object({ token: z.string().min(1), newPassword: z.string().min(6) });
+      const parsed = schema.safeParse(body);
+      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+      const { token, newPassword } = parsed.data;
       const row = await db.passwordResetToken.findUnique({ where: { token } });
       if (!row || row.expiresAt < new Date()) return { error: 'Invalid token' };
       const passwordHash = await bcrypt.hash(newPassword, 10);
