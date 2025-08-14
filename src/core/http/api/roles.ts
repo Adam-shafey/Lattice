@@ -59,11 +59,11 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     path: '/roles/assign',
     preHandler: app.authorize(policy.roles!.assign),
     handler: async ({ body, req }) => {
-      const schema = z.object({ roleName: z.string().min(1), userId: z.string().min(1), contextId: z.string().min(1).optional() });
+      const schema = z.object({ roleName: z.string().min(1).optional(), roleKey: z.string().uuid().optional(), userId: z.string().min(1), contextId: z.string().min(1).optional() }).refine((d) => d.roleName || d.roleKey, { message: 'roleName or roleKey required' });
       const parsed = schema.safeParse(body);
       if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { roleName, userId, contextId } = parsed.data;
-      await rs.assignRoleToUser({ roleName, userId, contextId, actorId: (req?.user?.id as string) ?? null, source: 'api' });
+      const { roleName, roleKey, userId, contextId } = parsed.data;
+      await rs.assignRoleToUser({ roleName, roleKey, userId, contextId, actorId: (req?.user?.id as string) ?? null, source: 'api' });
       return { ok: true };
     },
   });
@@ -73,11 +73,11 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     path: '/roles/remove',
     preHandler: app.authorize(policy.roles!.remove),
     handler: async ({ body, req }) => {
-      const schema = z.object({ roleName: z.string().min(1), userId: z.string().min(1), contextId: z.string().min(1).optional() });
+      const schema = z.object({ roleName: z.string().min(1).optional(), roleKey: z.string().uuid().optional(), userId: z.string().min(1), contextId: z.string().min(1).optional() }).refine((d) => d.roleName || d.roleKey, { message: 'roleName or roleKey required' });
       const parsed = schema.safeParse(body);
       if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { roleName, userId, contextId } = parsed.data;
-      await rs.removeRoleFromUser({ roleName, userId, contextId, actorId: (req?.user?.id as string) ?? null, source: 'api' });
+      const { roleName, roleKey, userId, contextId } = parsed.data;
+      await rs.removeRoleFromUser({ roleName, roleKey, userId, contextId, actorId: (req?.user?.id as string) ?? null, source: 'api' });
       return { ok: true };
     },
   });
@@ -88,11 +88,12 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     preHandler: app.authorize(policy.roles!.addPerm),
     handler: async ({ params, body, req }) => {
       const ps = z.object({ name: z.string().min(1) }).parse(params);
-      const schema = z.object({ permissionKey: z.string().min(1), contextId: z.string().min(1).optional() });
+      const schema = z.object({ permissionKey: z.string().min(1), contextId: z.string().min(1).optional(), contextType: z.string().min(1).optional() })
+        .refine((d) => !(d.contextId && d.contextType), { message: 'Provide either contextId for exact, or contextType for type-wide, not both' });
       const parsed = schema.safeParse(body);
       if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { permissionKey, contextId } = parsed.data;
-      await rs.addPermissionToRole({ roleName: ps.name, permissionKey, contextId, actorId: (req?.user?.id as string) ?? null, source: 'api' });
+      const { permissionKey, contextId, contextType } = parsed.data;
+      await rs.addPermissionToRole({ roleName: ps.name, permissionKey, contextId, contextType, actorId: (req?.user?.id as string) ?? null, source: 'api' });
       return { ok: true };
     },
   });
@@ -103,11 +104,12 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     preHandler: app.authorize(policy.roles!.removePerm),
     handler: async ({ params, body, req }) => {
       const ps = z.object({ name: z.string().min(1) }).parse(params);
-      const schema = z.object({ permissionKey: z.string().min(1), contextId: z.string().min(1).optional() });
+      const schema = z.object({ permissionKey: z.string().min(1), contextId: z.string().min(1).optional(), contextType: z.string().min(1).optional() })
+        .refine((d) => !(d.contextId && d.contextType), { message: 'Provide either contextId for exact, or contextType for type-wide, not both' });
       const parsed = schema.safeParse(body);
       if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { permissionKey, contextId } = parsed.data;
-      await rs.removePermissionFromRole({ roleName: ps.name, permissionKey, contextId, actorId: (req?.user?.id as string) ?? null, source: 'api' });
+      const { permissionKey, contextId, contextType } = parsed.data;
+      await rs.removePermissionFromRole({ roleName: ps.name, permissionKey, contextId, contextType, actorId: (req?.user?.id as string) ?? null, source: 'api' });
       return { ok: true };
     },
   });
