@@ -1,4 +1,5 @@
 import jwt, { type SignOptions, type Secret } from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 
 export interface JwtConfig {
   secret: string;
@@ -9,11 +10,17 @@ export interface JwtConfig {
 export function createJwtUtil(config: JwtConfig) {
   return {
     signAccess(payload: object): string {
-      const options: SignOptions = { expiresIn: config.accessTTL as unknown as SignOptions['expiresIn'] };
+      const options: SignOptions = {
+        expiresIn: config.accessTTL as unknown as SignOptions['expiresIn'],
+        jwtid: randomUUID(),
+      };
       return jwt.sign(payload as any, config.secret as Secret, options);
     },
     signRefresh(payload: object): string {
-      const options: SignOptions = { expiresIn: config.refreshTTL as unknown as SignOptions['expiresIn'] };
+      const options: SignOptions = {
+        expiresIn: config.refreshTTL as unknown as SignOptions['expiresIn'],
+        jwtid: randomUUID(),
+      };
       return jwt.sign(payload as any, config.secret as Secret, options);
     },
     verify(token: string): unknown {

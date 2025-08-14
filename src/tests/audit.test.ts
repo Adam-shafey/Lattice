@@ -12,7 +12,7 @@ describe('audit logging toggle', () => {
   it('logs when enabled', async () => {
     const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }, audit: { enabled: true } });
     const before = await db.auditLog.count();
-    await app.auditService.log({ action: 'test.event', success: true, userId: null, contextId: null });
+    await app.auditService.log({ action: 'test.event', success: true, actorId: null, contextId: null });
     const after = await db.auditLog.count();
     expect(after).toBe(before + 1);
   });
@@ -20,7 +20,7 @@ describe('audit logging toggle', () => {
   it('does not log when disabled', async () => {
     const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }, audit: { enabled: false } });
     const before = await db.auditLog.count();
-    await app.auditService.log({ action: 'test.event', success: true, userId: null, contextId: null });
+    await app.auditService.log({ action: 'test.event', success: true, actorId: null, contextId: null });
     const after = await db.auditLog.count();
     expect(after).toBe(before);
   });

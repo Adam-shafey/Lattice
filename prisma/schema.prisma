@@ -27,7 +27,9 @@ model User {
   userRoles     UserRole[]
   userPerms     UserPermission[]
   contexts      UserContext[]
-  auditLogs     AuditLog[]
+  auditActorLogs AuditLog[] @relation("AuditActor")
+  auditTargetLogs AuditLog[] @relation("AuditTargetUser")
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Role {
@@ -114,16 +116,48 @@ model UserContext {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  userId      String?
-  action      String
-  contextId   String?
-  success     Boolean
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id            String   @id @default(cuid())
+  actorId       String?
+  targetUserId  String?
+  action        String
+  contextId     String?
+  success       Boolean
+  requestId     String?
+  ip            String?
+  userAgent     String?
+  resourceType  String?
+  resourceId    String?
+  plugin        String?
+  error         String?
+  metadata      Json?
+  createdAt     DateTime @default(now())
 
-  user    User?    @relation(fields: [userId], references: [id])
+  actor   User?    @relation("AuditActor", fields: [actorId], references: [id])
+  target  User?    @relation("AuditTargetUser", fields: [targetUserId], references: [id])
   context Context? @relation(fields: [contextId], references: [id])
+
+  @@index([action, createdAt])
+  @@index([actorId, createdAt])
+  @@index([targetUserId, createdAt])
+  @@index([contextId, createdAt])
+}
+
+model RevokedToken {
+  id        String   @id @default(cuid())
+  jti       String   @unique
+  userId    String?
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  @@index([userId])
 }
 
 

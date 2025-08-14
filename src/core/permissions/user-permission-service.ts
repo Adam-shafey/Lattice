@@ -10,11 +10,12 @@ export class UserPermissionService {
     const id = `${params.userId}-${perm.id}-${params.contextId ?? 'global'}`;
     await db.userPermission.upsert({ where: { id }, update: {}, create: { id, userId: params.userId, permissionId: perm.id, contextId: params.contextId ?? null } });
     await this.audit.log({
-      userId: params.actorId ?? null,
+      actorId: params.actorId ?? null,
+      targetUserId: params.userId,
       contextId: params.contextId ?? null,
       action: 'permission.user.granted',
       success: true,
-      metadata: { targetUserId: params.userId, permissionKey: params.permissionKey, source: params.source, reason: params.reason },
+      metadata: { permissionKey: params.permissionKey, source: params.source, reason: params.reason },
     });
   }
 
@@ -25,11 +26,12 @@ export class UserPermissionService {
     const id = `${params.userId}-${perm.id}-${params.contextId ?? 'global'}`;
     await db.userPermission.delete({ where: { id } }).catch(() => {});
     await this.audit.log({
-      userId: params.actorId ?? null,
+      actorId: params.actorId ?? null,
+      targetUserId: params.userId,
       contextId: params.contextId ?? null,
       action: 'permission.user.revoked',
       success: true,
-      metadata: { targetUserId: params.userId, permissionKey: params.permissionKey, source: params.source, reason: params.reason },
+      metadata: { permissionKey: params.permissionKey, source: params.source, reason: params.reason },
     });
   }
 }

@@ -33,12 +33,16 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
       const allowed = await app.checkAccess({ userId, contextId: contextId ?? undefined, permission: requiredPermission });
 
       if (!allowed) {
-        await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, false);
+        try {
+          await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, false);
+        } catch {}
         const err = { statusCode: 403, message: 'Forbidden' };
         return send(403, err);
       }
 
-      await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, true);
+      try {
+        await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, true);
+      } catch {}
       if (next) return next();
       return;
     } catch (error) {

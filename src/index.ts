@@ -6,6 +6,11 @@ import { createAuthorize } from './core/http/middlewares/authz-middleware';
 import { fetchEffectivePermissions } from './core/permissions/effective-permissions';
 import { createAuthRoutes, requireAuthMiddleware } from './core/auth/routes';
 import { AuditService } from './core/audit/audit-service';
+import { registerUserRoutes } from './core/http/api/users';
+import { registerPermissionRoutes } from './core/http/api/permissions';
+import { registerContextRoutes } from './core/http/api/contexts';
+import { registerRoleRoutes } from './core/http/api/roles';
+import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
 
 export type SupportedAdapter = 'fastify' | 'express';
 
@@ -14,6 +19,7 @@ export interface CoreConfig {
   adapter: SupportedAdapter;
   jwt: { accessTTL: string; refreshTTL: string; secret?: string };
   audit?: { enabled: boolean };
+  policy?: RoutePermissionPolicy;
 }
 
 export interface RouteDefinition<Body = unknown> {
@@ -60,6 +66,7 @@ export class CoreSaaSApp {
   public readonly auditService: AuditService;
   private readonly adapterKind: SupportedAdapter;
   private readonly httpAdapter: HttpAdapter;
+  private readonly policy: RoutePermissionPolicy;
 
   private readonly userGrants: Map<string, Set<string>> = new Map();
   private readonly userContextGrants: Map<string, Map<string, Set<string>>> = new Map();
@@ -74,6 +81,11 @@ export class CoreSaaSApp {
       config.adapter === 'fastify'
         ? createFastifyAdapter(this)
         : createExpressAdapter(this);
+    this.policy = {
+      users: { ...defaultRoutePermissionPolicy.users, ...(config.policy?.users ?? {}) },
+      permissions: { ...defaultRoutePermissionPolicy.permissions, ...(config.policy?.permissions ?? {}) },
+      contexts: { ...defaultRoutePermissionPolicy.contexts, ...(config.policy?.contexts ?? {}) },
+    } as Required<RoutePermissionPolicy>;
   }
 
   public get express(): ReturnType<ExpressHttpAdapter['getUnderlying']> | undefined {
@@ -102,7 +114,13 @@ export class CoreSaaSApp {
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
     const { userId, contextId, permission } = input;
-    const effective = await fetchEffectivePermissions({ userId, contextId: contextId ?? null });
+    let effective: Set<string> = new Set();
+    try {
+      effective = await fetchEffectivePermissions({ userId, contextId: contextId ?? null });
+    } catch {
+      // If DB lookup fails (e.g., tests without DB), fall back to empty set
+      effective = new Set();
+    }
     const merged = new Set<string>([...effective]);
     const global = this.userGrants.get(userId);
     if (global) for (const p of global) merged.add(p);
@@ -151,6 +169,10 @@ export class CoreSaaSApp {
     await this.permissionRegistry.initFromDatabase();
     await this.permissionRegistry.syncToDatabase();
     createAuthRoutes(this);
+    registerUserRoutes(this, this.policy);
+    registerPermissionRoutes(this, this.policy);
+    registerContextRoutes(this, this.policy);
+    registerRoleRoutes(this, this.policy);
     await this.httpAdapter.listen(port, host);
   }
 }

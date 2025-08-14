@@ -31,13 +31,14 @@ Lattice Core is the **foundation of a permission-first SaaS backend**, providing
 
 | Feature                      | Description                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Auth**                     | Password, JWT (access + refresh), placeholders for OAuth2, MFA, social login.                                |
+| **Auth**                     | Password, JWT (access + refresh), token revocation, password change/reset; placeholders for OAuth2, MFA, social login. |
 | **Permission Registry**      | In-memory + DB-backed. Wildcard expansion, plugin registration, hot-reloadable.                              |
 | **Roles & User Permissions** | RolePermission, UserPermission tables. Scoped per context.                                                   |
 | **Role Management**          | Role CRUD, assign/remove roles, grant/revoke role permissions via service + CLI.                             |
 | **Context Management**       | Resolve from route/query/header. Supports hierarchies (parent → child contexts).                             |
 | **AuthZ Middleware**         | Checks permissions per request, ensures context alignment. Works for both adapters.                          |
 | **Plugin System**            | Register plugins with contexts, permissions, and routes.                                                     |
+| **Built-in REST APIs**       | Users CRUD, Contexts CRUD + membership, Roles CRUD + assign/remove + role-perm ops, User permission grant/revoke; all guarded by a modifiable policy. |
 | **Audit Logging**            | Records permission checks, context resolutions, token issued/revoked, role and permission grants/revokes.    |
 | **Developer Tooling**        | CLI: list-permissions, check-access, roles commands, generate-plugin. TypeScript types for permissions, roles, and contexts. |
 | **Caching**                  | Optional Redis-backed cache for effective permissions to optimize performance.                               |
@@ -57,6 +58,7 @@ Lattice Core is the **foundation of a permission-first SaaS backend**, providing
     permission-registry.ts
     permission-sync.ts
     wildcard-utils.ts
+    user-permission-service.ts
   /context
     context-service.ts
     context-resolver.ts
@@ -70,11 +72,17 @@ Lattice Core is the **foundation of a permission-first SaaS backend**, providing
     middlewares/
       authz-middleware.ts
       audit-logger.ts
+    api/
+      users.ts
+      permissions.ts
+      contexts.ts
   /cache
     redis-client.ts
     permission-cache.ts
   /hooks
     hooks.ts
+  /policy
+    policy.ts
   /cli
     index.ts
     generate-plugin.ts
@@ -138,7 +146,13 @@ package.json
 * [ ] Hierarchical contexts (parent → child)
 * [ ] Hot-reloadable plugin permissions at runtime
 * [ ] Caching layer for effective permissions (Redis)
-* [ ] Audit logging
+* [x] Audit logging
+ Implemented full-featured:
+Schema: added actorId, targetUserId, requestId, ip, userAgent, resourceType, resourceId, plugin, error, indexes.
+Config: audit in CoreSaaS supports enable/disable, sampleRate, redactKeys, sinks (db/stdout).
+Service: logs now accept enriched fields and respect config.
+Wired existing calls to use actorId vs targetUserId.
+Tests: added src/tests/audit.test.ts to verify enabled/disabled behavior.
   - Implemented MVP: permission checks, token issued events, role assign/remove, role perm grant/revoke, user perm grant/revoke logged to `AuditLog`.
 * [ ] CLI: generate-plugin scaffolding
 * [ ] TypeScript types for permissions, roles, contexts
@@ -181,6 +195,10 @@ onTokenIssued(user, tokenType)	After issuing access or refresh token	Audit login
 onTokenRevoked(user, tokenType)	After revoking tokens	Audit security events, clear caches
 onPluginRegistered(plugin)	After a plugin is registered	Sync plugin permissions, register plugin-specific hooks, initialize plugin context types
 onPluginUnregistered(plugin)	After a plugin is removed	Clean up plugin data, revoke plugin permissions
+
+What about when user is assigned or revoked role or permission?
+
+
 
 Implementation Notes
 
@@ -255,7 +273,59 @@ await roles.addPermissionToRole({ roleName: 'admin', permissionKey: 'example:rea
 
 ---
 
-## **9️⃣ Setup & Quickstart (SQLite Dev)**
+## **9️⃣ Audit Logging (Full)**
+
+Capabilities:
+- Events: permission.check (success/failure), context.resolve, token.issued/token.revoked, role.created/role.deleted, role.assigned/role.removed, permission.user.granted/permission.user.revoked, permission.role.granted/permission.role.revoked.
+- Schema enrichment: actorId vs targetUserId, requestId, ip, userAgent, resourceType/resourceId, plugin, error, metadata; indexed for querying.
+- Configurable: enable/disable, sampleRate, redactKeys, sinks (db/stdout).
+- Toggle via `audit` in `CoreSaaS` config.
+
+Example:
+```ts
+const app = CoreSaaS({
+  db: { provider: 'sqlite' },
+  adapter: 'fastify',
+  jwt: { accessTTL: '15m', refreshTTL: '7d', secret: '...' },
+  audit: { enabled: true, sampleRate: 1.0, redactKeys: ['password'], sinks: ['db', 'stdout'] },
+})
+```
+
+---
+
+## **10️⃣ Setup & Quickstart (SQLite Dev)**
+
+### Route-level Permissions
+
+Core exposes a modifiable route permission policy used by built-in routes. You can override defaults via `policy` in `CoreSaaS` config.
+
+Defaults:
+
+```ts
+policy: {
+  users: {
+    create: 'users:create', list: 'users:read', get: 'users:read', update: 'users:update', delete: 'users:delete'
+  },
+  permissions: {
+    grantUser: 'permissions:grant', revokeUser: 'permissions:revoke'
+  },
+  contexts: {
+    create: 'contexts:create', get: 'contexts:read', update: 'contexts:update', delete: 'contexts:delete', addUser: 'contexts:assign', removeUser: 'contexts:assign'
+  }
+}
+```
+
+Override example:
+
+```ts
+const app = CoreSaaS({
+  ...,
+  policy: {
+    users: { create: 'admin:users:create' },
+    permissions: { grantUser: 'security:grant' },
+  }
+})
+```
 
 1. Environment
    - Node.js 18+

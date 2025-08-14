@@ -8,7 +8,7 @@ export class RoleService {
     const db = getDbClient();
     const role = await db.role.upsert({ where: { name }, update: {}, create: { name } });
     await this.audit.log({
-      userId: options?.actorId ?? null,
+      actorId: options?.actorId ?? null,
       contextId: null,
       action: 'role.created',
       success: true,
@@ -27,7 +27,7 @@ export class RoleService {
       db.role.delete({ where: { id: role.id } }),
     ]);
     await this.audit.log({
-      userId: options?.actorId ?? null,
+      actorId: options?.actorId ?? null,
       contextId: null,
       action: 'role.deleted',
       success: true,
@@ -50,11 +50,12 @@ export class RoleService {
       create: { id, userId: params.userId, roleId: role.id, contextId: params.contextId ?? null },
     });
     await this.audit.log({
-      userId: params.actorId ?? null,
+      actorId: params.actorId ?? null,
+      targetUserId: params.userId,
       contextId: params.contextId ?? null,
       action: 'role.assigned',
       success: true,
-      metadata: { roleName: params.roleName, targetUserId: params.userId, source: params.source, reason: params.reason },
+      metadata: { roleName: params.roleName, source: params.source, reason: params.reason },
     });
     return res;
   }
@@ -66,11 +67,12 @@ export class RoleService {
     const id = `${params.userId}-${role.id}-${params.contextId ?? 'global'}`;
     await db.userRole.delete({ where: { id } }).catch(() => {});
     await this.audit.log({
-      userId: params.actorId ?? null,
+      actorId: params.actorId ?? null,
+      targetUserId: params.userId,
       contextId: params.contextId ?? null,
       action: 'role.removed',
       success: true,
-      metadata: { roleName: params.roleName, targetUserId: params.userId, source: params.source, reason: params.reason },
+      metadata: { roleName: params.roleName, source: params.source, reason: params.reason },
     });
   }
 
@@ -85,7 +87,7 @@ export class RoleService {
       create: { id, roleId: role.id, permissionId: perm.id, contextId: params.contextId ?? null },
     });
     await this.audit.log({
-      userId: params.actorId ?? null,
+      actorId: params.actorId ?? null,
       contextId: params.contextId ?? null,
       action: 'permission.role.granted',
       success: true,
@@ -103,7 +105,7 @@ export class RoleService {
     const id = `${role.id}-${perm.id}-${params.contextId ?? 'global'}`;
     await db.rolePermission.delete({ where: { id } }).catch(() => {});
     await this.audit.log({
-      userId: params.actorId ?? null,
+      actorId: params.actorId ?? null,
       contextId: params.contextId ?? null,
       action: 'permission.role.revoked',
       success: true,

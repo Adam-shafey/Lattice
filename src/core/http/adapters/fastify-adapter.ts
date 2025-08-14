@@ -31,13 +31,34 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
     };
   }
 
+  function wrapPreHandler(pre: unknown) {
+    // Normalize any middleware signature to Fastify-compatible (request, reply, done)
+    // Our middlewares are typically (req, res, next?) and may be async
+    return function (request: FastifyRequest, reply: FastifyReply, done: (err?: any) => void) {
+      try {
+        const maybePromise = (pre as any)(request, reply, undefined);
+        if (maybePromise && typeof (maybePromise as Promise<unknown>).then === 'function') {
+          (maybePromise as Promise<unknown>)
+            .then(() => {
+              if (!reply.sent) done();
+            })
+            .catch(done);
+        } else {
+          if (!reply.sent) done();
+        }
+      } catch (err) {
+        done(err);
+      }
+    };
+  }
+
   const adapter: FastifyHttpAdapter = {
     addRoute(route: RouteDefinition) {
       const preHandlers = Array.isArray(route.preHandler) ? route.preHandler : route.preHandler ? [route.preHandler] : [];
       instance.route({
         method: route.method,
         url: route.path,
-        preHandler: preHandlers as any,
+        preHandler: preHandlers.map(wrapPreHandler),
         handler: wrapHandler(route.handler) as any,
       });
     },
