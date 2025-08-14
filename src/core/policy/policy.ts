@@ -1,13 +1,25 @@
 export interface RoutePermissionPolicy {
   roles?: {
-    create: string;
-    list: string;
-    get: string;
-    delete: string;
-    assign: string;
-    remove: string;
-    addPerm: string;
-    removePerm: string;
+    // Context-type scoped operations
+    create: string;    // e.g., 'roles:{type}:create'
+    list: string;      // e.g., 'roles:{type}:list'
+    get: string;       // e.g., 'roles:{type}:read'
+    delete: string;    // e.g., 'roles:{type}:delete'
+    manage: string;    // e.g., 'roles:{type}:manage'
+    
+    // Assignment operations (exact context scope)
+    assign: string;    // e.g., 'roles:assign'
+    remove: string;    // e.g., 'roles:remove'
+    
+    // Permission operations require both role management and the permission itself
+    addPerm: {
+      roleManage: string;      // e.g., 'roles:{type}:manage'
+      permissionGrant: string; // e.g., 'permissions:{perm}:grant:{type}'
+    };
+    removePerm: {
+      roleManage: string;      // e.g., 'roles:{type}:manage'
+      permissionRevoke: string; // e.g., 'permissions:{perm}:revoke:{type}'
+    };
   };
   users?: {
     create: string;
@@ -32,14 +44,26 @@ export interface RoutePermissionPolicy {
 
 export const defaultRoutePermissionPolicy = {
   roles: {
-    create: 'roles:create',
-    list: 'roles:read',
-    get: 'roles:read',
-    delete: 'roles:delete',
+    // Context-type scoped operations
+    create: 'roles:{type}:create',
+    list: 'roles:{type}:list',
+    get: 'roles:{type}:read',
+    delete: 'roles:{type}:delete',
+    manage: 'roles:{type}:manage',
+    
+    // Assignment operations
     assign: 'roles:assign',
-    remove: 'roles:assign',
-    addPerm: 'roles:permissions:grant',
-    removePerm: 'roles:permissions:revoke',
+    remove: 'roles:remove',
+    
+    // Permission operations
+    addPerm: {
+      roleManage: 'roles:{type}:manage',
+      permissionGrant: 'permissions:{perm}:grant:{type}'
+    },
+    removePerm: {
+      roleManage: 'roles:{type}:manage',
+      permissionRevoke: 'permissions:{perm}:revoke:{type}'
+    },
   },
   users: {
     create: 'users:create',

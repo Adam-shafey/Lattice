@@ -1,12 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 
-let singleton: PrismaClient | null = null;
+const prisma = new PrismaClient();
 
-export function getDbClient(): PrismaClient {
-  if (!singleton) {
-    singleton = new PrismaClient();
-  }
-  return singleton;
-}
+export { prisma as db };
+export type { Prisma, Role, UserRole, RolePermission, Context, Permission } from '@prisma/client';
 
 

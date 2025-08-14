@@ -1,6 +1,16 @@
 import { CoreSaaSApp } from '../../../index';
 
-export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, options?: { contextRequired?: boolean }) {
+type AuthorizeScope = 'exact' | 'global' | 'type-wide';
+
+export interface AuthorizeOptions {
+  contextRequired?: boolean;
+  scope?: AuthorizeScope;
+  contextType?: string;
+}
+
+// Extend the CoreSaaSApp interface in index.ts instead
+
+export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, options?: AuthorizeOptions) {
   return async function authorize(req: any, res: any, next?: (err?: any) => void) {
     try {
       const userId: string | null = (req?.headers?.['x-user-id'] as string) || req?.user?.id || null;
@@ -8,11 +18,13 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         (req?.params?.['contextId'] as string) ||
         (req?.headers?.['x-context-id'] as string) ||
         (req?.query?.['contextId'] as string) ||
+        (req?.body?.contextId as string) ||
         null;
       const contextType: string | null =
         (req?.params?.['contextType'] as string) ||
         (req?.headers?.['x-context-type'] as string) ||
         (req?.query?.['contextType'] as string) ||
+        (req?.body?.contextType as string) ||
         null;
 
       const send = (statusCode: number, body: any) => {
@@ -35,7 +47,29 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         return send(400, err);
       }
 
-      const allowed = await app.checkAccess({ userId, context: contextId ? { id: contextId, type: contextType ?? 'unknown' } : null, permission: requiredPermission });
+      // Scope validation
+      if (options?.scope === 'global' && (contextId !== null || contextType !== null)) {
+        const err = { statusCode: 403, message: 'This operation requires global scope' };
+        return send(403, err);
+      }
+
+      if (options?.scope === 'type-wide' && !contextType) {
+        const err = { statusCode: 400, message: 'Context type required for type-wide operation' };
+        return send(400, err);
+      }
+
+      if (options?.scope === 'exact' && !contextId) {
+        const err = { statusCode: 400, message: 'Context ID required for exact scope operation' };
+        return send(400, err);
+      }
+
+      const allowed = await app.checkAccess({ 
+        userId, 
+        context: contextId ? { id: contextId, type: contextType ?? 'unknown' } : null, 
+        permission: requiredPermission,
+        requireGlobal: options?.scope === 'global',
+        requireTypeWide: options?.scope === 'type-wide'
+      });
 
       if (!allowed) {
         try {

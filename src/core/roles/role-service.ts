@@ -1,13 +1,31 @@
-import { getDbClient } from '../db/db-client';
+import { db } from '../db/db-client';
 import { AuditService } from '../audit/audit-service';
 import { randomUUID } from 'crypto';
+import { type RoutePermissionPolicy } from '../policy/policy';
+import { CoreSaaS } from '../../index';
 
 export class RoleService {
-  private readonly audit = new AuditService();
+  private audit = new AuditService();
+  private app: ReturnType<typeof CoreSaaS>;
 
-  async createRole(name: string, options?: { actorId?: string | null; source?: string; reason?: string; key?: string }) {
-    const db = getDbClient();
-    const role = await db.role.create({ data: { name, key: options?.key ?? randomUUID() } });
+  constructor(app: ReturnType<typeof CoreSaaS>) {
+    this.app = app;
+  }
+
+  async createRole(name: string, options?: { 
+    actorId?: string | null; 
+    source?: string; 
+    reason?: string; 
+    key?: string;
+    contextType: string;
+  }) {
+    const role = await db.role.create({ 
+      data: { 
+        name, 
+        key: options?.key ?? randomUUID(),
+        contextType: options?.contextType
+      } 
+    });
     await this.audit.log({
       actorId: options?.actorId ?? null,
       contextId: null,
@@ -19,14 +37,13 @@ export class RoleService {
   }
 
   async deleteRole(nameOrKey: string, options?: { actorId?: string | null; source?: string; reason?: string }) {
-    const db = getDbClient();
     const role = await db.role.findFirst({ where: { OR: [{ name: nameOrKey }, { key: nameOrKey }] } });
     if (!role) return;
-    await db.$transaction([
-      db.rolePermission.deleteMany({ where: { roleId: role.id } }),
-      db.userRole.deleteMany({ where: { roleId: role.id } }),
-      db.role.delete({ where: { id: role.id } }),
-    ]);
+    await db.$transaction(async (tx: any) => {
+      await tx.rolePermission.deleteMany({ where: { roleId: role.id } });
+      await tx.userRole.deleteMany({ where: { roleId: role.id } });
+      await tx.role.delete({ where: { id: role.id } });
+    });
     await this.audit.log({
       actorId: options?.actorId ?? null,
       contextId: null,
@@ -37,21 +54,36 @@ export class RoleService {
   }
 
   async listRoles() {
-    const db = getDbClient();
     return db.role.findMany({ orderBy: { name: 'asc' } });
   }
 
-  async assignRoleToUser(params: { roleName?: string; roleKey?: string; userId: string; contextId?: string | null; actorId?: string | null; source?: string; reason?: string }) {
-    const db = getDbClient();
+  async assignRoleToUser(params: { roleName?: string; roleKey?: string; userId: string; contextId?: string | null; contextType?: string | null; actorId?: string | null; source?: string; reason?: string }) {
     const role = params.roleKey
       ? await db.role.findUnique({ where: { key: params.roleKey } })
       : await db.role.findFirst({ where: { name: params.roleName ?? '' } });
     const ensuredRole = role ?? (await db.role.create({ data: { name: params.roleName ?? params.roleKey ?? 'role', key: randomUUID() } }));
+    // Validate context exists and type matches
+    if (params.contextId) {
+      const context = await db.context.findUnique({ where: { id: params.contextId } });
+      if (!context) {
+        throw new Error(`Context ${params.contextId} not found`);
+      }
+      if (params.contextType && context.type !== params.contextType) {
+        throw new Error(`Context ${params.contextId} has type ${context.type}, expected ${params.contextType}`);
+      }
+    }
+
     const id = `${params.userId}-${ensuredRole.id}-${params.contextId ?? 'global'}`;
     const res = await db.userRole.upsert({
       where: { id },
       update: {},
-      create: { id, userId: params.userId, roleId: ensuredRole.id, contextId: params.contextId ?? null },
+      create: { 
+        id, 
+        userId: params.userId, 
+        roleId: ensuredRole.id, 
+        contextId: params.contextId ?? null,
+        contextType: params.contextType ?? null
+      },
     });
     await this.audit.log({
       actorId: params.actorId ?? null,
@@ -64,8 +96,7 @@ export class RoleService {
     return res;
   }
 
-  async removeRoleFromUser(params: { roleName?: string; roleKey?: string; userId: string; contextId?: string | null; actorId?: string | null; source?: string; reason?: string }) {
-    const db = getDbClient();
+  async removeRoleFromUser(params: { roleName?: string; roleKey?: string; userId: string; contextId?: string | null; contextType?: string | null; actorId?: string | null; source?: string; reason?: string }) {
     const role = params.roleKey
       ? await db.role.findUnique({ where: { key: params.roleKey } })
       : await db.role.findFirst({ where: { name: params.roleName ?? '' } });
@@ -82,31 +113,71 @@ export class RoleService {
     });
   }
 
-  async addPermissionToRole(params: { roleName?: string; roleKey?: string; permissionKey: string; contextId?: string | null; contextType?: string | null; actorId?: string | null; source?: string; reason?: string }) {
-    const db = getDbClient();
+  async addPermissionToRole(params: { 
+    roleName?: string; 
+    roleKey?: string; 
+    permissionKey: string; 
+    contextId?: string | null; 
+    contextType?: string | null; 
+    actorId?: string | null; 
+    source?: string; 
+    reason?: string;
+    policy: RoutePermissionPolicy;
+  }) {
+    // First find the role to get its context type
     const role = params.roleKey
       ? await db.role.findUnique({ where: { key: params.roleKey } })
       : await db.role.findFirst({ where: { name: params.roleName ?? '' } });
-    const ensuredRole = role ?? (await db.role.create({ data: { name: params.roleName ?? params.roleKey ?? 'role', key: randomUUID() } }));
-    const perm = await db.permission.upsert({ where: { key: params.permissionKey }, update: {}, create: { key: params.permissionKey, label: params.permissionKey } });
-    const id = `${ensuredRole.id}-${perm.id}-${params.contextId ?? 'global'}`;
+    if (!role) throw new Error('Role not found');
+
+    // Check role management permission
+    const canManageRoles = await this.app.checkAccess({
+      userId: params.actorId!,
+      permission: params.policy.roles!.addPerm.roleManage.replace('{type}', role.contextType),
+      scope: 'type-wide',
+      contextType: role.contextType
+    });
+    if (!canManageRoles) {
+      throw new Error(`No permission to manage ${role.contextType} roles`);
+    }
+
+    // Check permission grant ability
+    const canGrantPermission = await this.app.checkAccess({
+      userId: params.actorId!,
+      permission: params.policy.roles!.addPerm.permissionGrant
+        .replace('{perm}', params.permissionKey)
+        .replace('{type}', role.contextType),
+      scope: 'type-wide',
+      contextType: role.contextType
+    });
+    if (!canGrantPermission) {
+      throw new Error(`No permission to grant ${params.permissionKey} in ${role.contextType}`);
+    }
+    // Create or find the permission
+    const perm = await db.permission.upsert({ 
+      where: { key: params.permissionKey }, 
+      update: {}, 
+      create: { key: params.permissionKey, label: params.permissionKey } 
+    });
+
+    // Create the role-permission link
+    const id = `${role.id}-${perm.id}-${params.contextId ?? 'global'}`;
     const res = await db.rolePermission.upsert({
       where: { id },
       update: {},
-      create: { id, roleId: ensuredRole.id, permissionId: perm.id, contextId: params.contextId ?? null, contextType: params.contextId ? null : (params.contextType ?? null) },
+      create: { id, roleId: role.id, permissionId: perm.id, contextId: params.contextId ?? null, contextType: params.contextId ? null : (params.contextType ?? null) },
     });
     await this.audit.log({
       actorId: params.actorId ?? null,
       contextId: params.contextId ?? null,
       action: 'permission.role.granted',
       success: true,
-      metadata: { roleName: ensuredRole.name, roleKey: ensuredRole.key, permissionKey: params.permissionKey, contextType: params.contextType ?? null, source: params.source, reason: params.reason },
+      metadata: { roleName: role.name, roleKey: role.key, permissionKey: params.permissionKey, contextType: params.contextType ?? null, source: params.source, reason: params.reason },
     });
     return res;
   }
 
   async removePermissionFromRole(params: { roleName?: string; roleKey?: string; permissionKey: string; contextId?: string | null; contextType?: string | null; actorId?: string | null; source?: string; reason?: string }) {
-    const db = getDbClient();
     const role = params.roleKey
       ? await db.role.findUnique({ where: { key: params.roleKey } })
       : await db.role.findFirst({ where: { name: params.roleName ?? '' } });
@@ -131,18 +202,17 @@ export class RoleService {
   }
 
   async listUserRoles(params: { userId: string; contextId?: string | null }) {
-    const db = getDbClient();
     const roles = await db.userRole.findMany({
       where: {
         userId: params.userId,
         OR: [
           { contextId: null },
-          ...(params.contextId ? [{ contextId: params.contextId }] as any : []),
+          ...(params.contextId ? [{ contextId: params.contextId }] : []),
         ],
       },
       include: { role: true },
     });
-    return roles.map((r) => ({ name: r.role.name, contextId: r.contextId }));
+    return roles.map((r: { role: { name: string }; contextId: string | null }) => ({ name: r.role.name, contextId: r.contextId }));
   }
 }
 

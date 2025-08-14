@@ -168,13 +168,64 @@ Tests: added src/tests/audit.test.ts to verify enabled/disabled behavior.
 ### Context-type Aware Permissions (Implemented)
 
 - Updated `checkAccess` to accept `{ type, id }` for context scoping
-- Extended schema with `contextType` on `UserPermission` and `RolePermission`
+- Extended schema with `contextType` on `UserPermission`, `RolePermission`, and `UserRole`
 - Matching order: exact (type+id) → type-wide (type+null) → global (null+null)
 - Wildcards preserved in permission keys (e.g., `example:*`)
 - REST endpoints accept `{ contextType, contextId }` (backfills type from `Context` when only id is given)
 - E2E tests cover exact/type-wide/global flows
+- Role assignments are context-type aware (validates type matches context)
+- Type-wide operations (e.g., role-permission grants) require global scope
+- Scope enforcement in authorize middleware:
+  - `exact`: Requires permission in exact context (or global)
+  - `global`: Requires global permission (null context)
+  - `type-wide`: Requires permission for context type
 
----
+### Role Management & Permissions
+
+Core implements a context-type aware role management system with strict permission requirements:
+
+1. **Role Operations**:
+   - Creating/managing roles requires type-specific permission (e.g., `roles:team:create` for team roles)
+   - Role operations are scoped to their context type (team roles can only be used in team contexts)
+   - Global operations (like listing all roles) require type-wide permission
+
+2. **Role-Permission Grants**:
+   To grant a permission to a role, you need BOTH:
+   - Permission to manage roles of that type (`roles:team:manage`)
+   - Permission to grant the specific permission in that context type (`permissions:read:grant:team`)
+   
+3. **Role Assignments**:
+   - Assigning roles requires exact context permission
+   - Context type is validated (can't assign team role in org context)
+   - Role assignments are always context-specific
+
+Example policy configuration:
+```ts
+policy: {
+  roles: {
+    // Role management (type-scoped)
+    create: 'roles:{type}:create',     // Can create roles of type {type}
+    get: 'roles:{type}:read',         // Can read roles of type {type}
+    list: 'roles:{type}:list',        // Can list roles of type {type}
+    delete: 'roles:{type}:delete',    // Can delete roles of type {type}
+    manage: 'roles:{type}:manage',    // Can manage roles of type {type}
+    
+    // Role assignments (context-scoped)
+    assign: 'roles:assign',          // Can assign roles in specific contexts
+    remove: 'roles:remove',          // Can remove roles in specific contexts
+    
+    // Permission operations (requires both role management and permission grant)
+    addPerm: {
+      roleManage: 'roles:{type}:manage',                  // Must have role management
+      permissionGrant: 'permissions:{perm}:grant:{type}'  // Must have grant permission
+    },
+    removePerm: {
+      roleManage: 'roles:{type}:manage',                  // Must have role management
+      permissionRevoke: 'permissions:{perm}:revoke:{type}'// Must have revoke permission
+    }
+  }
+}
+```
 
 ### **Phase 2 — Full End-State Core**
 
@@ -303,26 +354,53 @@ const app = CoreSaaS({
 
 ## **10️⃣ Setup & Quickstart (SQLite Dev)**
 
-### Route-level Permissions
+### Route-level Permissions & Scoping
 
 Core exposes a modifiable route permission policy used by built-in routes. You can override defaults via `policy` in `CoreSaaS` config.
+
+Each route is configured with both a permission key and a scope requirement:
+- `exact`: Requires permission in the exact context (e.g., role assignments)
+- `global`: Requires global permission (e.g., user management, type-wide operations)
+- `type-wide`: Requires permission for the context type
 
 Defaults:
 
 ```ts
 policy: {
   roles: {
-    create: 'roles:create', get: 'roles:read', list: 'roles:read', delete: 'roles:delete',
-    assign: 'roles:assign', remove: 'roles:assign', addPerm: 'roles:permissions:grant', removePerm: 'roles:permissions:revoke'
+    // Global operations
+    create: 'roles:create',           // scope: global
+    get: 'roles:read',               // scope: global
+    list: 'roles:read',              // scope: global
+    delete: 'roles:delete',          // scope: global
+    addPerm: 'roles:permissions:grant',    // scope: global (for type-wide grants)
+    removePerm: 'roles:permissions:revoke', // scope: global (for type-wide revokes)
+    
+    // Context-specific operations
+    assign: 'roles:assign',          // scope: exact (requires contextId)
+    remove: 'roles:assign'           // scope: exact (requires contextId)
   },
   users: {
-    create: 'users:create', list: 'users:read', get: 'users:read', update: 'users:update', delete: 'users:delete'
+    // All user operations require global scope
+    create: 'users:create',
+    list: 'users:read',
+    get: 'users:read',
+    update: 'users:update',
+    delete: 'users:delete'
   },
   permissions: {
-    grantUser: 'permissions:grant', revokeUser: 'permissions:revoke'
+    // Permission operations adapt to context
+    grantUser: 'permissions:grant',   // scope: global for type-wide, exact for contextId
+    revokeUser: 'permissions:revoke'  // scope: global for type-wide, exact for contextId
   },
   contexts: {
-    create: 'contexts:create', get: 'contexts:read', update: 'contexts:update', delete: 'contexts:delete', addUser: 'contexts:assign', removeUser: 'contexts:assign'
+    // Context operations mix scopes
+    create: 'contexts:create',        // scope: global for new types, exact for instances
+    get: 'contexts:read',            // scope: exact
+    update: 'contexts:update',       // scope: exact
+    delete: 'contexts:delete',       // scope: exact
+    addUser: 'contexts:assign',      // scope: exact
+    removeUser: 'contexts:assign'    // scope: exact
   }
 }
 ```
@@ -341,29 +419,29 @@ const app = CoreSaaS({
 
 ### Route–Permission Matrix
 
-| Route | Method | Required permission key (default) |
-| ----- | ------ | ---------------------------------- |
-| `/users` | POST | `users:create` |
-| `/users` | GET | `users:read` |
-| `/users/:id` | GET | `users:read` |
-| `/users/:id` | PUT | `users:update` |
-| `/users/:id` | DELETE | `users:delete` |
-| `/permissions/user/grant` | POST | `permissions:grant` |
-| `/permissions/user/revoke` | POST | `permissions:revoke` |
-| `/contexts` | POST | `contexts:create` |
-| `/contexts/:id` | GET | `contexts:read` |
-| `/contexts/:id` | PUT | `contexts:update` |
-| `/contexts/:id` | DELETE | `contexts:delete` |
-| `/contexts/:id/users/add` | POST | `contexts:assign` |
-| `/contexts/:id/users/remove` | POST | `contexts:assign` |
-| `/roles` | POST | `roles:create` |
-| `/roles` | GET | `roles:read` |
-| `/roles/:name` | GET | `roles:read` |
-| `/roles/:name` | DELETE | `roles:delete` |
-| `/roles/assign` | POST | `roles:assign` |
-| `/roles/remove` | POST | `roles:assign` |
-| `/roles/:name/permissions/add` | POST | `roles:permissions:grant` |
-| `/roles/:name/permissions/remove` | POST | `roles:permissions:revoke` |
+| Route | Method | Permission Key | Scope | Notes |
+| ----- | ------ | -------------- | ----- | ----- |
+| `/users` | POST | `users:create` | global | System-wide operation |
+| `/users` | GET | `users:read` | global | System-wide operation |
+| `/users/:id` | GET | `users:read` | global | System-wide operation |
+| `/users/:id` | PUT | `users:update` | global | System-wide operation |
+| `/users/:id` | DELETE | `users:delete` | global | System-wide operation |
+| `/permissions/user/grant` | POST | `permissions:grant` | dynamic | global for type-wide, exact for contextId |
+| `/permissions/user/revoke` | POST | `permissions:revoke` | dynamic | global for type-wide, exact for contextId |
+| `/contexts` | POST | `contexts:create` | dynamic | global for new types, exact for instances |
+| `/contexts/:id` | GET | `contexts:read` | exact | Context-specific |
+| `/contexts/:id` | PUT | `contexts:update` | exact | Context-specific |
+| `/contexts/:id` | DELETE | `contexts:delete` | exact | Context-specific |
+| `/contexts/:id/users/add` | POST | `contexts:assign` | exact | Context-specific |
+| `/contexts/:id/users/remove` | POST | `contexts:assign` | exact | Context-specific |
+| `/roles` | POST | `roles:create` | global | System-wide operation |
+| `/roles` | GET | `roles:read` | global | System-wide operation |
+| `/roles/:name` | GET | `roles:read` | global | System-wide operation |
+| `/roles/:name` | DELETE | `roles:delete` | global | System-wide operation |
+| `/roles/assign` | POST | `roles:assign` | exact | Requires contextId + type |
+| `/roles/remove` | POST | `roles:assign` | exact | Requires contextId + type |
+| `/roles/:name/permissions/add` | POST | `roles:permissions:grant` | global | For type-wide grants |
+| `/roles/:name/permissions/remove` | POST | `roles:permissions:revoke` | global | For type-wide revokes |
 
 All keys are developer-overridable via the `policy` option.
 
@@ -388,18 +466,42 @@ All REST inputs are validated with Zod. Invalid payloads return a consistent err
 
 Endpoints (all guarded by policy):
 - POST `/roles` { name }
+  - Scope: global
+  - Creates a new role with unique key
 - GET `/roles`
+  - Scope: global
+  - Lists all roles
 - GET `/roles/:name`
+  - Scope: global
+  - Gets role by name
 - DELETE `/roles/:name`
-- POST `/roles/assign` { roleName, userId, contextId? }
-- POST `/roles/remove` { roleName, userId, contextId? }
-- POST `/roles/:name/permissions/add` { permissionKey, contextId? }
-- POST `/roles/:name/permissions/remove` { permissionKey, contextId? }
+  - Scope: global
+  - Deletes role and all assignments
+- POST `/roles/assign` { roleName, userId, contextId, contextType }
+  - Scope: exact
+  - Assigns role to user in specific context
+  - Validates context type matches
+- POST `/roles/remove` { roleName, userId, contextId, contextType }
+  - Scope: exact
+  - Removes role from user in specific context
+  - Validates context type matches
+- POST `/roles/:name/permissions/add` { permissionKey, contextId?, contextType? }
+  - Scope: global
+  - Grants permission to role
+  - Type-wide if contextType provided
+  - Context-specific if contextId provided
+- POST `/roles/:name/permissions/remove` { permissionKey, contextId?, contextType? }
+  - Scope: global
+  - Revokes permission from role
+  - Type-wide if contextType provided
+  - Context-specific if contextId provided
 
 Policy keys used:
-- `roles.create`, `roles.list`, `roles.get`, `roles.delete`, `roles.assign`, `roles.remove`, `roles.addPerm`, `roles.removePerm`
+- `roles.create`, `roles.list`, `roles.get`, `roles.delete` (all global scope)
+- `roles.assign`, `roles.remove` (exact scope, requires context)
+- `roles.addPerm`, `roles.removePerm` (global scope for type-wide operations)
 
-All input is validated with Zod.
+All input is validated with Zod. Context type is validated against context records.
 
 1. Environment
    - Node.js 18+

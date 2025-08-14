@@ -1,5 +1,7 @@
 generator client {
   provider = "prisma-client-js"
+  engineType = "binary"
+  output   = "./generated/client"
 }
 
 datasource db {
@@ -34,20 +36,21 @@ model User {
 }
 
 model Role {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  rolePerms RolePermission[]
-  userRoles UserRole[]
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  contextType String   // e.g., 'team', 'org'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  rolePerms   RolePermission[]
+  userRoles   UserRole[]
 }
 
 model Context {
   id        String   @id
   type      String
   name      String?
-  parentId  String?  // reserved for hierarchical contexts
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   userContexts UserContext[]
@@ -62,6 +65,7 @@ model UserRole {
   userId    String
   roleId    String
   contextId String?  // null = global
+  contextType String?  // e.g., 'team' for type-wide when contextId is null
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

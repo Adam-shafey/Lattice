@@ -2,7 +2,7 @@ import { createFastifyAdapter, type FastifyHttpAdapter } from './core/http/adapt
 import { createExpressAdapter, type ExpressHttpAdapter } from './core/http/adapters/express-adapter';
 import { PermissionRegistry } from './core/permissions/permission-registry';
 import { ContextService } from './core/context/context-service';
-import { createAuthorize } from './core/http/middlewares/authz-middleware';
+import { createAuthorize, type AuthorizeOptions } from './core/http/middlewares/authz-middleware';
 import { fetchEffectivePermissions } from './core/permissions/effective-permissions';
 import { createAuthRoutes, requireAuthMiddleware } from './core/auth/routes';
 import { AuditService } from './core/audit/audit-service';
@@ -53,6 +53,10 @@ export interface CheckAccessInput {
   userId: string;
   context?: { type: string; id: string } | null;
   permission: string;
+  requireGlobal?: boolean;
+  requireTypeWide?: boolean;
+  scope?: 'exact' | 'global' | 'type-wide';
+  contextType?: string;
 }
 
 export interface HttpAdapter {
@@ -107,7 +111,7 @@ export class CoreSaaSApp {
     this.httpAdapter.addRoute(def);
   }
 
-  public authorize(requiredPermission: string, options?: { contextRequired?: boolean }) {
+  public authorize(requiredPermission: string, options?: AuthorizeOptions) {
     return createAuthorize(this, requiredPermission, options);
   }
 
