@@ -38,7 +38,7 @@ Lattice Core is the **foundation of a permission-first SaaS backend**, providing
 | **Context Management**       | Resolve from route/query/header. Supports hierarchies (parent → child contexts).                             |
 | **AuthZ Middleware**         | Checks permissions per request, ensures context alignment. Works for both adapters.                          |
 | **Plugin System**            | Register plugins with contexts, permissions, and routes.                                                     |
-| **Audit Logging**            | Records permission checks, context resolutions, and critical auth events.                                    |
+| **Audit Logging**            | Records permission checks, context resolutions, and auth events (token issued/revoked).                      |
 | **Developer Tooling**        | CLI: list-permissions, check-access, roles commands, generate-plugin. TypeScript types for permissions, roles, and contexts. |
 | **Caching**                  | Optional Redis-backed cache for effective permissions to optimize performance.                               |
 
@@ -139,6 +139,7 @@ package.json
 * [ ] Hot-reloadable plugin permissions at runtime
 * [ ] Caching layer for effective permissions (Redis)
 * [ ] Audit logging (permission checks, context resolution)
+  - Implemented MVP: permission checks and token issued events logged to `AuditLog`.
 * [ ] CLI: generate-plugin scaffolding
 * [ ] TypeScript types for permissions, roles, contexts
 * [ ] Testing utilities / fixtures for devs

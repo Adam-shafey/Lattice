@@ -5,6 +5,7 @@ import { ContextService } from './core/context/context-service';
 import { createAuthorize } from './core/http/middlewares/authz-middleware';
 import { fetchEffectivePermissions } from './core/permissions/effective-permissions';
 import { createAuthRoutes, requireAuthMiddleware } from './core/auth/routes';
+import { AuditService } from './core/audit/audit-service';
 
 export type SupportedAdapter = 'fastify' | 'express';
 
@@ -55,6 +56,7 @@ export class CoreSaaSApp {
   public readonly permissionRegistry: PermissionRegistry;
   public readonly PermissionRegistry: PermissionRegistry;
   public readonly contextService: ContextService;
+  public readonly auditService: AuditService;
   private readonly adapterKind: SupportedAdapter;
   private readonly httpAdapter: HttpAdapter;
 
@@ -65,6 +67,7 @@ export class CoreSaaSApp {
     this.permissionRegistry = new PermissionRegistry();
     this.PermissionRegistry = this.permissionRegistry;
     this.contextService = new ContextService();
+    this.auditService = new AuditService();
     this.adapterKind = config.adapter;
     this.httpAdapter =
       config.adapter === 'fastify'

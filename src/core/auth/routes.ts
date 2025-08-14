@@ -48,6 +48,8 @@ export function createAuthRoutes(app: CoreSaaSApp) {
       if (!ok) return { error: 'Invalid credentials' };
       const access = jwt.signAccess({ sub: user.id });
       const refresh = jwt.signRefresh({ sub: user.id });
+      await app.auditService.logTokenIssued(user.id, 'access');
+      await app.auditService.logTokenIssued(user.id, 'refresh');
       return { accessToken: access, refreshToken: refresh };
     },
   });
@@ -64,6 +66,8 @@ export function createAuthRoutes(app: CoreSaaSApp) {
       if (!user) return { error: 'Invalid token' };
       const access = jwt.signAccess({ sub: user.id });
       const newRefresh = jwt.signRefresh({ sub: user.id });
+      await app.auditService.logTokenIssued(user.id, 'access');
+      await app.auditService.logTokenIssued(user.id, 'refresh');
       return { accessToken: access, refreshToken: newRefresh };
     },
   });
