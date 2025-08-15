@@ -22,19 +22,7 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
       }
       const token = auth.substring('Bearer '.length);
       const jwt = getJwt();
-      const payload = jwt.verify(token) as any;
-      // Check revocation by JTI if present
-      const jti = payload?.jti as string | undefined;
-      if (jti) {
-        const revoked = await db.revokedToken.findUnique({ where: { jti } }).catch(() => null);
-        if (revoked) {
-          const err = { statusCode: 401, message: 'Token revoked' };
-          if (res?.status) return res.status(401).send(err);
-          if (res?.code) return res.code(401).send(err);
-          if (next) return next(err);
-          return;
-        }
-      }
+      const payload = await jwt.verify(token) as any;
       (req as any).user = { id: payload.sub };
       if (next) return next();
     } catch (e) {
@@ -42,6 +30,7 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
       if (res?.status) return res.status(401).send(err);
       if (res?.code) return res.code(401).send(err);
       if (next) return next(err);
+      return; // Don't continue to handler
     }
   };
 }
@@ -100,7 +89,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
         
         const { refreshToken } = parsed.data;
-        const payload = jwt.verify(refreshToken) as any;
+        const payload = await jwt.verify(refreshToken) as any;
         const userId = payload?.sub as string | undefined;
         const jti = payload?.jti as string | undefined;
         
@@ -139,8 +128,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   app.route({
     method: 'POST',
     path: '/auth/revoke',
-    preHandler: requireAuthMiddleware(app),
-    handler: async ({ body, user }) => {
+    handler: async ({ body }) => {
       const schema = z.object({ 
         token: z.string().min(1) 
       });
@@ -159,10 +147,10 @@ export function createAuthRoutes(app: CoreSaaSApp) {
         await db.revokedToken.upsert({ 
           where: { jti }, 
           update: {}, 
-          create: { jti, userId: user?.id ?? null } 
+          create: { jti, userId: payload?.sub ?? null } 
         });
         
-        await app.auditService.logTokenRevoked(user?.id ?? 'unknown', 'access');
+        await app.auditService.logTokenRevoked(payload?.sub ?? 'unknown', 'access');
         return { ok: true };
       } catch (error: any) {
         return { error: error.message || 'Token revocation failed' };
@@ -187,8 +175,12 @@ export function createAuthRoutes(app: CoreSaaSApp) {
         
         const { oldPassword, newPassword } = parsed.data;
         
-        await app.userService.changePassword(user!.id, oldPassword, newPassword, {
-          actorId: user!.id
+        if (!user) {
+          return { error: 'Unauthorized' };
+        }
+        
+        await app.userService.changePassword(user.id, oldPassword, newPassword, {
+          actorId: user.id
         });
         
         return { ok: true };

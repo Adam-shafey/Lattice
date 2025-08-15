@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { createJwtUtil } from '../core/auth/jwt';
 import { CoreSaaS } from '../index';
 import { db } from '../core/db/db-client';
@@ -8,52 +8,74 @@ describe('Auth Service', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+  });
+
+  beforeEach(async () => {
+    // Create fresh app instance for each test
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test-secret' }
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test-secret' },
+      audit: {
+        enabled: false // Disable audit logging for tests
+      }
     });
+
+    // Clean up database before each test - delete child records first
+    await db.auditLog.deleteMany();
+    await db.userPermission.deleteMany();
+    await db.rolePermission.deleteMany();
+    await db.userRole.deleteMany();
+    await db.userContext.deleteMany();
+    await db.passwordResetToken.deleteMany();
+    await db.revokedToken.deleteMany();
+    await db.user.deleteMany();
+    await db.context.deleteMany();
+    await db.role.deleteMany();
+    await db.permission.deleteMany();
   });
 
   afterAll(async () => {
-    await app.shutdown();
+    if (app) {
+      await app.shutdown();
+    }
   });
 
   describe('JWT utilities', () => {
-    it('signs and verifies access tokens', () => {
+    it('signs and verifies access tokens', async () => {
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
       const token = jwt.signAccess({ sub: 'user_1' });
-      const payload = jwt.verify(token) as any;
+      const payload = await jwt.verify(token) as any;
       expect(payload.sub).toBe('user_1');
       expect(payload.type).toBe('access');
     });
 
-    it('signs and verifies refresh tokens', () => {
+    it('signs and verifies refresh tokens', async () => {
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
       const token = jwt.signRefresh({ sub: 'user_1' });
-      const payload = jwt.verify(token) as any;
+      const payload = await jwt.verify(token) as any;
       expect(payload.sub).toBe('user_1');
       expect(payload.type).toBe('refresh');
     });
 
-    it('includes JTI in tokens', () => {
+    it('includes JTI in tokens', async () => {
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
       const token = jwt.signAccess({ sub: 'user_1' });
-      const payload = jwt.verify(token) as any;
+      const payload = await jwt.verify(token) as any;
       expect(payload.jti).toBeDefined();
       expect(typeof payload.jti).toBe('string');
     });
 
-    it('rejects invalid tokens', () => {
+    it('rejects invalid tokens', async () => {
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
-      expect(() => jwt.verify('invalid-token')).toThrow();
+      await expect(jwt.verify('invalid-token')).rejects.toThrow();
     });
 
-    it('rejects tokens with wrong secret', () => {
+    it('rejects tokens with wrong secret', async () => {
       const jwt1 = createJwtUtil({ secret: 'secret1', accessTTL: '15m', refreshTTL: '7d' });
       const jwt2 = createJwtUtil({ secret: 'secret2', accessTTL: '15m', refreshTTL: '7d' });
       const token = jwt1.signAccess({ sub: 'user_1' });
-      expect(() => jwt2.verify(token)).toThrow();
+      await expect(jwt2.verify(token)).rejects.toThrow();
     });
   });
 
@@ -71,8 +93,7 @@ describe('Auth Service', () => {
       const isInvalid = await app.userService.verifyPassword(user.id, 'wrongpassword');
       expect(isInvalid).toBe(false);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles password changes', async () => {
@@ -98,8 +119,7 @@ describe('Auth Service', () => {
       const newValid = await app.userService.verifyPassword(user.id, 'newpassword123');
       expect(newValid).toBe(true);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('rejects password change with wrong old password', async () => {
@@ -122,8 +142,7 @@ describe('Auth Service', () => {
       const stillValid = await app.userService.verifyPassword(user.id, 'correctpassword123');
       expect(stillValid).toBe(true);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 
@@ -131,7 +150,7 @@ describe('Auth Service', () => {
     it('tracks revoked tokens', async () => {
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
       const token = jwt.signAccess({ sub: 'user_1' });
-      const payload = jwt.verify(token) as any;
+      const payload = await jwt.verify(token) as any;
       const jti = payload.jti;
 
       // Revoke token
@@ -140,7 +159,7 @@ describe('Auth Service', () => {
       });
 
       // Verify token is now invalid
-      expect(() => jwt.verify(token)).toThrow();
+      await expect(jwt.verify(token)).rejects.toThrow('Token revoked');
     });
   });
 });

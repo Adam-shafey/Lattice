@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { CoreSaaS } from '../index';
 import { db } from '../core/db/db-client';
 
@@ -7,11 +7,31 @@ describe('Permission System', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+  });
+
+  beforeEach(async () => {
+    // Create fresh app instance for each test
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' },
+      audit: {
+        enabled: false // Disable audit logging for tests
+      }
     });
+    
+    // Clean up database before each test - delete child records first
+    await db.auditLog.deleteMany();
+    await db.userPermission.deleteMany();
+    await db.rolePermission.deleteMany();
+    await db.userRole.deleteMany();
+    await db.userContext.deleteMany();
+    await db.passwordResetToken.deleteMany();
+    await db.revokedToken.deleteMany();
+    await db.user.deleteMany();
+    await db.context.deleteMany();
+    await db.role.deleteMany();
+    await db.permission.deleteMany();
     
     // Initialize permission registry
     await app.permissionRegistry.initFromDatabase();
@@ -68,9 +88,12 @@ describe('Permission System', () => {
 
     it('initializes from database', async () => {
       // Create permission directly in database
+      const timestamp = Date.now();
+      const permissionKey = `db:init:test-${timestamp}`;
+      
       await db.permission.create({
         data: {
-          key: 'db:init:test',
+          key: permissionKey,
           label: 'Database Init Test',
           plugin: 'test'
         }
@@ -80,7 +103,7 @@ describe('Permission System', () => {
       app.permissionRegistry.clear();
       await app.permissionRegistry.initFromDatabase();
 
-      expect(app.permissionRegistry.has('db:init:test')).toBe(true);
+      expect(app.permissionRegistry.has(permissionKey)).toBe(true);
     });
   });
 
@@ -88,7 +111,7 @@ describe('Permission System', () => {
     it('merges user and role permissions (global)', async () => {
       // Create test user
       const user = await app.userService.createUser({
-        email: 'effective-test@example.com',
+        email: `effective-test-${Date.now()}@example.com`,
         password: 'password123',
         context: { actorId: 'system' }
       });
@@ -121,19 +144,18 @@ describe('Permission System', () => {
       });
       expect(hasPermission).toBe(true);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles context-specific permissions', async () => {
       const user = await app.userService.createUser({
-        email: 'context-perm-test@example.com',
+        email: `context-perm-test-${Date.now()}@example.com`,
         password: 'password123',
         context: { actorId: 'system' }
       });
 
       const context = await app.contextService.createContext({
-        id: 'perm-context',
+        id: `perm-context-${Date.now()}`,
         type: 'organization',
         name: 'Permission Context',
         context: { actorId: 'system' }
@@ -175,14 +197,12 @@ describe('Permission System', () => {
       });
       expect(hasNoPermission).toBe(false);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext(context.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles type-wide permissions', async () => {
       const user = await app.userService.createUser({
-        email: 'typewide-test@example.com',
+        email: `typewide-test-${Date.now()}@example.com`,
         password: 'password123',
         context: { actorId: 'system' }
       });
@@ -223,21 +243,20 @@ describe('Permission System', () => {
       });
       expect(hasNoPermission).toBe(false);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 
   describe('permission service', () => {
     it('grants and revokes user permissions', async () => {
       const user = await app.userService.createUser({
-        email: 'grant-revoke-test@example.com',
+        email: `grant-revoke-test-${Date.now()}@example.com`,
         password: 'password123',
         context: { actorId: 'system' }
       });
 
       const context = await app.contextService.createContext({
-        id: 'grant-context',
+        id: `grant-context-${Date.now()}`,
         type: 'organization',
         name: 'Grant Context',
         context: { actorId: 'system' }
@@ -277,20 +296,18 @@ describe('Permission System', () => {
       });
       expect(hasNoPermission).toBe(false);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext(context.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles bulk permission grants', async () => {
       const user = await app.userService.createUser({
-        email: 'bulk-test@example.com',
+        email: `bulk-test-${Date.now()}@example.com`,
         password: 'password123',
         context: { actorId: 'system' }
       });
 
       const context = await app.contextService.createContext({
-        id: 'bulk-context',
+        id: `bulk-context-${Date.now()}`,
         type: 'organization',
         name: 'Bulk Context',
         context: { actorId: 'system' }
@@ -333,20 +350,18 @@ describe('Permission System', () => {
       expect(canWrite).toBe(true);
       expect(canDelete).toBe(true);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext(context.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('gets user effective permissions', async () => {
       const user = await app.userService.createUser({
-        email: 'effective-perm-test@example.com',
+        email: `effective-perm-test-${Date.now()}@example.com`,
         password: 'password123',
         context: { actorId: 'system' }
       });
 
       const context = await app.contextService.createContext({
-        id: 'effective-context',
+        id: `effective-context-${Date.now()}`,
         type: 'organization',
         name: 'Effective Context',
         context: { actorId: 'system' }
@@ -393,10 +408,7 @@ describe('Permission System', () => {
       expect(effectivePermissions.some(p => p.key === 'effective:direct')).toBe(true);
       expect(effectivePermissions.some(p => p.key === 'effective:role')).toBe(true);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext(context.id, { actorId: 'system' });
-      await app.roleService.deleteRole('effective-role', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 

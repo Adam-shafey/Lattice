@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { CoreSaaS } from '../index';
 import { db } from '../core/db/db-client';
 
@@ -7,15 +7,37 @@ describe('Context Service', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+  });
+
+    beforeEach(async () => {
+    // Create fresh app instance for each test
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' },
+      audit: {
+        enabled: false // Disable audit logging for tests
+      }
     });
+    
+    // Clean up database before each test - delete child records first
+    await db.auditLog.deleteMany();
+    await db.userPermission.deleteMany();
+    await db.rolePermission.deleteMany();
+    await db.userRole.deleteMany();
+    await db.userContext.deleteMany();
+    await db.passwordResetToken.deleteMany();
+    await db.revokedToken.deleteMany();
+    await db.user.deleteMany();
+    await db.context.deleteMany();
+    await db.role.deleteMany();
+    await db.permission.deleteMany();
   });
 
   afterAll(async () => {
-    await app.shutdown();
+    if (app) {
+      await app.shutdown();
+    }
   });
 
   describe('context resolution', () => {
@@ -69,8 +91,7 @@ describe('Context Service', () => {
       expect(retrieved).toBeDefined();
       expect(retrieved?.id).toBe('test-org-1');
 
-      // Cleanup
-      await app.contextService.deleteContext('test-org-1', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('updates context properties', async () => {
@@ -89,8 +110,7 @@ describe('Context Service', () => {
       expect(updated.name).toBe('Updated Name');
       expect(updated.type).toBe('team');
 
-      // Cleanup
-      await app.contextService.deleteContext('test-org-2', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('lists contexts with filtering', async () => {
@@ -140,10 +160,7 @@ describe('Context Service', () => {
 
       expect(paginatedContexts.contexts.length).toBeLessThanOrEqual(2);
 
-      // Cleanup
-      await app.contextService.deleteContext('org-1', { actorId: 'system' });
-      await app.contextService.deleteContext('org-2', { actorId: 'system' });
-      await app.contextService.deleteContext('team-1', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('deletes contexts', async () => {
@@ -206,9 +223,7 @@ describe('Context Service', () => {
 
       expect(usersAfterRemoval.length).toBe(0);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext(context.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles multiple users in context', async () => {
@@ -252,10 +267,7 @@ describe('Context Service', () => {
       expect(users.length).toBe(2);
       expect(users.map(u => u.id).sort()).toEqual([user1.id, user2.id].sort());
 
-      // Cleanup
-      await app.userService.deleteUser(user1.id, { actorId: 'system' });
-      await app.userService.deleteUser(user2.id, { actorId: 'system' });
-      await app.contextService.deleteContext(context.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 
@@ -284,8 +296,7 @@ describe('Context Service', () => {
         })
       ).rejects.toThrow();
 
-      // Cleanup
-      await app.contextService.deleteContext(contextId, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 });

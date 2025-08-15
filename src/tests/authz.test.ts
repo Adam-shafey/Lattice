@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { CoreSaaS } from '../index';
 import { db } from '../core/db/db-client';
 
@@ -7,15 +7,37 @@ describe('Authorization Middleware', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+  });
+
+    beforeEach(async () => {
+    // Create fresh app instance for each test
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' },
+      audit: {
+        enabled: false // Disable audit logging for tests
+      }
     });
+    
+    // Clean up database before each test - delete child records first
+    await db.auditLog.deleteMany();
+    await db.userPermission.deleteMany();
+    await db.rolePermission.deleteMany();
+    await db.userRole.deleteMany();
+    await db.userContext.deleteMany();
+    await db.passwordResetToken.deleteMany();
+    await db.revokedToken.deleteMany();
+    await db.user.deleteMany();
+    await db.context.deleteMany();
+    await db.role.deleteMany();
+    await db.permission.deleteMany();
   });
 
   afterAll(async () => {
-    await app.shutdown();
+    if (app) {
+      await app.shutdown();
+    }
   });
 
   describe('basic authorization', () => {
@@ -80,9 +102,7 @@ describe('Authorization Middleware', () => {
 
       expect(hasNoPermission).toBe(false);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext(context.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles global permissions', async () => {
@@ -108,8 +128,7 @@ describe('Authorization Middleware', () => {
 
       expect(hasGlobalPermission).toBe(true);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles type-wide permissions', async () => {
@@ -137,8 +156,7 @@ describe('Authorization Middleware', () => {
 
       expect(hasTypeWidePermission).toBe(true);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 
@@ -191,10 +209,7 @@ describe('Authorization Middleware', () => {
 
       expect(hasRolePermission).toBe(true);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext(context.id, { actorId: 'system' });
-      await app.roleService.deleteRole('viewer', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 
@@ -257,9 +272,7 @@ describe('Authorization Middleware', () => {
 
       expect(canManage).toBe(false);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext(context.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 });

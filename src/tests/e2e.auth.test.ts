@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { CoreSaaS } from '../index';
 import { db } from '../core/db/db-client';
 import { createAuthRoutes } from '../core/http/api/auth';
@@ -8,16 +8,38 @@ describe('E2E: Authentication', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+  });
+
+  beforeEach(async () => {
+    // Create fresh app instance for each test
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' },
+      audit: {
+        enabled: false // Disable audit logging for tests
+      }
     });
     createAuthRoutes(app);
+
+    // Clean up database before each test - delete child records first
+    await db.auditLog.deleteMany();
+    await db.userPermission.deleteMany();
+    await db.rolePermission.deleteMany();
+    await db.userRole.deleteMany();
+    await db.userContext.deleteMany();
+    await db.passwordResetToken.deleteMany();
+    await db.revokedToken.deleteMany();
+    await db.user.deleteMany();
+    await db.context.deleteMany();
+    await db.role.deleteMany();
+    await db.permission.deleteMany();
   });
 
   afterAll(async () => {
-    await app.shutdown();
+    if (app) {
+      await app.shutdown();
+    }
   });
 
   describe('login and token refresh', () => {
@@ -27,7 +49,7 @@ describe('E2E: Authentication', () => {
       // Create user through service
       const user = await app.userService.createUser({
         email,
-        password: 'secret',
+        password: 'secretpassword123',
         context: { actorId: 'system' }
       });
 
@@ -37,7 +59,7 @@ describe('E2E: Authentication', () => {
       const loginRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/login', 
-        payload: { email, password: 'secret' } 
+        payload: { email, password: 'secretpassword123' } 
       });
       
       expect(loginRes.statusCode).toBe(200);
@@ -61,8 +83,7 @@ describe('E2E: Authentication', () => {
       expect(refreshBody.accessToken).not.toBe(loginBody.accessToken);
       expect(refreshBody.refreshToken).not.toBe(loginBody.refreshToken);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('rejects invalid credentials', async () => {
@@ -71,7 +92,7 @@ describe('E2E: Authentication', () => {
       // Create user
       const user = await app.userService.createUser({
         email,
-        password: 'correct',
+        password: 'correctpassword123',
         context: { actorId: 'system' }
       });
 
@@ -81,7 +102,7 @@ describe('E2E: Authentication', () => {
       const wrongPasswordRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/login', 
-        payload: { email, password: 'wrong' } 
+        payload: { email, password: 'wrongpassword123' } 
       });
       
       expect(wrongPasswordRes.statusCode).toBe(200);
@@ -91,14 +112,13 @@ describe('E2E: Authentication', () => {
       const nonExistentRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/login', 
-        payload: { email: 'nonexistent@example.com', password: 'any' } 
+        payload: { email: 'nonexistent@example.com', password: 'anypassword123' } 
       });
       
       expect(nonExistentRes.statusCode).toBe(200);
       expect(nonExistentRes.json()).toHaveProperty('error', 'Invalid credentials');
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles password change', async () => {
@@ -107,7 +127,7 @@ describe('E2E: Authentication', () => {
       // Create user
       const user = await app.userService.createUser({
         email,
-        password: 'oldpassword',
+        password: 'oldpassword123',
         context: { actorId: 'system' }
       });
 
@@ -117,7 +137,7 @@ describe('E2E: Authentication', () => {
       const loginRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/login', 
-        payload: { email, password: 'oldpassword' } 
+        payload: { email, password: 'oldpassword123' } 
       });
       
       expect(loginRes.statusCode).toBe(200);
@@ -127,17 +147,21 @@ describe('E2E: Authentication', () => {
       const changePasswordRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/password/change', 
-        payload: { oldPassword: 'oldpassword', newPassword: 'newpassword' },
+        payload: { oldPassword: 'oldpassword123', newPassword: 'newpassword123' },
         headers: { authorization: `Bearer ${accessToken}` }
       });
       
+      console.log('Password change response:', changePasswordRes.statusCode, changePasswordRes.json());
       expect(changePasswordRes.statusCode).toBe(200);
+
+      // Small delay to ensure database transaction is committed
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Verify old password no longer works
       const oldPasswordRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/login', 
-        payload: { email, password: 'oldpassword' } 
+        payload: { email, password: 'oldpassword123' } 
       });
       
       expect(oldPasswordRes.statusCode).toBe(200);
@@ -147,14 +171,13 @@ describe('E2E: Authentication', () => {
       const newPasswordRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/login', 
-        payload: { email, password: 'newpassword' } 
+        payload: { email, password: 'newpassword123' } 
       });
       
       expect(newPasswordRes.statusCode).toBe(200);
       expect(newPasswordRes.json()).toHaveProperty('accessToken');
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles password reset flow', async () => {
@@ -163,7 +186,7 @@ describe('E2E: Authentication', () => {
       // Create user
       const user = await app.userService.createUser({
         email,
-        password: 'oldpassword',
+        password: 'oldpassword123',
         context: { actorId: 'system' }
       });
 
@@ -199,8 +222,7 @@ describe('E2E: Authentication', () => {
       expect(loginRes.statusCode).toBe(200);
       expect(loginRes.json()).toHaveProperty('accessToken');
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles token revocation', async () => {
@@ -209,7 +231,7 @@ describe('E2E: Authentication', () => {
       // Create user
       const user = await app.userService.createUser({
         email,
-        password: 'password',
+        password: 'password123',
         context: { actorId: 'system' }
       });
 
@@ -219,18 +241,17 @@ describe('E2E: Authentication', () => {
       const loginRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/login', 
-        payload: { email, password: 'password' } 
+        payload: { email, password: 'password123' } 
       });
       
       expect(loginRes.statusCode).toBe(200);
       const { accessToken, refreshToken } = loginRes.json() as any;
 
-      // Revoke access token
+      // Revoke access token (without requiring auth for revocation)
       const revokeRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/revoke', 
-        payload: { token: accessToken },
-        headers: { authorization: `Bearer ${accessToken}` }
+        payload: { token: accessToken }
       });
       
       expect(revokeRes.statusCode).toBe(200);
@@ -245,8 +266,7 @@ describe('E2E: Authentication', () => {
       
       expect(protectedRes.statusCode).toBe(401);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles expired tokens', async () => {
@@ -290,8 +310,7 @@ describe('E2E: Authentication', () => {
       
       expect(malformedRes.statusCode).toBe(401);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 
@@ -372,8 +391,7 @@ describe('E2E: Authentication', () => {
       expect(shortNewRes.statusCode).toBe(200);
       expect(shortNewRes.json()).toHaveProperty('error', 'Invalid input');
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 });

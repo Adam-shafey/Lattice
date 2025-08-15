@@ -138,7 +138,7 @@ async function main() {
       const app = getApp();
       const roleService = app.roleService;
       const name = String(argv.name || argv.n);
-      const contextType = argv.contextType ? String(argv.contextType) : undefined;
+      const contextType = String(argv.contextType || 'global');
       const key = argv.key ? String(argv.key) : undefined;
       
       const role = await roleService.createRole({

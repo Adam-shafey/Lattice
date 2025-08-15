@@ -42,6 +42,10 @@ import type { Prisma } from '../db/db-client';
  */
 export class UserPermissionService extends BaseService implements IPermissionService {
   
+  constructor(db: any, audit: any) {
+    super(db, audit);
+  }
+  
   /**
    * Grants a permission directly to a user in a specific context
    * 
@@ -512,8 +516,13 @@ export class UserPermissionService extends BaseService implements IPermissionSer
           contextType,
         });
 
-        // Check if the user has the required permission
-        const hasPermission = permissions.some(p => p.key === permissionKey);
+        // Convert permissions to a Set of permission keys for wildcard matching
+        const permissionKeys = new Set(permissions.map(p => p.key));
+
+        // Use the permission registry to check for wildcard matches
+        // We need to access the permission registry through the app instance
+        // For now, we'll implement a simple wildcard check here
+        const hasPermission = this.checkPermissionWithWildcards(permissionKey, permissionKeys);
 
         return hasPermission;
       },
@@ -528,6 +537,76 @@ export class UserPermissionService extends BaseService implements IPermissionSer
       },
       serviceContext
     );
+  }
+
+  /**
+   * Checks if a permission matches any pattern in a set of granted permissions
+   * 
+   * This method supports wildcard matching using the same logic as the PermissionRegistry.
+   * 
+   * @param required - The permission key being checked
+   * @param granted - Set of permission keys the user has (may include wildcards)
+   * @returns Boolean indicating if the required permission is allowed
+   */
+  private checkPermissionWithWildcards(required: string, granted: Set<string>): boolean {
+    // Check for exact match first
+    if (granted.has(required)) {
+      return true;
+    }
+    
+    // Check for wildcard matches
+    for (const pattern of granted) {
+      if (pattern.includes('*') && this.permissionMatches(pattern, required)) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  /**
+   * Checks if a permission matches a pattern with wildcard support
+   * 
+   * @param pattern - The pattern to match against (may contain '*' wildcards)
+   * @param permission - The permission string to check
+   * @returns Boolean indicating if the permission matches the pattern
+   */
+  private permissionMatches(pattern: string, permission: string): boolean {
+    // Exact match
+    if (pattern === permission) {
+      return true;
+    }
+    
+    const patternParts = pattern.split(':');
+    const permParts = permission.split(':');
+
+    // Check each part of the permission
+    for (let i = 0; i < Math.max(patternParts.length, permParts.length); i++) {
+      const patternPart = patternParts[i];
+      const permPart = permParts[i];
+      
+      // If pattern part is undefined, no match
+      if (patternPart === undefined) {
+        return false;
+      }
+      
+      // If pattern part is wildcard, match everything
+      if (patternPart === '*') {
+        return true;
+      }
+      
+      // If permission part is undefined, no match
+      if (permPart === undefined) {
+        return false;
+      }
+      
+      // If parts don't match exactly, no match
+      if (patternPart !== permPart) {
+        return false;
+      }
+    }
+    
+    return true;
   }
 
   /**
@@ -557,7 +636,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
   async bulkGrantToUser(params: {
     userId: string;
     permissions: Array<{
-      key: string;
+      permissionKey: string;
       contextId?: string | null;
       contextType?: string | null;
     }>;
@@ -585,7 +664,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         await this.withTransaction(async (tx) => {
           for (const perm of permissions) {
             // Validate each permission
-            this.validateString(perm.key, 'permission key');
+            this.validateString(perm.permissionKey, 'permission key');
 
             // Verify context exists if provided
             if (perm.contextId) {
@@ -597,9 +676,9 @@ export class UserPermissionService extends BaseService implements IPermissionSer
 
             // Create or find the permission
             const permission = await tx.permission.upsert({
-              where: { key: perm.key },
+              where: { key: perm.permissionKey },
               update: {},
-              create: { key: perm.key, label: perm.key },
+              create: { key: perm.permissionKey, label: perm.permissionKey },
             });
 
             // Create the user-permission link
@@ -629,7 +708,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         resourceType: 'permission',
         metadata: { 
           permissionCount: permissions.length,
-          permissions: permissions.map(p => ({ key: p.key, contextId: p.contextId, contextType: p.contextType }))
+          permissions: permissions.map(p => ({ key: p.permissionKey, contextId: p.contextId, contextType: p.contextType }))
         },
       },
       serviceContext

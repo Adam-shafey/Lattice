@@ -25,6 +25,10 @@ import { randomUUID } from 'crypto';
  */
 export class UserService extends BaseService implements IUserService {
   
+  constructor(db: any, audit: any) {
+    super(db, audit);
+  }
+  
   /**
    * Creates a new user with the specified email and password
    * 
@@ -315,6 +319,27 @@ export class UserService extends BaseService implements IUserService {
       },
       serviceContext
     );
+  }
+
+  /**
+   * Verifies a user's password
+   * 
+   * @param userId - The user's unique identifier
+   * @param password - Password to verify
+   * @returns Promise resolving to true if password is correct, false otherwise
+   * 
+   * @throws ServiceError.notFound if user doesn't exist
+   */
+  async verifyPassword(userId: string, password: string): Promise<boolean> {
+    this.validateString(userId, 'user id');
+    this.validateString(password, 'password');
+
+    const user = await this.db.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw ServiceError.notFound('User', userId);
+    }
+
+    return compare(password, user.passwordHash);
   }
 
   /**

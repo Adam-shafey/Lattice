@@ -103,7 +103,7 @@ export class ServiceFactory implements IServiceFactory {
    */
   getContextService(): IContextService {
     if (!this._contextService) {
-      this._contextService = new ContextService(this.db, this.auditConfig);
+      this._contextService = new ContextService(this.db, this.auditService);
     }
     return this._contextService;
   }
@@ -119,7 +119,7 @@ export class ServiceFactory implements IServiceFactory {
    */
   getRoleService(): IRoleService {
     if (!this._roleService) {
-      this._roleService = new RoleService(this.db, this.auditConfig);
+      this._roleService = new RoleService(this.db, this.auditService);
     }
     return this._roleService;
   }
@@ -129,13 +129,13 @@ export class ServiceFactory implements IServiceFactory {
    * 
    * Creates the user permission service on first access and reuses the same
    * instance for subsequent calls. The service is configured with the shared
-   * database client and audit configuration.
+   * database client and audit service.
    * 
    * @returns IPermissionService instance
    */
   getPermissionService(): IPermissionService {
     if (!this._userPermissionService) {
-      this._userPermissionService = new UserPermissionService(this.db, this.auditConfig);
+      this._userPermissionService = new UserPermissionService(this.db, this.auditService);
     }
     return this._userPermissionService;
   }
@@ -145,13 +145,13 @@ export class ServiceFactory implements IServiceFactory {
    * 
    * Creates the user service on first access and reuses the same instance
    * for subsequent calls. The service is configured with the shared database
-   * client and audit configuration.
+   * client and audit service.
    * 
    * @returns IUserService instance
    */
   getUserService(): IUserService {
     if (!this._userService) {
-      this._userService = new UserService(this.db, this.auditConfig);
+      this._userService = new UserService(this.db, this.auditService);
     }
     return this._userService;
   }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { CoreSaaS } from '../index';
 import { db } from '../core/db/db-client';
 import { requireAuthMiddleware } from '../core/http/api/auth';
@@ -8,15 +8,37 @@ describe('E2E: Access Flows', () => {
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+  });
+
+    beforeEach(async () => {
+    // Create fresh app instance for each test
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' },
+      audit: {
+        enabled: false // Disable audit logging for tests
+      }
     });
+    
+    // Clean up database before each test - delete child records first
+    await db.auditLog.deleteMany();
+    await db.userPermission.deleteMany();
+    await db.rolePermission.deleteMany();
+    await db.userRole.deleteMany();
+    await db.userContext.deleteMany();
+    await db.passwordResetToken.deleteMany();
+    await db.revokedToken.deleteMany();
+    await db.user.deleteMany();
+    await db.context.deleteMany();
+    await db.role.deleteMany();
+    await db.permission.deleteMany();
   });
 
   afterAll(async () => {
-    await app.shutdown();
+    if (app) {
+      await app.shutdown();
+    }
   });
 
   describe('context-scoped access', () => {
@@ -116,11 +138,7 @@ describe('E2E: Access Flows', () => {
       });
       expect(r3.statusCode).toBe(200);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext('ctx_1', { actorId: 'system' });
-      await app.contextService.deleteContext('ctx_2', { actorId: 'system' });
-      await app.roleService.deleteRole('viewer', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('validates context type matches when assigning roles', async () => {
@@ -177,11 +195,7 @@ describe('E2E: Access Flows', () => {
         })
       ).resolves.toBeDefined();
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext('team_1', { actorId: 'system' });
-      await app.contextService.deleteContext('org_1', { actorId: 'system' });
-      await app.roleService.deleteRole('member', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 
@@ -205,7 +219,7 @@ describe('E2E: Access Flows', () => {
       // Create user through service
       const user = await app.userService.createUser({
         email,
-        password: 'secret1',
+        password: 'secretpassword123',
         context: { actorId: 'system' }
       });
 
@@ -236,7 +250,7 @@ describe('E2E: Access Flows', () => {
       const login = await f.inject({ 
         method: 'POST', 
         url: '/auth/login', 
-        payload: { email, password: 'secret1' } 
+        payload: { email, password: 'secretpassword123' } 
       });
       const { accessToken } = login.json() as any;
 
@@ -247,9 +261,7 @@ describe('E2E: Access Flows', () => {
       });
       expect(okRes.statusCode).toBe(200);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.roleService.deleteRole('viewer2', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 
@@ -307,10 +319,7 @@ describe('E2E: Access Flows', () => {
       });
       expect(res2.statusCode).toBe(200);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext('ctx_a', { actorId: 'system' });
-      await app.contextService.deleteContext('ctx_b', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('type-wide permissions work for all contexts of that type', async () => {
@@ -382,11 +391,7 @@ describe('E2E: Access Flows', () => {
       });
       expect(res3.statusCode).toBe(403);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.contextService.deleteContext('team_1', { actorId: 'system' });
-      await app.contextService.deleteContext('team_2', { actorId: 'system' });
-      await app.contextService.deleteContext('org_1', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 });

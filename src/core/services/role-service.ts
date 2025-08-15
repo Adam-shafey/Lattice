@@ -5,6 +5,11 @@ import type { Prisma } from '../db/db-client';
 import { randomUUID } from 'crypto';
 
 export class RoleService extends BaseService implements IRoleService {
+  
+  constructor(db: any, audit: any) {
+    super(db, audit);
+  }
+  
   async createRole(params: {
     name: string;
     contextType: string;

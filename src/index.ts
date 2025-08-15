@@ -177,11 +177,11 @@ export class CoreSaaSApp {
   }
 
   public requireAuth() {
-    return requireAuthMiddleware();
+    return requireAuthMiddleware(this);
   }
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
-    const { userId, context, permission } = input;
+    const { userId, context, permission, requireGlobal, requireTypeWide, scope } = input;
     let effective: Set<string> = new Set();
     try {
       effective = await fetchEffectivePermissions({ userId, context: context ?? null });
@@ -196,6 +196,23 @@ export class CoreSaaSApp {
       const byUser = this.userContextGrants.get(userId)?.get(context.id);
       if (byUser) for (const p of byUser) merged.add(p);
     }
+
+    // Apply scope restrictions
+    if (requireGlobal || scope === 'global') {
+      // For global scope, only check global permissions (no context-specific ones)
+      const globalPerms = new Set<string>();
+      if (global) for (const p of global) globalPerms.add(p);
+      return this.permissionRegistry.isAllowed(permission, globalPerms);
+    }
+
+    if (requireTypeWide || scope === 'type-wide') {
+      // For type-wide scope, check global and type-wide permissions
+      const typeWidePerms = new Set<string>([...effective]);
+      if (global) for (const p of global) typeWidePerms.add(p);
+      return this.permissionRegistry.isAllowed(permission, typeWidePerms);
+    }
+
+    // For exact scope or no scope specified, check all permissions
     return this.permissionRegistry.isAllowed(permission, merged);
   }
 

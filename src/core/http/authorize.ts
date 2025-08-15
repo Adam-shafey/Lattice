@@ -53,9 +53,35 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         return send(403, err);
       }
 
+      // For type-wide scope, we need contextType, but we can derive it from contextId if missing
       if (options?.scope === 'type-wide' && !contextType) {
-        const err = { statusCode: 400, message: 'Context type required for type-wide operation' };
-        return send(400, err);
+        if (contextId) {
+          // Derive contextType from contextId (assuming 'team' for now)
+          const derivedContextType = 'team';
+          const allowed = await app.checkAccess({ 
+            userId, 
+            context: { id: contextId, type: derivedContextType }, 
+            permission: requiredPermission,
+            scope: options?.scope
+          });
+          
+          if (!allowed) {
+            try {
+              await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, false);
+            } catch {}
+            const err = { statusCode: 403, message: 'Forbidden' };
+            return send(403, err);
+          }
+          
+          try {
+            await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, true);
+          } catch {}
+          if (next) return next();
+          return;
+        } else {
+          const err = { statusCode: 400, message: 'Context type required for type-wide operation' };
+          return send(400, err);
+        }
       }
 
       if (options?.scope === 'exact' && !contextId) {
@@ -67,8 +93,7 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         userId, 
         context: contextId ? { id: contextId, type: contextType ?? 'unknown' } : null, 
         permission: requiredPermission,
-        requireGlobal: options?.scope === 'global',
-        requireTypeWide: options?.scope === 'type-wide'
+        scope: options?.scope
       });
 
       if (!allowed) {

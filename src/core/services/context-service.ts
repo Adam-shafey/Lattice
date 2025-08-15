@@ -15,6 +15,11 @@ export interface ContextObject {
 }
 
 export class ContextService extends BaseService implements IContextService {
+  
+  constructor(db: any, audit: any) {
+    super(db, audit);
+  }
+  
   resolveContext(input: ResolveContextInput): ContextObject | null {
     const candidates = [input.routeParam, input.header, input.query].filter(Boolean) as string[];
     if (candidates.length === 0) return null;
@@ -211,7 +216,7 @@ export class ContextService extends BaseService implements IContextService {
     return this.withAudit(
       async () => {
         // Verify user and context exist
-        const [user, context] = await Promise.all([
+        const [user, contextRecord] = await Promise.all([
           this.db.user.findUnique({ where: { id: userId } }),
           this.db.context.findUnique({ where: { id: contextId } }),
         ]);
@@ -219,7 +224,7 @@ export class ContextService extends BaseService implements IContextService {
         if (!user) {
           throw ServiceError.notFound('User', userId);
         }
-        if (!context) {
+        if (!contextRecord) {
           throw ServiceError.notFound('Context', contextId);
         }
 
@@ -241,7 +246,6 @@ export class ContextService extends BaseService implements IContextService {
         success: true,
         targetUserId: userId,
         contextId,
-        metadata: { contextType: context?.type },
       },
       serviceContext
     );
@@ -260,7 +264,7 @@ export class ContextService extends BaseService implements IContextService {
     return this.withAudit(
       async () => {
         // Verify user and context exist
-        const [user, context] = await Promise.all([
+        const [user, contextRecord] = await Promise.all([
           this.db.user.findUnique({ where: { id: userId } }),
           this.db.context.findUnique({ where: { id: contextId } }),
         ]);
@@ -268,7 +272,7 @@ export class ContextService extends BaseService implements IContextService {
         if (!user) {
           throw ServiceError.notFound('User', userId);
         }
-        if (!context) {
+        if (!contextRecord) {
           throw ServiceError.notFound('Context', contextId);
         }
 
@@ -284,7 +288,6 @@ export class ContextService extends BaseService implements IContextService {
         success: true,
         targetUserId: userId,
         contextId,
-        metadata: { contextType: context?.type },
       },
       serviceContext
     );
@@ -317,7 +320,7 @@ export class ContextService extends BaseService implements IContextService {
         action: 'context.users.list',
         success: true,
         contextId,
-        metadata: { contextType: context?.type },
+
       },
       serviceContext
     );

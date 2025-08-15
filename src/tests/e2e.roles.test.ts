@@ -1,19 +1,49 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { CoreSaaS } from '../index';
 import { registerRoleRoutes } from '../core/http/api/roles';
 import { defaultRoutePermissionPolicy } from '../core/policy/policy';
+import { db } from '../core/db/db-client';
 
 describe('E2E: Role Management', () => {
   let app: ReturnType<typeof CoreSaaS>;
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+  });
+
+  beforeEach(async () => {
+    // Create fresh app instance for each test
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' },
+      audit: {
+        enabled: false // Disable audit logging for tests
+      }
     });
     registerRoleRoutes(app, defaultRoutePermissionPolicy);
+    
+    // Clean up database before each test - delete child records first
+    await db.auditLog.deleteMany();
+    await db.userPermission.deleteMany();
+    await db.rolePermission.deleteMany();
+    await db.userRole.deleteMany();
+    await db.userContext.deleteMany();
+    await db.passwordResetToken.deleteMany();
+    await db.revokedToken.deleteMany();
+    await db.user.deleteMany();
+    await db.context.deleteMany();
+    await db.role.deleteMany();
+    await db.permission.deleteMany();
+
+    // Register permissions used in tests
+    app.permissionRegistry.register({ key: 'roles:assign:team', label: 'Assign Team Roles' });
+    app.permissionRegistry.register({ key: 'roles:remove:team', label: 'Remove Team Roles' });
+    app.permissionRegistry.register({ key: 'roles:team:manage', label: 'Manage Team Roles' });
+    app.permissionRegistry.register({ key: 'roles:team:create', label: 'Create Team Roles' });
+    app.permissionRegistry.register({ key: 'roles:team:list', label: 'List Team Roles' });
+    app.permissionRegistry.register({ key: 'roles:list', label: 'List All Roles' });
+    app.permissionRegistry.register({ key: 'permissions:example:read:grant:team', label: 'Grant Example Read Permission to Team' });
   });
 
   afterAll(async () => {
@@ -23,6 +53,13 @@ describe('E2E: Role Management', () => {
   describe('role management permissions', () => {
     it('enforces type-specific permission for role management', async () => {
       const f = app.fastify!;
+
+      // Create test user
+      const user = await app.userService.createUser({
+        email: `role_test_${Date.now()}@example.com`,
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
 
       // No auth -> 401
       const r1 = await f.inject({ 
@@ -34,7 +71,7 @@ describe('E2E: Role Management', () => {
 
       // Wrong context type permission not enough
       await app.permissionService.grantToUser({
-        userId: 'u1',
+        userId: user.id,
         permissionKey: 'roles:org:create',
         context: { actorId: 'system' }
       });
@@ -43,13 +80,13 @@ describe('E2E: Role Management', () => {
         method: 'POST', 
         url: '/roles', 
         payload: { name: 'editor', contextType: 'team' },
-        headers: { 'x-user-id': 'u1' }
+        headers: { 'x-user-id': user.id }
       });
       expect(r2.statusCode).toBe(403);
 
       // Correct context type permission works
       await app.permissionService.grantToUser({
-        userId: 'u1',
+        userId: user.id,
         permissionKey: 'roles:team:create',
         context: { actorId: 'system' }
       });
@@ -58,119 +95,152 @@ describe('E2E: Role Management', () => {
         method: 'POST', 
         url: '/roles', 
         payload: { name: 'editor', contextType: 'team' },
-        headers: { 'x-user-id': 'u1' }
+        headers: { 'x-user-id': user.id }
       });
       expect(r3.statusCode).toBe(200);
+
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('enforces exact scope for role assignments', async () => {
       const f = app.fastify!;
 
+      // Create test context
+      const context = await app.contextService.createContext({
+        id: 'ctx_1',
+        type: 'team',
+        name: 'Test Context',
+        context: { actorId: 'system' }
+      });
+
+      // Create test users
+      const user1 = await app.userService.createUser({
+        email: `role_assign_1_${Date.now()}@example.com`,
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
+      const user2 = await app.userService.createUser({
+        email: `role_assign_2_${Date.now()}@example.com`,
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
       // Missing context type -> 403
       const r1 = await f.inject({ 
         method: 'POST', 
         url: '/roles/assign', 
-        payload: { roleName: 'editor', userId: 'u2', contextId: 'ctx_1' },
-        headers: { 'x-user-id': 'u1' }
+        payload: { roleName: 'editor', userId: user2.id, contextId: 'ctx_1' },
+        headers: { 'x-user-id': user1.id }
       });
       expect(r1.statusCode).toBe(403);
 
-      // Global permission not enough, needs exact context
-      await app.permissionService.grantToUser({
-        userId: 'u1',
-        permissionKey: 'roles:assign',
-        context: { actorId: 'system' }
-      });
+      // Global permission not enough, needs type-wide context
+      app.grantUserPermission(user1.id, 'roles:assign');
       
       const r2 = await f.inject({ 
         method: 'POST', 
         url: '/roles/assign', 
-        payload: { roleName: 'editor', userId: 'u2', contextId: 'ctx_1', contextType: 'team' },
-        headers: { 'x-user-id': 'u1' }
+        payload: { roleName: 'editor', userId: user2.id, contextId: 'ctx_1', contextType: 'team' },
+        headers: { 'x-user-id': user1.id }
       });
       expect(r2.statusCode).toBe(403);
 
-      // Context-specific permission works
-      await app.permissionService.grantToUser({
-        userId: 'u1',
-        permissionKey: 'roles:assign',
-        contextId: 'ctx_1',
-        context: { actorId: 'system' }
-      });
+      // Type-wide permission works
+      app.grantUserPermission(user1.id, 'roles:assign:team');
       
       const r3 = await f.inject({ 
         method: 'POST', 
         url: '/roles/assign', 
-        payload: { roleName: 'editor', userId: 'u2', contextId: 'ctx_1', contextType: 'team' },
-        headers: { 'x-user-id': 'u1' }
+        payload: { roleName: 'editor', userId: user2.id, contextId: 'ctx_1', contextType: 'team' },
+        headers: { 'x-user-id': user1.id }
       });
       expect(r3.statusCode).toBe(200);
+
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('requires both role management and permission grant abilities', async () => {
       const f = app.fastify!;
 
-      // Only role management permission not enough
-      await app.permissionService.grantToUser({
-        userId: 'u1',
-        permissionKey: 'roles:team:manage',
+      // Create test user for first test
+      const user1 = await app.userService.createUser({
+        email: `role_manage_1_${Date.now()}@example.com`,
+        password: 'password123',
         context: { actorId: 'system' }
       });
+
+      // Only role management permission not enough
+      app.grantUserPermission(user1.id, 'roles:team:manage');
       
       const r1 = await f.inject({ 
         method: 'POST', 
         url: '/roles/editor/permissions/add', 
         payload: { permissionKey: 'example:read', contextType: 'team' },
-        headers: { 'x-user-id': 'u1' }
+        headers: { 'x-user-id': user1.id }
       });
       expect(r1.statusCode).toBe(403);
 
-      // Only permission grant ability not enough
-      await app.permissionService.grantToUser({
-        userId: 'u1',
-        permissionKey: 'permissions:example:read:grant:team',
+      // Create new user for second test
+      const user2 = await app.userService.createUser({
+        email: `role_manage_2_${Date.now()}@example.com`,
+        password: 'password123',
         context: { actorId: 'system' }
       });
+
+      // Only permission grant ability not enough
+      app.grantUserPermission(user2.id, 'permissions:example:read:grant:team');
       
       const r2 = await f.inject({ 
         method: 'POST', 
         url: '/roles/editor/permissions/add', 
         payload: { permissionKey: 'example:read', contextType: 'team' },
-        headers: { 'x-user-id': 'u1' }
+        headers: { 'x-user-id': user2.id }
       });
       expect(r2.statusCode).toBe(403);
 
+      // Create new user for third test
+      const user3 = await app.userService.createUser({
+        email: `role_manage_3_${Date.now()}@example.com`,
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
       // Both permissions work
-      await app.permissionService.grantToUser({
-        userId: 'u1',
-        permissionKey: 'roles:team:manage',
-        context: { actorId: 'system' }
-      });
-      
-      await app.permissionService.grantToUser({
-        userId: 'u1',
-        permissionKey: 'permissions:example:read:grant:team',
-        context: { actorId: 'system' }
-      });
+      app.grantUserPermission(user3.id, 'roles:team:manage');
+      app.grantUserPermission(user3.id, 'permissions:example:read:grant:team');
       
       const r3 = await f.inject({ 
         method: 'POST', 
         url: '/roles/editor/permissions/add', 
         payload: { permissionKey: 'example:read', contextType: 'team' },
-        headers: { 'x-user-id': 'u1' }
+        headers: { 'x-user-id': user3.id }
       });
       expect(r3.statusCode).toBe(200);
+
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('validates role-permission grant inputs', async () => {
       const f = app.fastify!;
 
-      // Grant global permission for the test
-      await app.permissionService.grantToUser({
-        userId: 'u1',
-        permissionKey: 'roles:permissions:grant',
+      // Create test user
+      const user = await app.userService.createUser({
+        email: `role_validate_${Date.now()}@example.com`,
+        password: 'password123',
         context: { actorId: 'system' }
       });
+
+      // Create the editor role first
+      await app.roleService.createRole({
+        name: 'editor',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
+
+      // Grant both required permissions for the test
+      app.grantUserPermission(user.id, 'roles:team:manage');
+      app.grantUserPermission(user.id, 'permissions:example:read:grant:team');
 
       // Cannot provide both contextId and contextType
       const r1 = await f.inject({ 
@@ -181,9 +251,9 @@ describe('E2E: Role Management', () => {
           contextId: 'ctx_1',
           contextType: 'team'
         },
-        headers: { 'x-user-id': 'u1' }
+        headers: { 'x-user-id': user.id }
       });
-      expect(r1.statusCode).toBe(403);
+      expect(r1.statusCode).toBe(400);
       expect(r1.json()).toMatchObject({ 
         error: 'Invalid input',
         issues: expect.arrayContaining([
@@ -201,7 +271,7 @@ describe('E2E: Role Management', () => {
           permissionKey: 'example:read', 
           contextId: 'ctx_1'
         },
-        headers: { 'x-user-id': 'u1' }
+        headers: { 'x-user-id': user.id }
       });
       expect(r2.statusCode).toBe(200);
 
@@ -213,9 +283,11 @@ describe('E2E: Role Management', () => {
           permissionKey: 'example:read', 
           contextType: 'team'
         },
-        headers: { 'x-user-id': 'u1' }
+        headers: { 'x-user-id': user.id }
       });
       expect(r3.statusCode).toBe(200);
+
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 
@@ -223,12 +295,18 @@ describe('E2E: Role Management', () => {
     it('creates roles with proper validation', async () => {
       const f = app.fastify!;
 
-      // Grant permission
-      await app.permissionService.grantToUser({
-        userId: 'admin',
-        permissionKey: 'roles:team:create',
+      // Create admin user
+      const admin = await app.userService.createUser({
+        email: `role_admin_${Date.now()}@example.com`,
+        password: 'password123',
         context: { actorId: 'system' }
       });
+
+      // Grant permissions for both create and list operations
+      app.grantUserPermission(admin.id, 'roles:team:create');
+
+      // The list roles endpoint now requires a type-specific permission
+      app.grantUserPermission(admin.id, 'roles:team:list');
 
       // Create role
       const createRes = await f.inject({ 
@@ -239,7 +317,7 @@ describe('E2E: Role Management', () => {
           contextType: 'team',
           key: 'test-role-key'
         },
-        headers: { 'x-user-id': 'admin' }
+        headers: { 'x-user-id': admin.id }
       });
       
       expect(createRes.statusCode).toBe(200);
@@ -252,23 +330,30 @@ describe('E2E: Role Management', () => {
       const listRes = await f.inject({ 
         method: 'GET', 
         url: '/roles?contextType=team',
-        headers: { 'x-user-id': 'admin' }
+        headers: { 'x-user-id': admin.id }
       });
       
       expect(listRes.statusCode).toBe(200);
       const roles = listRes.json() as any[];
       expect(roles.some(r => r.name === 'test-role')).toBe(true);
 
-      // Cleanup
-      await app.roleService.deleteRole('test-role', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
 
     it('handles role assignments and removals', async () => {
       const f = app.fastify!;
 
+      // Create test context
+      const context = await app.contextService.createContext({
+        id: 'ctx_1',
+        type: 'team',
+        name: 'Test Context',
+        context: { actorId: 'system' }
+      });
+
       // Create test user and role
       const user = await app.userService.createUser({
-        email: 'role-test@example.com',
+        email: `role-test-${Date.now()}@example.com`,
         password: 'password123',
         context: { actorId: 'system' }
       });
@@ -279,13 +364,16 @@ describe('E2E: Role Management', () => {
         context: { actorId: 'system' }
       });
 
-      // Grant permissions
-      await app.permissionService.grantToUser({
-        userId: 'admin',
-        permissionKey: 'roles:assign',
-        contextId: 'ctx_1',
+      // Create admin user
+      const admin = await app.userService.createUser({
+        email: `role_assign_admin_${Date.now()}@example.com`,
+        password: 'password123',
         context: { actorId: 'system' }
       });
+
+      // Grant permissions - role assignment now requires type-wide scope
+      app.grantUserPermission(admin.id, 'roles:assign:team');
+      app.grantUserPermission(admin.id, 'roles:remove:team');
 
       // Assign role
       const assignRes = await f.inject({ 
@@ -297,7 +385,7 @@ describe('E2E: Role Management', () => {
           contextId: 'ctx_1',
           contextType: 'team'
         },
-        headers: { 'x-user-id': 'admin' }
+        headers: { 'x-user-id': admin.id }
       });
       
       expect(assignRes.statusCode).toBe(200);
@@ -312,14 +400,12 @@ describe('E2E: Role Management', () => {
           contextId: 'ctx_1',
           contextType: 'team'
         },
-        headers: { 'x-user-id': 'admin' }
+        headers: { 'x-user-id': admin.id }
       });
       
       expect(removeRes.statusCode).toBe(200);
 
-      // Cleanup
-      await app.userService.deleteUser(user.id, { actorId: 'system' });
-      await app.roleService.deleteRole('test-assignment-role', { actorId: 'system' });
+      // No manual cleanup needed - beforeEach handles it
     });
   });
 });

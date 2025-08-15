@@ -8,7 +8,25 @@
 
 import { db as PrismaClient, type Prisma } from '../db/db-client';
 import type { PrismaClient as PrismaClientType } from '../../../prisma/generated/client';
-import { AuditService, type AuditConfig } from './audit-service';
+
+// Define audit interface to avoid circular dependency
+export interface AuditServiceInterface {
+  log(params: {
+    actorId?: string | null;
+    targetUserId?: string | null;
+    contextId?: string | null;
+    action: string;
+    success: boolean;
+    requestId?: string | null;
+    ip?: string | null;
+    userAgent?: string | null;
+    resourceType?: string | null;
+    resourceId?: string | null;
+    plugin?: string | null;
+    error?: string | null;
+    metadata?: unknown;
+  }): Promise<void>;
+}
 
 /**
  * Service Context Interface
@@ -142,19 +160,19 @@ export abstract class BaseService {
   protected readonly db: PrismaClientType;
   
   /** Audit service for logging all operations */
-  protected readonly audit: AuditService;
+  protected readonly audit: AuditServiceInterface;
 
   /**
    * Constructor for BaseService
    * @param db - Prisma database client
-   * @param auditConfig - Optional audit configuration
+   * @param audit - Audit service instance
    */
   constructor(
     db: PrismaClientType,
-    auditConfig?: AuditConfig
+    audit: AuditServiceInterface
   ) {
     this.db = db;
-    this.audit = new AuditService(auditConfig);
+    this.audit = audit;
   }
 
   /**

@@ -64,10 +64,27 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
       } catch (error) {
         // Handle errors gracefully
         console.error('Fastify handler error:', error);
-        reply.status(500).send({ 
-          error: 'Internal server error',
-          message: error instanceof Error ? error.message : 'Unknown error'
-        });
+        
+        // Check for custom error with status code
+        if (error && typeof error === 'object' && 'statusCode' in error) {
+          const statusCode = (error as any).statusCode;
+          const response: any = { 
+            error: 'Invalid input',
+            message: error instanceof Error ? error.message : 'Unknown error'
+          };
+          
+          // Add issues if present
+          if ('issues' in error) {
+            response.issues = (error as any).issues;
+          }
+          
+          reply.status(statusCode).send(response);
+        } else {
+          reply.status(500).send({ 
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
       }
     };
   }

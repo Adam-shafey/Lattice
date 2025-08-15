@@ -1,5 +1,5 @@
 import { db } from '../db/db-client';
-import { BaseService, ServiceError } from './base-service';
+import { ServiceError, type AuditServiceInterface } from './base-service';
 
 export interface AuditConfig {
   enabled: boolean;
@@ -27,13 +27,13 @@ export interface AuditLogEntry {
   metadata?: unknown;
 }
 
-export class AuditService extends BaseService {
+export class AuditService implements AuditServiceInterface {
   private readonly cfg: AuditConfig;
   private readonly batchQueue: AuditLogEntry[] = [];
   private flushTimer?: NodeJS.Timeout;
+  private readonly db = db;
 
   constructor(enabledOrConfig: boolean | AuditConfig = true) {
-    super(db);
     this.cfg = typeof enabledOrConfig === 'boolean' 
       ? { enabled: enabledOrConfig } 
       : enabledOrConfig;
@@ -156,7 +156,7 @@ export class AuditService extends BaseService {
 
     if (this.cfg.sinks?.includes('db')) {
       promises.push(
-        this.db.auditLog.create({ data }).catch(error => {
+        this.db.auditLog.create({ data }).then(() => {}).catch(error => {
           console.error('Failed to write audit log to database:', error);
         })
       );
@@ -182,8 +182,10 @@ export class AuditService extends BaseService {
     try {
       if (this.cfg.sinks?.includes('db')) {
         await this.db.auditLog.createMany({
-          data: batch,
-          skipDuplicates: true,
+          data: batch.map(entry => ({
+            ...entry,
+            metadata: entry.metadata as any
+          }))
         });
       }
 

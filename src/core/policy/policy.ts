@@ -70,9 +70,9 @@ export const defaultRoutePermissionPolicy = {
     delete: 'roles:{type}:delete',
     manage: 'roles:{type}:manage',
     
-    // Assignment operations (exact context scope)
-    assign: 'roles:assign',
-    remove: 'roles:remove',
+    // Assignment operations (type-wide scope - need context type)
+    assign: 'roles:assign:{type}',
+    remove: 'roles:remove:{type}',
     
     // Permission operations (require both role management and permission grant)
     addPerm: {
