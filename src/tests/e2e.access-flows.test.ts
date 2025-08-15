@@ -1,144 +1,394 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { CoreSaaS } from '../index';
-import { PrismaClient } from '../../prisma/generated/client';
-import { RoleService } from '../core/services/role-service';
-import { createAuthRoutes, requireAuthMiddleware } from '../core/http/api/auth';
-import { defaultRoutePermissionPolicy } from '../core/policy/policy';
+import { db } from '../core/db/db-client';
+import { requireAuthMiddleware } from '../core/http/api/auth';
 
-describe('E2E: access flows (roles, permissions, contexts, bearer)', () => {
-  const db = new PrismaClient() as PrismaClient & {
-    user: { create: any; delete: any };
-    context: { create: any };
-    permission: { upsert: any; findUniqueOrThrow: any };
-    userPermission: { create: any };
-  };
+describe('E2E: Access Flows', () => {
   let app: ReturnType<typeof CoreSaaS>;
-  let roleService: RoleService;
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
-    app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
-    roleService = new RoleService(app);
+    app = CoreSaaS({ 
+      db: { provider: 'sqlite' }, 
+      adapter: 'fastify', 
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
+    });
   });
 
-
-
-  // Test: Context-scoped access - verifies that role and user permissions are properly scoped to contexts
-  // Edge case: Tests that permissions from different sources (roles vs direct) work independently in different contexts
-  it('role in context grants access only within that context; user grant works for another context', async () => {
-    const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
-    const f = app.fastify!;
-
-    // Protected routes (pass type via header)
-    app.route({ method: 'GET', path: '/read/:contextId', preHandler: app.authorize('example:read', { contextRequired: true }), handler: async () => ({ ok: true }) });
-    app.route({ method: 'GET', path: '/write/:contextId', preHandler: app.authorize('example:write', { contextRequired: true }), handler: async () => ({ ok: true }) });
-
-    const userId = `u_${Date.now()}`;
-    // Create user in DB so role assignment has FK
-    await db.user.create({ data: { id: userId, email: `${userId}@example.com`, passwordHash: 'x' } });
-
-    // Ensure contexts exist for FK
-    await db.context.create({ data: { id: 'ctx_1', type: 'team' } }).catch(() => {});
-    await db.context.create({ data: { id: 'ctx_2', type: 'team' } }).catch(() => {});
-
-    // Create role with read permission, assign to ctx_1 only
-    await roleService.createRole('viewer', { contextType: 'team' });
-    await roleService.addPermissionToRole({ 
-      roleName: 'viewer', 
-      permissionKey: 'example:read',
-      contextType: 'team',
-      policy: defaultRoutePermissionPolicy
-    });
-    await roleService.assignRoleToUser({ 
-      roleName: 'viewer', 
-      userId, 
-      contextId: 'ctx_1', 
-      contextType: 'team' 
-    });
-
-    // Access ctx_1 allowed
-    const r1 = await f.inject({ method: 'GET', url: '/read/ctx_1', headers: { 'x-user-id': userId, 'x-context-type': 'team' } });
-    expect(r1.statusCode).toBe(200);
-    // Access ctx_2 denied
-    const r2 = await f.inject({ method: 'GET', url: '/read/ctx_2', headers: { 'x-user-id': userId, 'x-context-type': 'team' } });
-    expect(r2.statusCode).toBe(403);
-
-    // Grant user-level write permission in ctx_2
-    await db.permission.upsert({ where: { key: 'example:write' }, update: {}, create: { key: 'example:write', label: 'Write example' } });
-    const perm = await db.permission.findUniqueOrThrow({ where: { key: 'example:write' } });
-    await db.userPermission.create({ data: { id: `${userId}-${perm.id}-ctx_2`, userId, permissionId: perm.id, contextId: 'ctx_2' } });
-    // Now write on ctx_2 should pass
-    const r3 = await f.inject({ method: 'GET', url: '/write/ctx_2', headers: { 'x-user-id': userId, 'x-context-type': 'team' } });
-    expect(r3.statusCode).toBe(200);
+  afterAll(async () => {
+    await app.shutdown();
   });
 
-  // Test: Context type validation - verifies that role assignments validate context type matches
-  // Edge case: Tests that mismatched context types are rejected, even if the context exists
-  it('validates context type matches when assigning roles', async () => {
-    const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
-    const userId = `u_${Date.now()}`;
-    await db.user.create({ data: { id: userId, email: `${userId}@example.com`, passwordHash: 'x' } });
+  describe('context-scoped access', () => {
+    it('role in context grants access only within that context; user grant works for another context', async () => {
+      const f = app.fastify!;
 
-    // Create contexts of different types
-    await db.context.create({ data: { id: 'team_1', type: 'team' } }).catch(() => {});
-    await db.context.create({ data: { id: 'org_1', type: 'org' } }).catch(() => {});
+      // Protected routes (pass type via header)
+      app.route({ 
+        method: 'GET', 
+        path: '/read/:contextId', 
+        preHandler: app.authorize('example:read', { contextRequired: true }), 
+        handler: async () => ({ ok: true }) 
+      });
+      
+      app.route({ 
+        method: 'GET', 
+        path: '/write/:contextId', 
+        preHandler: app.authorize('example:write', { contextRequired: true }), 
+        handler: async () => ({ ok: true }) 
+      });
 
-    // Create role with wrong type
-    await roleService.createRole('member', { contextType: 'org' });
+      const userId = `u_${Date.now()}`;
+      
+      // Create user through service
+      const user = await app.userService.createUser({
+        email: `${userId}@example.com`,
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
 
-    // Assigning org role to team context should fail
-    await expect(
-      roleService.assignRoleToUser({ roleName: 'member', userId, contextId: 'team_1', contextType: 'team' })
-    ).rejects.toThrow('Role member has type org, cannot be assigned in team context');
+      // Create contexts through service
+      await app.contextService.createContext({
+        id: 'ctx_1',
+        type: 'team',
+        name: 'Context 1',
+        context: { actorId: 'system' }
+      });
 
-    // Assigning with correct type should work
-    await expect(
-      roleService.assignRoleToUser({ roleName: 'member', userId, contextId: 'org_1', contextType: 'org' })
-    ).resolves.toBeDefined();
+      await app.contextService.createContext({
+        id: 'ctx_2',
+        type: 'team',
+        name: 'Context 2',
+        context: { actorId: 'system' }
+      });
+
+      // Create role with read permission, assign to ctx_1 only
+      await app.roleService.createRole({
+        name: 'viewer',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
+      
+      await app.roleService.addPermissionToRole({ 
+        roleName: 'viewer', 
+        permissionKey: 'example:read',
+        contextId: 'ctx_1',
+        context: { actorId: 'system' }
+      });
+      
+      await app.roleService.assignRoleToUser({ 
+        roleName: 'viewer', 
+        userId: user.id, 
+        contextId: 'ctx_1', 
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
+
+      // Access ctx_1 allowed
+      const r1 = await f.inject({ 
+        method: 'GET', 
+        url: '/read/ctx_1', 
+        headers: { 'x-user-id': user.id, 'x-context-type': 'team' } 
+      });
+      expect(r1.statusCode).toBe(200);
+      
+      // Access ctx_2 denied
+      const r2 = await f.inject({ 
+        method: 'GET', 
+        url: '/read/ctx_2', 
+        headers: { 'x-user-id': user.id, 'x-context-type': 'team' } 
+      });
+      expect(r2.statusCode).toBe(403);
+
+      // Grant user-level write permission in ctx_2
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'example:write',
+        contextId: 'ctx_2',
+        context: { actorId: 'system' }
+      });
+      
+      // Now write on ctx_2 should pass
+      const r3 = await f.inject({ 
+        method: 'GET', 
+        url: '/write/ctx_2', 
+        headers: { 'x-user-id': user.id, 'x-context-type': 'team' } 
+      });
+      expect(r3.statusCode).toBe(200);
+
+      // Cleanup
+      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      await app.contextService.deleteContext('ctx_1', { actorId: 'system' });
+      await app.contextService.deleteContext('ctx_2', { actorId: 'system' });
+      await app.roleService.deleteRole('viewer', { actorId: 'system' });
+    });
+
+    it('validates context type matches when assigning roles', async () => {
+      const userId = `u_${Date.now()}`;
+      
+      // Create user through service
+      const user = await app.userService.createUser({
+        email: `${userId}@example.com`,
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
+      // Create contexts of different types
+      await app.contextService.createContext({
+        id: 'team_1',
+        type: 'team',
+        name: 'Team 1',
+        context: { actorId: 'system' }
+      });
+
+      await app.contextService.createContext({
+        id: 'org_1',
+        type: 'org',
+        name: 'Org 1',
+        context: { actorId: 'system' }
+      });
+
+      // Create role with wrong type
+      await app.roleService.createRole({
+        name: 'member',
+        contextType: 'org',
+        context: { actorId: 'system' }
+      });
+
+      // Assigning org role to team context should fail
+      await expect(
+        app.roleService.assignRoleToUser({ 
+          roleName: 'member', 
+          userId: user.id, 
+          contextId: 'team_1', 
+          contextType: 'team',
+          context: { actorId: 'system' }
+        })
+      ).rejects.toThrow('Role member has type org, cannot be assigned in team context');
+
+      // Assigning with correct type should work
+      await expect(
+        app.roleService.assignRoleToUser({ 
+          roleName: 'member', 
+          userId: user.id, 
+          contextId: 'org_1', 
+          contextType: 'org',
+          context: { actorId: 'system' }
+        })
+      ).resolves.toBeDefined();
+
+      // Cleanup
+      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      await app.contextService.deleteContext('team_1', { actorId: 'system' });
+      await app.contextService.deleteContext('org_1', { actorId: 'system' });
+      await app.roleService.deleteRole('member', { actorId: 'system' });
+    });
   });
 
-  // Test: Bearer token + authorize chain - verifies that token auth and permission checks work together
-  // Edge case: Tests that global permissions work with bearer token auth
-  it('bearer token + authorize chain allows when token valid and permission present', async () => {
-    const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
-    createAuthRoutes(app);
-    const f = app.fastify!;
+  describe('bearer token + authorize chain', () => {
+    it('bearer token + authorize chain allows when token valid and permission present', async () => {
+      const f = app.fastify!;
 
-    // Protected route requiring bearer + permission
-    app.route({
-      method: 'GET',
-      path: '/bear/:contextId',
-      preHandler: [requireAuthMiddleware(), app.authorize('example:read', { contextRequired: true })],
-      handler: async () => ({ ok: true }),
+      // Protected route requiring bearer + permission
+      app.route({
+        method: 'GET',
+        path: '/bear/:contextId',
+        preHandler: [
+          requireAuthMiddleware(app),
+          app.authorize('example:read', { contextRequired: true })
+        ],
+        handler: async () => ({ ok: true }),
+      });
+
+      const email = `b_${Date.now()}@example.com`;
+      
+      // Create user through service
+      const user = await app.userService.createUser({
+        email,
+        password: 'secret1',
+        context: { actorId: 'system' }
+      });
+
+      // Prepare permission via role (global)
+      await app.roleService.createRole({
+        name: 'viewer2',
+        contextType: 'global',
+        context: { actorId: 'system' }
+      });
+      
+      await app.roleService.addPermissionToRole({ 
+        roleName: 'viewer2', 
+        permissionKey: 'example:read',
+        contextId: null,
+        contextType: 'global',
+        context: { actorId: 'system' }
+      });
+      
+      await app.roleService.assignRoleToUser({ 
+        roleName: 'viewer2', 
+        userId: user.id, 
+        contextId: null,
+        contextType: 'global',
+        context: { actorId: 'system' }
+      });
+
+      // Login to get tokens
+      const login = await f.inject({ 
+        method: 'POST', 
+        url: '/auth/login', 
+        payload: { email, password: 'secret1' } 
+      });
+      const { accessToken } = login.json() as any;
+
+      const okRes = await f.inject({ 
+        method: 'GET', 
+        url: '/bear/ctx_any', 
+        headers: { authorization: `Bearer ${accessToken}` } 
+      });
+      expect(okRes.statusCode).toBe(200);
+
+      // Cleanup
+      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      await app.roleService.deleteRole('viewer2', { actorId: 'system' });
     });
-
-    const email = `b_${Date.now()}@example.com`;
-    const user = await db.user.create({ data: { email, passwordHash: await (await import('bcryptjs')).default.hash('secret1', 10) } });
-
-    // Prepare permission via role (global)
-    await roleService.createRole('viewer2', { contextType: 'global' });
-    await roleService.addPermissionToRole({ 
-      roleName: 'viewer2', 
-      permissionKey: 'example:read',
-      contextType: 'global',
-      policy: defaultRoutePermissionPolicy
-    });
-    await roleService.assignRoleToUser({ 
-      roleName: 'viewer2', 
-      userId: user.id, 
-      contextId: null,
-      contextType: 'global'
-    });
-
-    // Login to get tokens
-    const login = await f.inject({ method: 'POST', url: '/auth/login', payload: { email, password: 'secret1' } });
-    const { accessToken } = login.json() as any;
-
-    const okRes = await f.inject({ method: 'GET', url: '/bear/ctx_any', headers: { authorization: `Bearer ${accessToken}` } });
-    expect(okRes.statusCode).toBe(200);
   });
 
+  describe('permission inheritance', () => {
+    it('global permissions work in any context', async () => {
+      const f = app.fastify!;
 
+      app.route({
+        method: 'GET',
+        path: '/global/:contextId',
+        preHandler: app.authorize('global:read', { contextRequired: true }),
+        handler: async () => ({ ok: true }),
+      });
+
+      const user = await app.userService.createUser({
+        email: `global_${Date.now()}@example.com`,
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
+      // Grant global permission
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'global:read',
+        context: { actorId: 'system' }
+      });
+
+      // Create multiple contexts
+      await app.contextService.createContext({
+        id: 'ctx_a',
+        type: 'team',
+        name: 'Context A',
+        context: { actorId: 'system' }
+      });
+
+      await app.contextService.createContext({
+        id: 'ctx_b',
+        type: 'org',
+        name: 'Context B',
+        context: { actorId: 'system' }
+      });
+
+      // Should work in any context
+      const res1 = await f.inject({ 
+        method: 'GET', 
+        url: '/global/ctx_a', 
+        headers: { 'x-user-id': user.id, 'x-context-type': 'team' } 
+      });
+      expect(res1.statusCode).toBe(200);
+
+      const res2 = await f.inject({ 
+        method: 'GET', 
+        url: '/global/ctx_b', 
+        headers: { 'x-user-id': user.id, 'x-context-type': 'org' } 
+      });
+      expect(res2.statusCode).toBe(200);
+
+      // Cleanup
+      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      await app.contextService.deleteContext('ctx_a', { actorId: 'system' });
+      await app.contextService.deleteContext('ctx_b', { actorId: 'system' });
+    });
+
+    it('type-wide permissions work for all contexts of that type', async () => {
+      const f = app.fastify!;
+
+      app.route({
+        method: 'GET',
+        path: '/typewide/:contextId',
+        preHandler: app.authorize('team:read', { contextRequired: true }),
+        handler: async () => ({ ok: true }),
+      });
+
+      const user = await app.userService.createUser({
+        email: `typewide_${Date.now()}@example.com`,
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
+      // Grant type-wide permission
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'team:read',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
+
+      // Create multiple team contexts
+      await app.contextService.createContext({
+        id: 'team_1',
+        type: 'team',
+        name: 'Team 1',
+        context: { actorId: 'system' }
+      });
+
+      await app.contextService.createContext({
+        id: 'team_2',
+        type: 'team',
+        name: 'Team 2',
+        context: { actorId: 'system' }
+      });
+
+      await app.contextService.createContext({
+        id: 'org_1',
+        type: 'org',
+        name: 'Org 1',
+        context: { actorId: 'system' }
+      });
+
+      // Should work in any team context
+      const res1 = await f.inject({ 
+        method: 'GET', 
+        url: '/typewide/team_1', 
+        headers: { 'x-user-id': user.id, 'x-context-type': 'team' } 
+      });
+      expect(res1.statusCode).toBe(200);
+
+      const res2 = await f.inject({ 
+        method: 'GET', 
+        url: '/typewide/team_2', 
+        headers: { 'x-user-id': user.id, 'x-context-type': 'team' } 
+      });
+      expect(res2.statusCode).toBe(200);
+
+      // Should not work in org context
+      const res3 = await f.inject({ 
+        method: 'GET', 
+        url: '/typewide/org_1', 
+        headers: { 'x-user-id': user.id, 'x-context-type': 'org' } 
+      });
+      expect(res3.statusCode).toBe(403);
+
+      // Cleanup
+      await app.userService.deleteUser(user.id, { actorId: 'system' });
+      await app.contextService.deleteContext('team_1', { actorId: 'system' });
+      await app.contextService.deleteContext('team_2', { actorId: 'system' });
+      await app.contextService.deleteContext('org_1', { actorId: 'system' });
+    });
+  });
 });
 
 

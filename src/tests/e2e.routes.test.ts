@@ -1,123 +1,309 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { CoreSaaS } from '../index';
-import { PrismaClient } from '../../prisma/generated/client';
+import { db } from '../core/db/db-client';
 
-describe('E2E: protected routes via authorize()', () => {
-  // Test: Basic exact scope - verifies that context-specific permissions work only in their context
-  // Edge case: Ensures global permissions also work for exact scope routes
-  it('requires x-user-id and permission with exact scope', async () => {
-    const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
-    // Protected with exact scope
-    app.route({
-      method: 'GET',
-      path: '/protected/:contextId',
-      preHandler: app.authorize('example:read', { scope: 'exact', contextRequired: true }),
-      handler: async () => ({ ok: true }),
+describe('E2E: Protected Routes', () => {
+  let app: ReturnType<typeof CoreSaaS>;
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
+    app = CoreSaaS({ 
+      db: { provider: 'sqlite' }, 
+      adapter: 'fastify', 
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
     });
-    // No header -> 401
-    const r1 = await app.fastify!.inject({ method: 'GET', url: '/protected/ctx_1' });
-    expect(r1.statusCode).toBe(401);
-    // With user but no grants -> 403
-    const r2 = await app.fastify!.inject({ method: 'GET', url: '/protected/ctx_1', headers: { 'x-user-id': 'u1', 'x-context-type': 'team' } });
-    expect(r2.statusCode).toBe(403);
-    // Grant and allow in exact context
-    app.grantUserPermission('u1', 'example:*', 'ctx_1');
-    const r3 = await app.fastify!.inject({ method: 'GET', url: '/protected/ctx_1', headers: { 'x-user-id': 'u1', 'x-context-type': 'team' } });
-    expect(r3.statusCode).toBe(200);
   });
 
-  // Test: Global scope - verifies that only global permissions work for global-scoped routes
-  // Edge case: Ensures context-specific permissions are not enough, even with matching context
-  it('enforces global scope requirement', async () => {
-    const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
-    // Protected with global scope
-    app.route({
-      method: 'GET',
-      path: '/global',
-      preHandler: app.authorize('admin:users:create', { scope: 'global' }),
-      handler: async () => ({ ok: true }),
-    });
-    // Context-specific permission not enough
-    app.grantUserPermission('u2', 'admin:users:create', 'ctx_1');
-    const r1 = await app.fastify!.inject({ method: 'GET', url: '/global', headers: { 'x-user-id': 'u2' } });
-    expect(r1.statusCode).toBe(403);
-    // Global permission works
-    app.grantUserPermission('u2', 'admin:users:create');
-    const r2 = await app.fastify!.inject({ method: 'GET', url: '/global', headers: { 'x-user-id': 'u2' } });
-    expect(r2.statusCode).toBe(200);
+  afterAll(async () => {
+    await app.shutdown();
   });
 
-  // Test: Type-wide scope - verifies that type-wide operations require context type and global permission
-  // Edge case: Ensures context-specific permissions are not enough, even with matching type
-  it('enforces type-wide scope requirement', async () => {
-    const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
-    // Protected with type-wide scope
-    app.route({
-      method: 'GET',
-      path: '/type-wide',
-      preHandler: app.authorize('team:settings:read', { scope: 'type-wide' }),
-      handler: async () => ({ ok: true }),
+  describe('exact scope permissions', () => {
+    it('requires x-user-id and permission with exact scope', async () => {
+      // Protected with exact scope
+      app.route({
+        method: 'GET',
+        path: '/protected/:contextId',
+        preHandler: app.authorize('example:read', { scope: 'exact', contextRequired: true }),
+        handler: async () => ({ ok: true }),
+      });
+      
+      // No header -> 401
+      const r1 = await app.fastify!.inject({ method: 'GET', url: '/protected/ctx_1' });
+      expect(r1.statusCode).toBe(401);
+      
+      // With user but no grants -> 403
+      const r2 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/protected/ctx_1', 
+        headers: { 'x-user-id': 'u1', 'x-context-type': 'team' } 
+      });
+      expect(r2.statusCode).toBe(403);
+      
+      // Grant and allow in exact context
+      await app.permissionService.grantToUser({
+        userId: 'u1',
+        permissionKey: 'example:*',
+        contextId: 'ctx_1',
+        context: { actorId: 'system' }
+      });
+      
+      const r3 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/protected/ctx_1', 
+        headers: { 'x-user-id': 'u1', 'x-context-type': 'team' } 
+      });
+      expect(r3.statusCode).toBe(200);
     });
-    // Missing context type -> 400
-    const r1 = await app.fastify!.inject({ method: 'GET', url: '/type-wide', headers: { 'x-user-id': 'u3' } });
-    expect(r1.statusCode).toBe(400);
-    // Context-specific permission not enough
-    app.grantUserPermission('u3', 'team:settings:read', 'team_1');
-    const r2 = await app.fastify!.inject({ method: 'GET', url: '/type-wide', headers: { 'x-user-id': 'u3', 'x-context-type': 'team' } });
-    expect(r2.statusCode).toBe(403);
-    // Global permission works
-    app.grantUserPermission('u3', 'team:settings:read');
-    const r3 = await app.fastify!.inject({ method: 'GET', url: '/type-wide', headers: { 'x-user-id': 'u3', 'x-context-type': 'team' } });
-    expect(r3.statusCode).toBe(200);
   });
 
-  // Test: Mixed scopes - verifies that a route chain with different scope requirements works correctly
-  // Edge case: Tests that all scope requirements must be met when multiple authorize middlewares are used
-  it('handles mixed scope requirements in middleware chain', async () => {
-    const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
-    const db = new PrismaClient();
-    
-    // Create test context
-    await db.context.create({ data: { id: 'ctx_1', type: 'team', name: 'Test Team' } }).catch(() => {});
-    
-    // Route with both global and exact scope requirements
-    app.route({
-      method: 'POST',
-      path: '/mixed/:contextId',
-      preHandler: [
-        app.authorize('admin:manage', { scope: 'global' }),
-        app.authorize('context:write', { scope: 'exact', contextRequired: true })
-      ],
-      handler: async () => ({ ok: true }),
+  describe('global scope permissions', () => {
+    it('enforces global scope requirement', async () => {
+      // Protected with global scope
+      app.route({
+        method: 'GET',
+        path: '/global',
+        preHandler: app.authorize('admin:users:create', { scope: 'global' }),
+        handler: async () => ({ ok: true }),
+      });
+      
+      // Context-specific permission not enough
+      await app.permissionService.grantToUser({
+        userId: 'u2',
+        permissionKey: 'admin:users:create',
+        contextId: 'ctx_1',
+        context: { actorId: 'system' }
+      });
+      
+      const r1 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/global', 
+        headers: { 'x-user-id': 'u2' } 
+      });
+      expect(r1.statusCode).toBe(403);
+      
+      // Global permission works
+      await app.permissionService.grantToUser({
+        userId: 'u2',
+        permissionKey: 'admin:users:create',
+        context: { actorId: 'system' }
+      });
+      
+      const r2 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/global', 
+        headers: { 'x-user-id': 'u2' } 
+      });
+      expect(r2.statusCode).toBe(200);
+    });
+  });
+
+  describe('type-wide scope permissions', () => {
+    it('enforces type-wide scope requirement', async () => {
+      // Protected with type-wide scope
+      app.route({
+        method: 'GET',
+        path: '/type-wide',
+        preHandler: app.authorize('team:settings:read', { scope: 'type-wide' }),
+        handler: async () => ({ ok: true }),
+      });
+      
+      // Missing context type -> 400
+      const r1 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/type-wide', 
+        headers: { 'x-user-id': 'u3' } 
+      });
+      expect(r1.statusCode).toBe(400);
+      
+      // Context-specific permission not enough
+      await app.permissionService.grantToUser({
+        userId: 'u3',
+        permissionKey: 'team:settings:read',
+        contextId: 'team_1',
+        context: { actorId: 'system' }
+      });
+      
+      const r2 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/type-wide', 
+        headers: { 'x-user-id': 'u3', 'x-context-type': 'team' } 
+      });
+      expect(r2.statusCode).toBe(403);
+      
+      // Global permission works
+      await app.permissionService.grantToUser({
+        userId: 'u3',
+        permissionKey: 'team:settings:read',
+        context: { actorId: 'system' }
+      });
+      
+      const r3 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/type-wide', 
+        headers: { 'x-user-id': 'u3', 'x-context-type': 'team' } 
+      });
+      expect(r3.statusCode).toBe(200);
+    });
+  });
+
+  describe('mixed scope requirements', () => {
+    it('handles mixed scope requirements in middleware chain', async () => {
+      // Create test context
+      await app.contextService.createContext({
+        id: 'ctx_1',
+        type: 'team',
+        name: 'Test Team',
+        context: { actorId: 'system' }
+      });
+      
+      // Route with both global and exact scope requirements
+      app.route({
+        method: 'POST',
+        path: '/mixed/:contextId',
+        preHandler: [
+          app.authorize('admin:manage', { scope: 'global' }),
+          app.authorize('context:write', { scope: 'exact', contextRequired: true })
+        ],
+        handler: async () => ({ ok: true }),
+      });
+
+      // Setup permissions
+      await app.permissionService.grantToUser({
+        userId: 'u4',
+        permissionKey: 'admin:manage',
+        context: { actorId: 'system' }
+      }); // global
+      
+      await app.permissionService.grantToUser({
+        userId: 'u4',
+        permissionKey: 'context:write',
+        contextId: 'ctx_1',
+        context: { actorId: 'system' }
+      }); // exact
+
+      // Both permissions present -> 200
+      const r1 = await app.fastify!.inject({ 
+        method: 'POST', 
+        url: '/mixed/ctx_1', 
+        headers: { 'x-user-id': 'u4', 'x-context-type': 'team' }
+      });
+      expect(r1.statusCode).toBe(200);
+
+      // Missing global -> 403
+      const r2 = await app.fastify!.inject({ 
+        method: 'POST', 
+        url: '/mixed/ctx_1', 
+        headers: { 'x-user-id': 'u5', 'x-context-type': 'team' }
+      });
+      expect(r2.statusCode).toBe(403);
+
+      // Missing exact -> 403
+      await app.permissionService.grantToUser({
+        userId: 'u6',
+        permissionKey: 'admin:manage',
+        context: { actorId: 'system' }
+      });
+      
+      const r3 = await app.fastify!.inject({ 
+        method: 'POST', 
+        url: '/mixed/ctx_1', 
+        headers: { 'x-user-id': 'u6', 'x-context-type': 'team' }
+      });
+      expect(r3.statusCode).toBe(403);
+
+      // Cleanup
+      await app.contextService.deleteContext('ctx_1', { actorId: 'system' });
+    });
+  });
+
+  describe('wildcard permissions', () => {
+    it('handles wildcard permissions in routes', async () => {
+      app.route({
+        method: 'GET',
+        path: '/wildcard/:contextId',
+        preHandler: app.authorize('content:*', { contextRequired: true }),
+        handler: async () => ({ ok: true }),
+      });
+
+      // Create test context
+      await app.contextService.createContext({
+        id: 'wildcard-ctx',
+        type: 'team',
+        name: 'Wildcard Test',
+        context: { actorId: 'system' }
+      });
+
+      // Grant wildcard permission
+      await app.permissionService.grantToUser({
+        userId: 'wildcard-user',
+        permissionKey: 'content:*',
+        contextId: 'wildcard-ctx',
+        context: { actorId: 'system' }
+      });
+
+      // Should work with any content permission
+      const r1 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/wildcard/wildcard-ctx', 
+        headers: { 'x-user-id': 'wildcard-user', 'x-context-type': 'team' }
+      });
+      expect(r1.statusCode).toBe(200);
+
+      // Cleanup
+      await app.contextService.deleteContext('wildcard-ctx', { actorId: 'system' });
+    });
+  });
+
+  describe('error handling', () => {
+    it('handles invalid context types', async () => {
+      app.route({
+        method: 'GET',
+        path: '/invalid-context/:contextId',
+        preHandler: app.authorize('test:read', { contextRequired: true }),
+        handler: async () => ({ ok: true }),
+      });
+
+      // Grant permission
+      await app.permissionService.grantToUser({
+        userId: 'test-user',
+        permissionKey: 'test:read',
+        contextId: 'ctx_1',
+        context: { actorId: 'system' }
+      });
+
+      // Missing context type header
+      const r1 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/invalid-context/ctx_1', 
+        headers: { 'x-user-id': 'test-user' }
+      });
+      expect(r1.statusCode).toBe(400);
+
+      // Invalid context type
+      const r2 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/invalid-context/ctx_1', 
+        headers: { 'x-user-id': 'test-user', 'x-context-type': 'invalid' }
+      });
+      expect(r2.statusCode).toBe(400);
     });
 
-    // Setup permissions
-    app.grantUserPermission('u4', 'admin:manage', undefined); // global
-    app.grantUserPermission('u4', 'context:write', 'ctx_1'); // exact
+    it('handles missing user ID', async () => {
+      app.route({
+        method: 'GET',
+        path: '/no-user/:contextId',
+        preHandler: app.authorize('test:read', { contextRequired: true }),
+        handler: async () => ({ ok: true }),
+      });
 
-    // Both permissions present -> 200
-    const r1 = await app.fastify!.inject({ 
-      method: 'POST', 
-      url: '/mixed/ctx_1', 
-      headers: { 'x-user-id': 'u4', 'x-context-type': 'team' }
+      // Missing user ID
+      const r1 = await app.fastify!.inject({ 
+        method: 'GET', 
+        url: '/no-user/ctx_1', 
+        headers: { 'x-context-type': 'team' }
+      });
+      expect(r1.statusCode).toBe(401);
     });
-    expect(r1.statusCode).toBe(200);
-
-    // Missing global -> 403
-    const r2 = await app.fastify!.inject({ 
-      method: 'POST', 
-      url: '/mixed/ctx_1', 
-      headers: { 'x-user-id': 'u5', 'x-context-type': 'team' }
-    });
-    expect(r2.statusCode).toBe(403);
-
-    // Missing exact -> 403
-    app.grantUserPermission('u6', 'admin:manage');
-    const r3 = await app.fastify!.inject({ 
-      method: 'POST', 
-      url: '/mixed/ctx_1', 
-      headers: { 'x-user-id': 'u6', 'x-context-type': 'team' }
-    });
-    expect(r3.statusCode).toBe(403);
   });
 });
