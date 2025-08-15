@@ -31,7 +31,7 @@ export async function fetchEffectivePermissions({ userId, context }: EffectivePe
     },
     select: { roleId: true },
   });
-  const roleIds = [...new Set(userRoles.map((r) => r.roleId))];
+  const roleIds = [...new Set(userRoles.map((r: { roleId: string }) => r.roleId))];
 
   // Role permissions (global and in-context)
   const rolePerms = roleIds.length

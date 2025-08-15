@@ -36,7 +36,7 @@ export class PermissionRegistry {
   }
 
   async syncToDatabase(): Promise<void> {
-    const inDb = new Set((await db.permission.findMany({ select: { key: true } })).map((r) => r.key));
+    const inDb = new Set((await db.permission.findMany({ select: { key: true } })).map((r: { key: string }) => r.key));
     for (const p of this.registry.values()) {
       if (!inDb.has(p.key)) {
         await db.permission.create({ data: { key: p.key, label: p.label, plugin: p.plugin ?? null } });

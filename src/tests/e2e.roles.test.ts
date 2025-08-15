@@ -20,7 +20,7 @@ describe('E2E: roles API guards', () => {
     expect(r1.statusCode).toBe(401);
 
     // Wrong context type permission not enough
-    app.grantUserPermission('u1', 'roles:org:create', null, 'org');
+    app.grantUserPermission('u1', 'roles:org:create', undefined);
     const r2 = await f.inject({ 
       method: 'POST', 
       url: '/roles', 
@@ -30,7 +30,7 @@ describe('E2E: roles API guards', () => {
     expect(r2.statusCode).toBe(403);
 
     // Correct context type permission works
-    app.grantUserPermission('u1', 'roles:team:create', null, 'team');
+    app.grantUserPermission('u1', 'roles:team:create', undefined);
     const r3 = await f.inject({ 
       method: 'POST', 
       url: '/roles', 
@@ -85,7 +85,7 @@ describe('E2E: roles API guards', () => {
     const f = app.fastify!;
 
     // Only role management permission not enough
-    app.grantUserPermission('u1', 'roles:team:manage', null, 'team');
+    app.grantUserPermission('u1', 'roles:team:manage', undefined);
     const r1 = await f.inject({ 
       method: 'POST', 
       url: '/roles/editor/permissions/add', 
@@ -95,7 +95,7 @@ describe('E2E: roles API guards', () => {
     expect(r1.statusCode).toBe(403);
 
     // Only permission grant ability not enough
-    app.grantUserPermission('u1', 'permissions:example:read:grant:team', null, 'team');
+    app.grantUserPermission('u1', 'permissions:example:read:grant:team', undefined);
     const r2 = await f.inject({ 
       method: 'POST', 
       url: '/roles/editor/permissions/add', 
@@ -105,8 +105,8 @@ describe('E2E: roles API guards', () => {
     expect(r2.statusCode).toBe(403);
 
     // Both permissions work
-    app.grantUserPermission('u1', 'roles:team:manage', null, 'team');
-    app.grantUserPermission('u1', 'permissions:example:read:grant:team', null, 'team');
+    app.grantUserPermission('u1', 'roles:team:manage', undefined);
+    app.grantUserPermission('u1', 'permissions:example:read:grant:team', undefined);
     const r3 = await f.inject({ 
       method: 'POST', 
       url: '/roles/editor/permissions/add', 

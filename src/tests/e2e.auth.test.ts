@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { CoreSaaS } from '../index';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../prisma/generated/client';
 import bcrypt from 'bcryptjs';
 import { createAuthRoutes } from '../core/http/api/auth';
 

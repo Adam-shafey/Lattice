@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import minimist from 'minimist';
 import { CoreSaaS } from '../../index';
+import { defaultRoutePermissionPolicy } from '../policy/policy';
 import { RoleService } from '../services/role-service';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
@@ -68,19 +69,22 @@ async function main() {
       break;
     }
     case 'roles:create': {
-      const rs = new RoleService();
+      const app = getApp();
+      const rs = new RoleService(app);
       const name = String(argv.name || argv.n);
       const role = await rs.createRole(name);
       console.log(role);
       break;
     }
     case 'roles:list': {
-      const rs = new RoleService();
+      const app = getApp();
+      const rs = new RoleService(app);
       console.log(await rs.listRoles());
       break;
     }
     case 'roles:assign': {
-      const rs = new RoleService();
+      const app = getApp();
+      const rs = new RoleService(app);
       const roleName = String(argv.role || argv.r);
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
@@ -89,7 +93,8 @@ async function main() {
       break;
     }
     case 'roles:remove': {
-      const rs = new RoleService();
+      const app = getApp();
+      const rs = new RoleService(app);
       const roleName = String(argv.role || argv.r);
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
@@ -98,16 +103,23 @@ async function main() {
       break;
     }
     case 'roles:add-perm': {
-      const rs = new RoleService();
+      const app = getApp();
+      const rs = new RoleService(app);
       const roleName = String(argv.role || argv.r);
       const permissionKey = String(argv.permission || argv.p);
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
-      await rs.addPermissionToRole({ roleName, permissionKey, contextId });
+      await rs.addPermissionToRole({ 
+        roleName, 
+        permissionKey, 
+        contextId,
+        policy: defaultRoutePermissionPolicy
+      });
       console.log('OK');
       break;
     }
     case 'roles:remove-perm': {
-      const rs = new RoleService();
+      const app = getApp();
+      const rs = new RoleService(app);
       const roleName = String(argv.role || argv.r);
       const permissionKey = String(argv.permission || argv.p);
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
@@ -116,7 +128,8 @@ async function main() {
       break;
     }
     case 'roles:user-roles': {
-      const rs = new RoleService();
+      const app = getApp();
+      const rs = new RoleService(app);
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
       console.log(await rs.listUserRoles({ userId, contextId }));

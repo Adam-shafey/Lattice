@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { CoreSaaS } from '../index';
+import { PrismaClient } from '../../prisma/generated/client';
 
 describe('E2E: protected routes via authorize()', () => {
   // Test: Basic exact scope - verifies that context-specific permissions work only in their context
@@ -37,7 +38,7 @@ describe('E2E: protected routes via authorize()', () => {
       handler: async () => ({ ok: true }),
     });
     // Context-specific permission not enough
-    app.grantUserPermission('u2', 'admin:users:create', 'ctx_1', 'team');
+    app.grantUserPermission('u2', 'admin:users:create', 'ctx_1');
     const r1 = await app.fastify!.inject({ method: 'GET', url: '/global', headers: { 'x-user-id': 'u2' } });
     expect(r1.statusCode).toBe(403);
     // Global permission works
@@ -61,7 +62,7 @@ describe('E2E: protected routes via authorize()', () => {
     const r1 = await app.fastify!.inject({ method: 'GET', url: '/type-wide', headers: { 'x-user-id': 'u3' } });
     expect(r1.statusCode).toBe(400);
     // Context-specific permission not enough
-    app.grantUserPermission('u3', 'team:settings:read', 'team_1', 'team');
+    app.grantUserPermission('u3', 'team:settings:read', 'team_1');
     const r2 = await app.fastify!.inject({ method: 'GET', url: '/type-wide', headers: { 'x-user-id': 'u3', 'x-context-type': 'team' } });
     expect(r2.statusCode).toBe(403);
     // Global permission works
@@ -74,6 +75,10 @@ describe('E2E: protected routes via authorize()', () => {
   // Edge case: Tests that all scope requirements must be met when multiple authorize middlewares are used
   it('handles mixed scope requirements in middleware chain', async () => {
     const app = CoreSaaS({ db: { provider: 'sqlite' }, adapter: 'fastify', jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' } });
+    const db = new PrismaClient();
+    
+    // Create test context
+    await db.context.create({ data: { id: 'ctx_1', type: 'team', name: 'Test Team' } }).catch(() => {});
     
     // Route with both global and exact scope requirements
     app.route({
@@ -87,8 +92,8 @@ describe('E2E: protected routes via authorize()', () => {
     });
 
     // Setup permissions
-    app.grantUserPermission('u4', 'admin:manage', null, null); // global
-    app.grantUserPermission('u4', 'context:write', 'ctx_1', 'team'); // exact
+    app.grantUserPermission('u4', 'admin:manage', undefined); // global
+    app.grantUserPermission('u4', 'context:write', 'ctx_1'); // exact
 
     // Both permissions present -> 200
     const r1 = await app.fastify!.inject({ 
@@ -116,5 +121,3 @@ describe('E2E: protected routes via authorize()', () => {
     expect(r3.statusCode).toBe(403);
   });
 });
-
-

@@ -82,8 +82,12 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
       const parsed = schema.safeParse(body);
       if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
       const { roleName, roleKey, userId, contextId, contextType } = parsed.data;
-      await rs.assignRoleToUser({ roleName, roleKey, userId, contextId, contextType, actorId: (req?.user?.id as string) ?? null, source: 'api' });
-      return { ok: true };
+      try {
+        await rs.assignRoleToUser({ roleName, roleKey, userId, contextId, contextType, actorId: (req?.user?.id as string) ?? null, source: 'api' });
+        return { ok: true };
+      } catch (error: any) {
+        return { error: 'Invalid input', message: error.message };
+      }
     },
   });
 
@@ -143,16 +147,20 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
       const parsed = schema.safeParse(body);
       if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
       const { permissionKey, contextId, contextType } = parsed.data;
-      await rs.addPermissionToRole({ 
-        roleName: ps.name, 
-        permissionKey, 
-        contextId, 
-        contextType, 
-        actorId: (req?.user?.id as string) ?? null, 
-        source: 'api',
-        policy
-      });
-      return { ok: true };
+      try {
+        await rs.addPermissionToRole({ 
+          roleName: ps.name, 
+          permissionKey, 
+          contextId, 
+          contextType, 
+          actorId: (req?.user?.id as string) ?? null, 
+          source: 'api',
+          policy
+        });
+        return { ok: true };
+      } catch (error: any) {
+        return { error: 'Invalid input', message: error.message };
+      }
     },
   });
 
@@ -197,5 +205,3 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     },
   });
 }
-
-
