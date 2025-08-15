@@ -1,35 +1,39 @@
 import { CoreSaaSApp } from '../../../index';
-import { RoleService } from '../../services/role-service';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 
 export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
-  const rs = new RoleService(app);
-
   app.route({
     method: 'POST',
     path: '/roles',
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.body;
       return app.authorize(policy.roles!.create.replace('{type}', contextType), { 
-      scope: 'type-wide',
-      contextType: 'required'
-    })(req, res, next);
+        scope: 'type-wide',
+        contextType: 'required'
+      })(req, res, next);
     },
-    handler: async ({ body, req }: { body: any; req: any }) => {
+    handler: async ({ body, req }) => {
       const schema = z.object({ 
         name: z.string().min(1),
-        contextType: z.string().min(1)
+        contextType: z.string().min(1),
+        key: z.string().optional()
       });
       const parsed = schema.safeParse(body);
       if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { name, contextType } = parsed.data;
-      const role = await rs.createRole(name, { 
-        actorId: (req?.user?.id as string) ?? null, 
-        source: 'api',
-        contextType
-      });
-      return role;
+      
+      try {
+        const { name, contextType, key } = parsed.data;
+        const role = await app.roleService.createRole({
+          name,
+          contextType,
+          key,
+          context: { actorId: req?.user?.id || 'system' }
+        });
+        return role;
+      } catch (error: any) {
+        return { error: error.message || 'Failed to create role' };
+      }
     },
   });
 
@@ -37,10 +41,17 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     method: 'GET',
     path: '/roles',
     preHandler: app.authorize(policy.roles!.list, { scope: 'global' }),
-    handler: async ({ req }) => {
-      const list = await rs.listRoles();
-      await app.auditService.log({ actorId: (req?.user?.id as string) ?? null, action: 'roles.list', success: true, requestId: req?.requestId, ip: req?.clientIp, userAgent: req?.userAgent });
-      return list;
+    handler: async ({ query, req }) => {
+      try {
+        const contextType = query.contextType as string | undefined;
+        const roles = await app.roleService.listRoles({
+          contextType,
+          context: { actorId: req?.user?.id || 'system' }
+        });
+        return roles;
+      } catch (error: any) {
+        return { error: error.message || 'Failed to list roles' };
+      }
     },
   });
 
@@ -49,10 +60,16 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     path: '/roles/:name',
     preHandler: app.authorize(policy.roles!.get, { scope: 'global' }),
     handler: async ({ params, req }) => {
-      const all = await rs.listRoles();
-      const role = all.find((r: { name: string; key: string }) => r.name === params.name);
-      await app.auditService.log({ actorId: (req?.user?.id as string) ?? null, action: 'roles.get', success: Boolean(role), requestId: req?.requestId, ip: req?.clientIp, userAgent: req?.userAgent, metadata: { name: params.name } });
-      return role ?? { error: 'Not found' };
+      try {
+        const { name } = z.object({ name: z.string().min(1) }).parse(params);
+        const role = await app.roleService.getRoleByName(name, {
+          actorId: req?.user?.id || 'system'
+        });
+        if (!role) return { error: 'Role not found' };
+        return role;
+      } catch (error: any) {
+        return { error: error.message || 'Failed to get role' };
+      }
     },
   });
 
@@ -61,9 +78,15 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     path: '/roles/:name',
     preHandler: app.authorize(policy.roles!.delete, { scope: 'global' }),
     handler: async ({ params, req }) => {
-      const ps = z.object({ name: z.string().min(1) }).parse(params);
-      await rs.deleteRole(ps.name, { actorId: (req?.user?.id as string) ?? null, source: 'api' });
-      return { ok: true };
+      try {
+        const { name } = z.object({ name: z.string().min(1) }).parse(params);
+        await app.roleService.deleteRole(name, {
+          actorId: req?.user?.id || 'system'
+        });
+        return { ok: true };
+      } catch (error: any) {
+        return { error: error.message || 'Failed to delete role' };
+      }
     },
   });
 
@@ -74,19 +97,28 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         roleName: z.string().min(1).optional(), 
-        roleKey: z.string().uuid().optional(), 
+        roleKey: z.string().optional(), 
         userId: z.string().min(1), 
         contextId: z.string().min(1), 
         contextType: z.string().min(1)
       }).refine((d) => d.roleName || d.roleKey, { message: 'roleName or roleKey required' });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { roleName, roleKey, userId, contextId, contextType } = parsed.data;
+      
       try {
-        await rs.assignRoleToUser({ roleName, roleKey, userId, contextId, contextType, actorId: (req?.user?.id as string) ?? null, source: 'api' });
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { roleName, roleKey, userId, contextId, contextType } = parsed.data;
+        await app.roleService.assignRoleToUser({
+          roleName,
+          roleKey,
+          userId,
+          contextId,
+          contextType,
+          context: { actorId: req?.user?.id || 'system' }
+        });
         return { ok: true };
       } catch (error: any) {
-        return { error: 'Invalid input', message: error.message };
+        return { error: error.message || 'Failed to assign role' };
       }
     },
   });
@@ -98,16 +130,29 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         roleName: z.string().min(1).optional(), 
-        roleKey: z.string().uuid().optional(), 
+        roleKey: z.string().optional(), 
         userId: z.string().min(1), 
         contextId: z.string().min(1), 
         contextType: z.string().min(1)
       }).refine((d) => d.roleName || d.roleKey, { message: 'roleName or roleKey required' });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { roleName, roleKey, userId, contextId, contextType } = parsed.data;
-      await rs.removeRoleFromUser({ roleName, roleKey, userId, contextId, contextType, actorId: (req?.user?.id as string) ?? null, source: 'api' });
-      return { ok: true };
+      
+      try {
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { roleName, roleKey, userId, contextId, contextType } = parsed.data;
+        await app.roleService.removeRoleFromUser({
+          roleName,
+          roleKey,
+          userId,
+          contextId,
+          contextType,
+          context: { actorId: req?.user?.id || 'system' }
+        });
+        return { ok: true };
+      } catch (error: any) {
+        return { error: error.message || 'Failed to remove role' };
+      }
     },
   });
 
@@ -119,9 +164,9 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
       (req: any, res: any, next: () => void) => {
         const { contextType } = req.body;
         return app.authorize(policy.roles!.addPerm.roleManage.replace('{type}', contextType), {
-        scope: 'type-wide',
-        contextType: 'required'
-      })(req, res, next);
+          scope: 'type-wide',
+          contextType: 'required'
+        })(req, res, next);
       },
       // Must have permission grant ability for this permission in this context
       async (req: any, res: any, next: () => void) => {
@@ -141,25 +186,30 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
       }
     ],
     handler: async ({ params, body, req }) => {
-      const ps = z.object({ name: z.string().min(1) }).parse(params);
-      const schema = z.object({ permissionKey: z.string().min(1), contextId: z.string().min(1).optional(), contextType: z.string().min(1).optional() })
-        .refine((d) => !(d.contextId && d.contextType), { message: 'Provide either contextId for exact, or contextType for type-wide, not both' });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { permissionKey, contextId, contextType } = parsed.data;
       try {
-        await rs.addPermissionToRole({ 
-          roleName: ps.name, 
-          permissionKey, 
-          contextId, 
-          contextType, 
-          actorId: (req?.user?.id as string) ?? null, 
-          source: 'api',
-          policy
+        const { name } = z.object({ name: z.string().min(1) }).parse(params);
+        const schema = z.object({ 
+          permissionKey: z.string().min(1), 
+          contextId: z.string().min(1).optional(), 
+          contextType: z.string().min(1).optional() 
+        }).refine((d) => !(d.contextId && d.contextType), { 
+          message: 'Provide either contextId for exact, or contextType for type-wide, not both' 
+        });
+        
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { permissionKey, contextId, contextType } = parsed.data;
+        await app.roleService.addPermissionToRole({
+          roleName: name,
+          permissionKey,
+          contextId,
+          contextType,
+          context: { actorId: req?.user?.id || 'system' }
         });
         return { ok: true };
       } catch (error: any) {
-        return { error: 'Invalid input', message: error.message };
+        return { error: error.message || 'Failed to add permission to role' };
       }
     },
   });
@@ -194,14 +244,31 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
       }
     ],
     handler: async ({ params, body, req }) => {
-      const ps = z.object({ name: z.string().min(1) }).parse(params);
-      const schema = z.object({ permissionKey: z.string().min(1), contextId: z.string().min(1).optional(), contextType: z.string().min(1).optional() })
-        .refine((d) => !(d.contextId && d.contextType), { message: 'Provide either contextId for exact, or contextType for type-wide, not both' });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { permissionKey, contextId, contextType } = parsed.data;
-      await rs.removePermissionFromRole({ roleName: ps.name, permissionKey, contextId, contextType, actorId: (req?.user?.id as string) ?? null, source: 'api' });
-      return { ok: true };
+      try {
+        const { name } = z.object({ name: z.string().min(1) }).parse(params);
+        const schema = z.object({ 
+          permissionKey: z.string().min(1), 
+          contextId: z.string().min(1).optional(), 
+          contextType: z.string().min(1).optional() 
+        }).refine((d) => !(d.contextId && d.contextType), { 
+          message: 'Provide either contextId for exact, or contextType for type-wide, not both' 
+        });
+        
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { permissionKey, contextId, contextType } = parsed.data;
+        await app.roleService.removePermissionFromRole({
+          roleName: name,
+          permissionKey,
+          contextId,
+          contextType,
+          context: { actorId: req?.user?.id || 'system' }
+        });
+        return { ok: true };
+      } catch (error: any) {
+        return { error: error.message || 'Failed to remove permission from role' };
+      }
     },
   });
 }

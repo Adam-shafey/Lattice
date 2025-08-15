@@ -2,15 +2,20 @@
 import minimist from 'minimist';
 import { CoreSaaS } from '../../index';
 import { defaultRoutePermissionPolicy } from '../policy/policy';
-import { RoleService } from '../services/role-service';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import { getServiceFactory } from '../services';
 
 function getApp() {
   const app = CoreSaaS({
     db: { provider: 'sqlite' },
     adapter: 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' },
+    audit: {
+      enabled: true,
+      sinks: ['db', 'stdout'],
+      batchSize: 50,
+      flushInterval: 2000
+    }
   });
   return app;
 }
@@ -46,11 +51,15 @@ async function main() {
     if (explicit) return String(explicit);
     const email = argv.email || argv.e;
     if (!email) throw new Error('Provide --userId <id> or --email <email>');
-    const db = new PrismaClient();
-    const user = await db.user.findUnique({ where: { email: String(email) } });
+    
+    // Use the new UserService instead of direct database access
+    const app = getApp();
+    const userService = app.userService;
+    const user = await userService.getUserByEmail(String(email));
     if (!user) throw new Error(`User not found for email ${email}. Create it first with: lattice users:create --email <email> --password <pw>`);
     return user.id;
   }
+
   switch (cmd) {
     case 'list-permissions':
       await listPermissions();
@@ -62,77 +71,288 @@ async function main() {
       const email = String(argv.email || argv.e);
       const password = String(argv.password || argv.p);
       if (!email || !password) throw new Error('Usage: users:create --email <email> --password <pw>');
-      const db = new PrismaClient();
-      const passwordHash = await bcrypt.hash(password, 10);
-      const user = await db.user.upsert({ where: { email }, update: {}, create: { email, passwordHash } });
+      
+      // Use the new UserService instead of direct database access
+      const app = getApp();
+      const userService = app.userService;
+      const user = await userService.createUser({
+        email,
+        password,
+        context: { actorId: 'system' }
+      });
       console.log(user);
+      break;
+    }
+    case 'users:list': {
+      const app = getApp();
+      const userService = app.userService;
+      const limit = argv.limit ? parseInt(String(argv.limit)) : 20;
+      const offset = argv.offset ? parseInt(String(argv.offset)) : 0;
+      
+      const result = await userService.listUsers({
+        limit,
+        offset,
+        context: { actorId: 'system' }
+      });
+      
+      console.log(`Found ${result.total} users:`);
+      result.users.forEach(user => {
+        console.log(`- ${user.id}: ${user.email} (created: ${user.createdAt})`);
+      });
+      break;
+    }
+    case 'users:get': {
+      const app = getApp();
+      const userService = app.userService;
+      const email = argv.email || argv.e;
+      const userId = argv.userId || argv.u;
+      
+      if (!email && !userId) {
+        throw new Error('Provide --email <email> or --userId <id>');
+      }
+      
+      let user;
+      if (email) {
+        user = await userService.getUserByEmail(String(email), { actorId: 'system' });
+      } else {
+        user = await userService.getUserById(String(userId), { actorId: 'system' });
+      }
+      
+      if (!user) {
+        console.log('User not found');
+      } else {
+        console.log(user);
+      }
+      break;
+    }
+    case 'users:delete': {
+      const app = getApp();
+      const userService = app.userService;
+      const userId = await resolveUserIdFromArgs();
+      
+      await userService.deleteUser(userId, { actorId: 'system' });
+      console.log('User deleted successfully');
       break;
     }
     case 'roles:create': {
       const app = getApp();
-      const rs = new RoleService(app);
+      const roleService = app.roleService;
       const name = String(argv.name || argv.n);
-      const role = await rs.createRole(name);
+      const contextType = argv.contextType ? String(argv.contextType) : undefined;
+      const key = argv.key ? String(argv.key) : undefined;
+      
+      const role = await roleService.createRole({
+        name,
+        contextType,
+        key,
+        context: { actorId: 'system' }
+      });
       console.log(role);
       break;
     }
     case 'roles:list': {
       const app = getApp();
-      const rs = new RoleService(app);
-      console.log(await rs.listRoles());
+      const roleService = app.roleService;
+      const contextType = argv.contextType ? String(argv.contextType) : undefined;
+      
+      const roles = await roleService.listRoles({ contextType });
+      console.log('Roles:');
+      roles.forEach(role => {
+        console.log(`- ${role.name} (${role.key}) - ${role.contextType || 'global'}`);
+      });
       break;
     }
     case 'roles:assign': {
       const app = getApp();
-      const rs = new RoleService(app);
+      const roleService = app.roleService;
       const roleName = String(argv.role || argv.r);
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
-      await rs.assignRoleToUser({ roleName, userId, contextId });
-      console.log('OK');
+      const contextType = argv.contextType ? String(argv.contextType) : undefined;
+      
+      await roleService.assignRoleToUser({
+        roleName,
+        userId,
+        contextId,
+        contextType,
+        context: { actorId: 'system' }
+      });
+      console.log('Role assigned successfully');
       break;
     }
     case 'roles:remove': {
       const app = getApp();
-      const rs = new RoleService(app);
+      const roleService = app.roleService;
       const roleName = String(argv.role || argv.r);
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
-      await rs.removeRoleFromUser({ roleName, userId, contextId });
-      console.log('OK');
+      
+      await roleService.removeRoleFromUser({
+        roleName,
+        userId,
+        contextId,
+        context: { actorId: 'system' }
+      });
+      console.log('Role removed successfully');
       break;
     }
     case 'roles:add-perm': {
       const app = getApp();
-      const rs = new RoleService(app);
+      const roleService = app.roleService;
       const roleName = String(argv.role || argv.r);
       const permissionKey = String(argv.permission || argv.p);
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
-      await rs.addPermissionToRole({ 
-        roleName, 
-        permissionKey, 
+      const contextType = argv.contextType ? String(argv.contextType) : undefined;
+      
+      await roleService.addPermissionToRole({
+        roleName,
+        permissionKey,
         contextId,
-        policy: defaultRoutePermissionPolicy
+        contextType,
+        context: { actorId: 'system' }
       });
-      console.log('OK');
+      console.log('Permission added to role successfully');
       break;
     }
     case 'roles:remove-perm': {
       const app = getApp();
-      const rs = new RoleService(app);
+      const roleService = app.roleService;
       const roleName = String(argv.role || argv.r);
       const permissionKey = String(argv.permission || argv.p);
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
-      await rs.removePermissionFromRole({ roleName, permissionKey, contextId });
-      console.log('OK');
+      
+      await roleService.removePermissionFromRole({
+        roleName,
+        permissionKey,
+        contextId,
+        context: { actorId: 'system' }
+      });
+      console.log('Permission removed from role successfully');
       break;
     }
     case 'roles:user-roles': {
       const app = getApp();
-      const rs = new RoleService(app);
+      const roleService = app.roleService;
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
-      console.log(await rs.listUserRoles({ userId, contextId }));
+      
+      const roles = await roleService.listUserRoles({
+        userId,
+        contextId,
+        context: { actorId: 'system' }
+      });
+      
+      console.log('User roles:');
+      roles.forEach(role => {
+        console.log(`- ${role.name}${role.contextId ? ` (context: ${role.contextId})` : ' (global)'}`);
+      });
+      break;
+    }
+    case 'permissions:grant': {
+      const app = getApp();
+      const permissionService = app.permissionService;
+      const userId = await resolveUserIdFromArgs();
+      const permissionKey = String(argv.permission || argv.p);
+      const contextId = argv.contextId ? String(argv.contextId) : undefined;
+      const contextType = argv.contextType ? String(argv.contextType) : undefined;
+      
+      await permissionService.grantToUser({
+        userId,
+        permissionKey,
+        contextId,
+        contextType,
+        context: { actorId: 'system' }
+      });
+      console.log('Permission granted successfully');
+      break;
+    }
+    case 'permissions:revoke': {
+      const app = getApp();
+      const permissionService = app.permissionService;
+      const userId = await resolveUserIdFromArgs();
+      const permissionKey = String(argv.permission || argv.p);
+      const contextId = argv.contextId ? String(argv.contextId) : undefined;
+      
+      await permissionService.revokeFromUser({
+        userId,
+        permissionKey,
+        contextId,
+        context: { actorId: 'system' }
+      });
+      console.log('Permission revoked successfully');
+      break;
+    }
+    case 'permissions:user': {
+      const app = getApp();
+      const permissionService = app.permissionService;
+      const userId = await resolveUserIdFromArgs();
+      const contextId = argv.contextId ? String(argv.contextId) : undefined;
+      const contextType = argv.contextType ? String(argv.contextType) : undefined;
+      
+      const permissions = await permissionService.getUserPermissions({
+        userId,
+        contextId,
+        contextType,
+        context: { actorId: 'system' }
+      });
+      
+      console.log('User permissions:');
+      permissions.forEach(permission => {
+        console.log(`- ${permission.key}: ${permission.label}`);
+      });
+      break;
+    }
+    case 'permissions:effective': {
+      const app = getApp();
+      const permissionService = app.permissionService;
+      const userId = await resolveUserIdFromArgs();
+      const contextId = argv.contextId ? String(argv.contextId) : undefined;
+      
+      const permissions = await permissionService.getUserEffectivePermissions({
+        userId,
+        contextId,
+        context: { actorId: 'system' }
+      });
+      
+      console.log('Effective permissions:');
+      permissions.forEach(permission => {
+        console.log(`- ${permission.key}: ${permission.label}`);
+      });
+      break;
+    }
+    case 'contexts:create': {
+      const app = getApp();
+      const contextService = app.contextService;
+      const id = String(argv.id);
+      const type = String(argv.type);
+      const name = String(argv.name);
+      
+      const context = await contextService.createContext({
+        id,
+        type,
+        name,
+        context: { actorId: 'system' }
+      });
+      console.log(context);
+      break;
+    }
+    case 'contexts:list': {
+      const app = getApp();
+      const contextService = app.contextService;
+      const type = argv.type ? String(argv.type) : undefined;
+      const limit = argv.limit ? parseInt(String(argv.limit)) : 20;
+      const offset = argv.offset ? parseInt(String(argv.offset)) : 0;
+      
+      const result = await contextService.listContexts({
+        type,
+        limit,
+        offset
+      });
+      
+      console.log(`Found ${result.total} contexts:`);
+      result.contexts.forEach(context => {
+        console.log(`- ${context.id}: ${context.name} (${context.type})`);
+      });
       break;
     }
     case 'help':
@@ -146,13 +366,22 @@ async function main() {
       // eslint-disable-next-line no-console
       console.log('  check-access --userId <id> --contextId <ctx?> --permission <perm>');
       console.log('  users:create --email <email> --password <pw>');
-      console.log('  roles:create --name <name>');
-      console.log('  roles:list');
-      console.log('  roles:assign --role <name> (--userId <id> | --email <email>) [--contextId <ctx>]');
+      console.log('  users:list [--limit <n>] [--offset <n>]');
+      console.log('  users:get (--email <email> | --userId <id>)');
+      console.log('  users:delete (--userId <id> | --email <email>)');
+      console.log('  roles:create --name <name> [--contextType <type>] [--key <key>]');
+      console.log('  roles:list [--contextType <type>]');
+      console.log('  roles:assign --role <name> (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
       console.log('  roles:remove --role <name> (--userId <id> | --email <email>) [--contextId <ctx>]');
-      console.log('  roles:add-perm --role <name> --permission <key> [--contextId <ctx>]');
+      console.log('  roles:add-perm --role <name> --permission <key> [--contextId <ctx>] [--contextType <type>]');
       console.log('  roles:remove-perm --role <name> --permission <key> [--contextId <ctx>]');
       console.log('  roles:user-roles (--userId <id> | --email <email>) [--contextId <ctx>]');
+      console.log('  permissions:grant --permission <key> (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
+      console.log('  permissions:revoke --permission <key> (--userId <id> | --email <email>) [--contextId <ctx>]');
+      console.log('  permissions:user (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
+      console.log('  permissions:effective (--userId <id> | --email <email>) [--contextId <ctx>]');
+      console.log('  contexts:create --id <id> --type <type> --name <name>');
+      console.log('  contexts:list [--type <type>] [--limit <n>] [--offset <n>]');
   }
 }
 

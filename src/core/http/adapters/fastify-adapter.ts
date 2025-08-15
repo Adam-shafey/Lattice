@@ -5,51 +5,92 @@ export interface FastifyHttpAdapter extends HttpAdapter {
   getUnderlying: () => FastifyInstance;
 }
 
+/**
+ * Creates a Fastify HTTP adapter for the CoreSaaS application
+ * 
+ * This adapter wraps Fastify functionality to provide a consistent
+ * interface for route registration and server management.
+ * 
+ * @param app - The CoreSaaS application instance
+ * @returns FastifyHttpAdapter instance
+ */
 export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
-  const instance: FastifyInstance = fastify({ logger: true });
+  const instance: FastifyInstance = fastify({ 
+    logger: true,
+    trustProxy: true
+  });
 
+  /**
+   * Wraps a route handler to work with Fastify
+   * 
+   * Extracts user and context information from the request and
+   * passes it to the handler in a standardized format.
+   */
   function wrapHandler(handler: RouteDefinition['handler']) {
     return async function (request: FastifyRequest, reply: FastifyReply) {
-      const userId = (request.headers['x-user-id'] as string) || null;
-      const contextId =
-        (request.params as Record<string, string | undefined>)?.['contextId'] ||
-        (request.headers['x-context-id'] as string) ||
-        (request.query as Record<string, string | undefined>)?.['contextId'] ||
-        null;
-      const contextType =
-        (request.params as Record<string, string | undefined>)?.['contextType'] ||
-        (request.headers['x-context-type'] as string) ||
-        (request.query as Record<string, string | undefined>)?.['contextType'] ||
-        null;
+      try {
+        // Extract user ID from headers
+        const userId = (request.headers['x-user-id'] as string) || null;
+        
+        // Extract context information from various sources
+        const contextId =
+          (request.params as Record<string, string | undefined>)?.['contextId'] ||
+          (request.headers['x-context-id'] as string) ||
+          (request.query as Record<string, string | undefined>)?.['contextId'] ||
+          null;
+          
+        const contextType =
+          (request.params as Record<string, string | undefined>)?.['contextType'] ||
+          (request.headers['x-context-type'] as string) ||
+          (request.query as Record<string, string | undefined>)?.['contextType'] ||
+          null;
 
-      const context = contextId ? { id: contextId, type: contextType ?? 'unknown' } : null;
-      const user = userId ? { id: userId } : null;
+        // Create standardized context and user objects
+        const context = contextId ? { id: contextId, type: contextType ?? 'unknown' } : null;
+        const user = userId ? { id: userId } : null;
 
-      const result = await handler({
-        user,
-        context,
-        body: (request.body ?? {}) as unknown,
-        params: (request.params as Record<string, string>) ?? {},
-        query: (request.query as Record<string, string | string[]>) ?? {},
-        req: request,
-      });
-      reply.send(result);
+        // Call the handler with standardized parameters
+        const result = await handler({
+          user,
+          context,
+          body: (request.body ?? {}) as unknown,
+          params: (request.params as Record<string, string>) ?? {},
+          query: (request.query as Record<string, string | string[]>) ?? {},
+          req: request,
+        });
+        
+        // Send the response
+        reply.send(result);
+      } catch (error) {
+        // Handle errors gracefully
+        console.error('Fastify handler error:', error);
+        reply.status(500).send({ 
+          error: 'Internal server error',
+          message: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
     };
   }
 
+  /**
+   * Wraps a pre-handler function to work with Fastify middleware
+   * 
+   * Normalizes middleware signatures to be Fastify-compatible.
+   */
   function wrapPreHandler(pre: unknown) {
-    // Normalize any middleware signature to Fastify-compatible (request, reply, done)
-    // Our middlewares are typically (req, res, next?) and may be async
     return function (request: FastifyRequest, reply: FastifyReply, done: (err?: any) => void) {
       try {
         const maybePromise = (pre as any)(request, reply, undefined);
+        
         if (maybePromise && typeof (maybePromise as Promise<unknown>).then === 'function') {
+          // Handle async middleware
           (maybePromise as Promise<unknown>)
             .then(() => {
               if (!reply.sent) done();
             })
             .catch(done);
         } else {
+          // Handle sync middleware
           if (!reply.sent) done();
         }
       } catch (err) {
@@ -59,8 +100,16 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
   }
 
   const adapter: FastifyHttpAdapter = {
+    /**
+     * Adds a route to the Fastify application
+     */
     addRoute(route: RouteDefinition) {
-      const preHandlers = Array.isArray(route.preHandler) ? route.preHandler : route.preHandler ? [route.preHandler] : [];
+      const preHandlers = Array.isArray(route.preHandler) 
+        ? route.preHandler 
+        : route.preHandler 
+          ? [route.preHandler] 
+          : [];
+          
       instance.route({
         method: route.method,
         url: route.path,
@@ -68,9 +117,17 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
         handler: wrapHandler(route.handler) as any,
       });
     },
+
+    /**
+     * Starts the Fastify server
+     */
     async listen(port: number, host?: string) {
       await instance.listen({ port, host });
     },
+
+    /**
+     * Returns the underlying Fastify instance
+     */
     getUnderlying() {
       return instance;
     },

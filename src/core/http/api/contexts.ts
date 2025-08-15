@@ -1,23 +1,35 @@
 import { CoreSaaSApp } from '../../../index';
-import { getDbClient } from '../../db/db-client';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 
 export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
-  const db = getDbClient();
-
   app.route({
     method: 'POST',
     path: '/contexts',
     preHandler: app.authorize(policy.contexts!.create),
     handler: async ({ body, req }) => {
-      const schema = z.object({ id: z.string().min(1), type: z.string().min(1), parentId: z.string().min(1).nullable().optional() });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { id, type, parentId } = parsed.data;
-      const ctx = await db.context.create({ data: { id, type, parentId: parentId ?? null } });
-      await app.auditService.log({ actorId: (req?.user?.id as string) ?? null, action: 'contexts.create', success: true, contextId: id, requestId: req?.requestId, ip: req?.clientIp, userAgent: req?.userAgent });
-      return ctx;
+      const schema = z.object({ 
+        id: z.string().min(1), 
+        type: z.string().min(1), 
+        name: z.string().optional()
+      });
+      
+      try {
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { id, type, name } = parsed.data;
+        const context = await app.contextService.createContext({
+          id,
+          type,
+          name,
+          context: { actorId: req?.user?.id || 'system' }
+        });
+        
+        return context;
+      } catch (error: any) {
+        return { error: error.message || 'Failed to create context' };
+      }
     },
   });
 
@@ -26,10 +38,17 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     path: '/contexts/:id',
     preHandler: app.authorize(policy.contexts!.get),
     handler: async ({ params, req }) => {
-      const ps = z.object({ id: z.string().min(1) }).parse(params);
-      const ctx = await db.context.findUnique({ where: { id: ps.id } });
-      await app.auditService.log({ actorId: (req?.user?.id as string) ?? null, action: 'contexts.get', success: Boolean(ctx), contextId: params.id, requestId: req?.requestId, ip: req?.clientIp, userAgent: req?.userAgent });
-      return ctx ?? { error: 'Not found' };
+      try {
+        const { id } = z.object({ id: z.string().min(1) }).parse(params);
+        const context = await app.contextService.getContext(id, {
+          actorId: req?.user?.id || 'system'
+        });
+        
+        if (!context) return { error: 'Context not found' };
+        return context;
+      } catch (error: any) {
+        return { error: error.message || 'Failed to get context' };
+      }
     },
   });
 
@@ -38,14 +57,25 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     path: '/contexts/:id',
     preHandler: app.authorize(policy.contexts!.update),
     handler: async ({ params, body, req }) => {
-      const ps = z.object({ id: z.string().min(1) }).parse(params);
-      const schema = z.object({ type: z.string().min(1).optional(), parentId: z.string().min(1).nullable().optional() });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { type, parentId } = parsed.data;
-      const ctx = await db.context.update({ where: { id: ps.id }, data: { type, parentId: parentId ?? null } });
-      await app.auditService.log({ actorId: (req?.user?.id as string) ?? null, action: 'contexts.update', success: true, contextId: params.id, requestId: req?.requestId, ip: req?.clientIp, userAgent: req?.userAgent });
-      return ctx;
+      const schema = z.object({ 
+        name: z.string().optional(), 
+        type: z.string().min(1).optional() 
+      });
+      
+      try {
+        const { id } = z.object({ id: z.string().min(1) }).parse(params);
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const updates = parsed.data;
+        const context = await app.contextService.updateContext(id, updates, {
+          actorId: req?.user?.id || 'system'
+        });
+        
+        return context;
+      } catch (error: any) {
+        return { error: error.message || 'Failed to update context' };
+      }
     },
   });
 
@@ -54,10 +84,15 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     path: '/contexts/:id',
     preHandler: app.authorize(policy.contexts!.delete),
     handler: async ({ params, req }) => {
-      const ps = z.object({ id: z.string().min(1) }).parse(params);
-      const ok = await db.context.delete({ where: { id: ps.id } }).then(() => true).catch(() => false);
-      await app.auditService.log({ actorId: (req?.user?.id as string) ?? null, action: 'contexts.delete', success: ok, contextId: params.id, requestId: req?.requestId, ip: req?.clientIp, userAgent: req?.userAgent });
-      return { ok: true };
+      try {
+        const { id } = z.object({ id: z.string().min(1) }).parse(params);
+        await app.contextService.deleteContext(id, {
+          actorId: req?.user?.id || 'system'
+        });
+        return { ok: true };
+      } catch (error: any) {
+        return { error: error.message || 'Failed to delete context' };
+      }
     },
   });
 
@@ -66,15 +101,26 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     path: '/contexts/:id/users/add',
     preHandler: app.authorize(policy.contexts!.addUser),
     handler: async ({ params, body, req }) => {
-      const ps = z.object({ id: z.string().min(1) }).parse(params);
-      const schema = z.object({ userId: z.string().min(1) });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { userId } = parsed.data;
-      const id = `${userId}-${ps.id}`;
-      await db.userContext.upsert({ where: { id }, update: {}, create: { id, userId, contextId: ps.id } });
-      await app.auditService.log({ actorId: (req?.user?.id as string) ?? null, action: 'contexts.user.add', success: true, contextId: params.id, targetUserId: userId, requestId: req?.requestId, ip: req?.clientIp, userAgent: req?.userAgent });
-      return { ok: true };
+      const schema = z.object({ 
+        userId: z.string().min(1) 
+      });
+      
+      try {
+        const { id } = z.object({ id: z.string().min(1) }).parse(params);
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { userId } = parsed.data;
+        await app.contextService.addUserToContext({
+          userId,
+          contextId: id,
+          context: { actorId: req?.user?.id || 'system' }
+        });
+        
+        return { ok: true };
+      } catch (error: any) {
+        return { error: error.message || 'Failed to add user to context' };
+      }
     },
   });
 
@@ -83,15 +129,69 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     path: '/contexts/:id/users/remove',
     preHandler: app.authorize(policy.contexts!.removeUser),
     handler: async ({ params, body, req }) => {
-      const ps = z.object({ id: z.string().min(1) }).parse(params);
-      const schema = z.object({ userId: z.string().min(1) });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { userId } = parsed.data;
-      const id = `${userId}-${ps.id}`;
-      const ok = await db.userContext.delete({ where: { id } }).then(() => true).catch(() => false);
-      await app.auditService.log({ actorId: (req?.user?.id as string) ?? null, action: 'contexts.user.remove', success: ok, contextId: params.id, targetUserId: userId, requestId: req?.requestId, ip: req?.clientIp, userAgent: req?.userAgent });
-      return { ok: true };
+      const schema = z.object({ 
+        userId: z.string().min(1) 
+      });
+      
+      try {
+        const { id } = z.object({ id: z.string().min(1) }).parse(params);
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { userId } = parsed.data;
+        await app.contextService.removeUserFromContext({
+          userId,
+          contextId: id,
+          context: { actorId: req?.user?.id || 'system' }
+        });
+        
+        return { ok: true };
+      } catch (error: any) {
+        return { error: error.message || 'Failed to remove user from context' };
+      }
+    },
+  });
+
+  app.route({
+    method: 'GET',
+    path: '/contexts',
+    preHandler: app.authorize(policy.contexts!.get),
+    handler: async ({ query, req }) => {
+      try {
+        const type = query.type as string | undefined;
+        const limit = query.limit ? parseInt(query.limit as string) : undefined;
+        const offset = query.offset ? parseInt(query.offset as string) : undefined;
+        
+        const result = await app.contextService.listContexts({
+          type,
+          limit,
+          offset,
+          context: { actorId: req?.user?.id || 'system' }
+        });
+        
+        return result;
+      } catch (error: any) {
+        return { error: error.message || 'Failed to list contexts' };
+      }
+    },
+  });
+
+  app.route({
+    method: 'GET',
+    path: '/contexts/:id/users',
+    preHandler: app.authorize(policy.contexts!.get),
+    handler: async ({ params, req }) => {
+      try {
+        const { id } = z.object({ id: z.string().min(1) }).parse(params);
+        const users = await app.contextService.getContextUsers({
+          contextId: id,
+          context: { actorId: req?.user?.id || 'system' }
+        });
+        
+        return users;
+      } catch (error: any) {
+        return { error: error.message || 'Failed to get context users' };
+      }
     },
   });
 }

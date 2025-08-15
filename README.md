@@ -12,6 +12,7 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
 - Extensible plugin architecture for routes, contexts, and permissions
 - Developer-first experience: CLI, TypeScript types, hot-reloadable permissions
 - Minimal core routes: focus on auth and infrastructure, not business logic
+- **Production-ready service layer** with standardized patterns, error handling, and audit logging
 
 **Goal:** Enable developers to spin up secure, modular SaaS apps quickly while leaving domain-specific features to plugins.
 
@@ -24,6 +25,7 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
 3. **Plugin-driven:** Core provides infrastructure; plugins add features and routes.
 4. **Open-source & DX-first:** Documentation, CLI tooling, type safety, and hot-reloadable registry.
 5. **Adapter-agnostic:** Core works with Fastify or Express via a shared interface.
+6. **Service-oriented:** Production-ready services with consistent patterns, error handling, and audit logging.
 
 ---
 
@@ -31,7 +33,7 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
 
 | Feature                      | Description                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Auth**                     | Password, JWT (access + refresh), token revocation, Partially: password change/reset; WIP OAuth2, MFA, social login. |
+| **Auth**                     | Password, JWT (access + refresh), token revocation, password change/reset with bcrypt hashing. WIP OAuth2, MFA, social login. |
 | **Permission Registry**      | In-memory + DB-backed. Wildcard expansion, WIP: plugin registration, WIP: hot-reloadable.                              |
 | **Roles & User Permissions** | RolePermission, UserPermission tables. Scoped per context.                                                   |
 | **Role Management**          | Role CRUD, assign/remove roles, grant/revoke role permissions via service + CLI.                             |
@@ -40,8 +42,9 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
 | **Plugin System**            | Register plugins with contexts, roles, permissions, and routes.                                                     |
 | **Built-in REST APIs**       | Users CRUD, Contexts CRUD + membership, Roles CRUD + assign/remove + role-perm ops, User permission grant/revoke; all guarded by a modifiable policy. |
 | **Audit Logging**            | Records permission checks, context resolutions, token issued/revoked, role and permission grants/revokes.    |
-| **Developer Tooling**        | CLI: list-permissions, check-access, roles commands, generate-plugin. TypeScript types for permissions, roles, and contexts. |
+| **Developer Tooling**        | CLI: list-permissions, check-access, roles commands, user management, permission management, context management. TypeScript types for permissions, roles, and contexts. |
 | **Caching**                  | WIP: Optional Redis-backed cache for effective permissions to optimize performance.                               |
+| **Service Layer**            | Production-ready services with standardized error handling, input validation, audit logging, and transaction management. |
 
 ---
 
@@ -76,10 +79,15 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
   /policy
     policy.ts - Defines policies for route permissions and access control.
   /services
+    base-service.ts - Abstract base class providing common service functionality.
+    interfaces.ts - TypeScript interfaces for all core services.
+    service-factory.ts - Centralized service management and instantiation.
     audit-service.ts - Provides auditing capabilities for logging actions.
     context-service.ts - Manages context operations and resolutions.
     role-service.ts - Handles role management and operations.
+    user-service.ts - Manages user accounts, authentication, and profile operations.
     user-permission-service.ts - Manages user permissions and operations.
+    index.ts - Comprehensive barrel file exporting all service components.
   /tests
     audit.test.ts - Tests for auditing functionality.
     auth.test.ts - Tests for authentication functionality.
@@ -100,6 +108,87 @@ package.json - Contains project metadata and dependencies.
 
 ---
 
+## Service Architecture
+
+Lattice Core provides a production-ready service layer with consistent patterns:
+
+### Service Hierarchy
+
+```
+BaseService (abstract)
+├── AuditService - Comprehensive audit logging with batching and multiple sinks
+├── ContextService - Context management with full CRUD operations
+├── RoleService - Role management with context-aware assignments
+├── UserService - User management with authentication and profile operations
+└── UserPermissionService - Permission management with effective permission calculation
+
+ServiceFactory - Centralized service management with dependency injection
+```
+
+### Key Service Features
+
+- **Standardized Error Handling**: All services use `ServiceError` with predefined error types
+- **Input Validation**: Comprehensive validation with descriptive error messages
+- **Audit Logging**: Automatic audit logging for all operations with configurable sinks
+- **Transaction Support**: Proper transaction handling for multi-step operations
+- **Interface Contracts**: All services implement TypeScript interfaces for better testing
+- **Dependency Injection**: Services receive dependencies through constructor injection
+- **Type Safety**: Full TypeScript support with proper type definitions
+
+### Service Factory
+
+The `ServiceFactory` manages all service instances and provides centralized access:
+
+```typescript
+// Initialize service factory
+const factory = new ServiceFactory({
+  db: prismaClient,
+  audit: {
+    enabled: true,
+    sinks: ['db', 'stdout'],
+    batchSize: 100,
+    flushInterval: 5000
+  }
+});
+
+// Access services
+const userService = factory.getUserService();
+const roleService = factory.getRoleService();
+const contextService = factory.getContextService();
+const permissionService = factory.getPermissionService();
+const auditService = factory.auditService;
+```
+
+### Application Integration
+
+The main application provides convenient access to all services:
+
+```typescript
+const app = CoreSaaS({
+  db: { provider: 'postgres' },
+  adapter: 'fastify',
+  jwt: { accessTTL: '15m', refreshTTL: '7d' },
+  audit: {
+    enabled: true,
+    sinks: ['db', 'stdout'],
+    batchSize: 100,
+    flushInterval: 5000
+  }
+});
+
+// Access services through the application
+const userService = app.userService;
+const roleService = app.roleService;
+const contextService = app.contextService;
+const permissionService = app.permissionService;
+const auditService = app.auditService;
+
+// Or access the service factory directly
+const services = app.services;
+```
+
+---
+
 ## Core DB Schema (Prisma)
 
 - Tables: `User`, `Role`, `Permission`, `UserPermission`, `RolePermission`, `UserRole`, `Context`, `UserContext`, `AuditLog`, `RevokedToken`, `PasswordResetToken`.
@@ -116,6 +205,7 @@ package.json - Contains project metadata and dependencies.
 - WIP: Minimal friction to add a plugin: `registerPlugin()`.
 - **CLI tooling** for inspecting permissions and simulating access.
 - Clear logging & audit trail for debugging and security.
+- **Production-ready services** with consistent patterns and error handling.
 
 ---
 
@@ -134,6 +224,7 @@ package.json - Contains project metadata and dependencies.
 - [x] CLI: list-permissions, check-access
 - [x] Minimal unit tests (auth, permissions, context)
 - [x] Input validation (Zod) on built-in REST APIs
+- [x] **Service layer refactoring** - Production-ready services with standardized patterns
 
 ---
 
@@ -150,6 +241,10 @@ package.json - Contains project metadata and dependencies.
     - Wired existing calls to use actorId vs targetUserId.
     - Tests: added src/tests/audit.test.ts to verify enabled/disabled behavior.
     - Permission checks, token issued events, role assign/remove, role perm grant/revoke, user perm grant/revoke logged to `AuditLog`.
+- [x] **Service factory and dependency injection** - Centralized service management
+- [x] **User service implementation** - Complete user management with authentication
+- [x] **Enhanced CLI** - User management, permission management, context management commands
+- [x] **Application integration** - Main app and CLI refactored to use new service patterns
 - [ ] CLI: generate-plugin scaffolding
 - [ ] TypeScript types for permissions, roles, contexts
 - [ ] Testing utilities / fixtures for devs
@@ -294,35 +389,182 @@ policy: {
 }
 ```
 
+## Service Usage Examples
+
+### User Management
+
+```typescript
+// Create a new user
+const user = await app.userService.createUser({
+  email: 'user@example.com',
+  password: 'securepassword123',
+  context: { actorId: 'system' }
+});
+
+// Get user by email
+const user = await app.userService.getUserByEmail('user@example.com');
+
+// Update user profile
+await app.userService.updateUser('user_123', {
+  email: 'newemail@example.com'
+}, { actorId: 'admin_456' });
+
+// Change password
+await app.userService.changePassword('user_123', 'oldpass', 'newpass123', {
+  actorId: 'user_123'
+});
+```
+
+### Role Management
+
+```typescript
+// Create a role
+const role = await app.roleService.createRole({
+  name: 'admin',
+  contextType: 'organization',
+  context: { actorId: 'system' }
+});
+
+// Assign role to user
+await app.roleService.assignRoleToUser({
+  roleName: 'admin',
+  userId: 'user_123',
+  contextId: 'org_456',
+  context: { actorId: 'admin_789' }
+});
+
+// Add permission to role
+await app.roleService.addPermissionToRole({
+  roleName: 'admin',
+  permissionKey: 'users:delete',
+  contextId: 'org_456',
+  context: { actorId: 'admin_789' }
+});
+```
+
+### Permission Management
+
+```typescript
+// Grant permission to user
+await app.permissionService.grantToUser({
+  userId: 'user_123',
+  permissionKey: 'users:read',
+  contextId: 'org_456',
+  context: { actorId: 'admin_789' }
+});
+
+// Check user permission
+const hasPermission = await app.permissionService.checkUserPermission({
+  userId: 'user_123',
+  permissionKey: 'users:read',
+  contextId: 'org_456',
+  context: { actorId: 'admin_789' }
+});
+
+// Get effective permissions
+const permissions = await app.permissionService.getUserEffectivePermissions({
+  userId: 'user_123',
+  contextId: 'org_456',
+  context: { actorId: 'admin_789' }
+});
+```
+
+### Context Management
+
+```typescript
+// Create a context
+const context = await app.contextService.createContext({
+  id: 'org_123',
+  type: 'organization',
+  name: 'Acme Corp',
+  context: { actorId: 'system' }
+});
+
+// Resolve context from request
+const resolved = app.contextService.resolveContext({
+  routeParam: 'org_123',
+  header: 'x-context-id',
+  query: 'context'
+});
+
+// Add user to context
+await app.contextService.addUserToContext({
+  userId: 'user_123',
+  contextId: 'org_456',
+  context: { actorId: 'admin_789' }
+});
+```
+
+### Audit Logging
+
+```typescript
+// Log custom events
+await app.auditService.log({
+  actorId: 'user_123',
+  action: 'user.deleted',
+  success: true,
+  targetUserId: 'user_456',
+  contextId: 'org_789',
+  metadata: { reason: 'account_closed' }
+});
+
+// Convenience methods
+await app.auditService.logPermissionCheck('user_123', 'org_456', 'users:delete', true);
+await app.auditService.logUserAction('admin_123', 'user_456', 'user.updated', true);
+```
+
 ## Roles Quickstart
 
 CLI examples:
 
 ```bash
-# create/list
-lattice roles:create --name admin
-lattice roles:list
+# User Management
+lattice users:create --email user@example.com --password secret123
+lattice users:list --limit 20 --offset 0
+lattice users:get --email user@example.com
+lattice users:delete --email user@example.com
 
-# assign/remove role to a user
-lattice roles:assign --role admin --userId user_123
-lattice roles:remove --role admin --userId user_123
+# Role Management
+lattice roles:create --name admin --contextType organization
+lattice roles:list --contextType organization
+lattice roles:assign --role admin --email user@example.com --contextId org_123
+lattice roles:remove --role admin --email user@example.com --contextId org_123
+lattice roles:add-perm --role admin --permission users:read --contextId org_123
+lattice roles:remove-perm --role admin --permission users:read --contextId org_123
+lattice roles:user-roles --email user@example.com --contextId org_123
 
-# add/remove a permission to role
-lattice roles:add-perm --role admin --permission example:read
-lattice roles:remove-perm --role admin --permission example:read
+# Permission Management
+lattice permissions:grant --permission users:read --email user@example.com --contextId org_123
+lattice permissions:revoke --permission users:read --email user@example.com --contextId org_123
+lattice permissions:user --email user@example.com --contextId org_123
+lattice permissions:effective --email user@example.com --contextId org_123
 
-# list user roles
-lattice roles:user-roles --userId user_123
+# Context Management
+lattice contexts:create --id org_123 --type organization --name "Acme Corp"
+lattice contexts:list --type organization --limit 10
+
+# System Commands
+lattice list-permissions
+lattice check-access --userId user_123 --contextId org_123 --permission users:read
 ```
 
 Programmatic:
 
 ```ts
-import { RoleService } from './core/roles/role-service'
-const roles = new RoleService()
-await roles.createRole('admin')
-await roles.assignRoleToUser({ roleName: 'admin', userId: 'user_123' })
-await roles.addPermissionToRole({ roleName: 'admin', permissionKey: 'example:read' })
+import { CoreSaaS } from './src/index'
+
+const app = CoreSaaS({
+  db: { provider: 'postgres' },
+  adapter: 'fastify',
+  jwt: { accessTTL: '15m', refreshTTL: '7d' },
+  audit: { enabled: true, sinks: ['db', 'stdout'] }
+})
+
+// Use services
+await app.userService.createUser({ email: 'user@example.com', password: 'secret123' })
+await app.roleService.createRole({ name: 'admin', contextType: 'organization' })
+await app.roleService.assignRoleToUser({ roleName: 'admin', userId: 'user_123', contextId: 'org_456' })
+await app.roleService.addPermissionToRole({ roleName: 'admin', permissionKey: 'example:read' })
 ```
 
 ---
@@ -533,6 +775,10 @@ Done now:
 - Full audit logging with config and request metadata
 - Policy overrides for route permissions
 - Input validation on all REST endpoints (Zod)
+- **Production-ready service layer** with standardized patterns, error handling, and audit logging
+- **Service factory** for centralized service management
+- **Enhanced CLI** with comprehensive user, permission, and context management
+- **Application integration** with convenient service access patterns
 
 Next to consider:
 - Better error normalization/translation

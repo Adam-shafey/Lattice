@@ -24,6 +24,7 @@ export type {
   Permission,
   UserRole,
   RolePermission,
+  UserPermission,
   Context,
   UserContext,
   AuditLog,

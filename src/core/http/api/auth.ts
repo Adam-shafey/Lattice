@@ -1,16 +1,15 @@
-import bcrypt from 'bcryptjs';
 import { CoreSaaSApp } from '../../../index';
-import { db, getDbClient } from '../../db/db-client';
 import { createJwtUtil } from '../../auth/jwt';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
+import { db } from '../../db/db-client';
 
 function getJwt() {
   const secret = process.env.JWT_SECRET || 'dev-secret';
   return createJwtUtil({ secret, accessTTL: '15m', refreshTTL: '7d' });
 }
 
-export function requireAuthMiddleware() {
+export function requireAuthMiddleware(app: CoreSaaSApp) {
   return async function (req: any, res: any, next?: (err?: any) => void) {
     try {
       const auth = req?.headers?.authorization as string | undefined;
@@ -27,7 +26,6 @@ export function requireAuthMiddleware() {
       // Check revocation by JTI if present
       const jti = payload?.jti as string | undefined;
       if (jti) {
-        const db = getDbClient();
         const revoked = await db.revokedToken.findUnique({ where: { jti } }).catch(() => null);
         if (revoked) {
           const err = { statusCode: 401, message: 'Token revoked' };
@@ -55,19 +53,37 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     method: 'POST',
     path: '/auth/login',
     handler: async ({ body }) => {
-      const schema = z.object({ email: z.string().email(), password: z.string().min(6) });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { email, password } = parsed.data;
-      const user = await db.user.findUnique({ where: { email } });
-      if (!user) return { error: 'Invalid credentials' };
-      const ok = await bcrypt.compare(password, user.passwordHash);
-      if (!ok) return { error: 'Invalid credentials' };
-      const access = jwt.signAccess({ sub: user.id });
-      const refresh = jwt.signRefresh({ sub: user.id });
-      await app.auditService.logTokenIssued(user.id, 'access');
-      await app.auditService.logTokenIssued(user.id, 'refresh');
-      return { accessToken: access, refreshToken: refresh };
+      const schema = z.object({ 
+        email: z.string().email(), 
+        password: z.string().min(6) 
+      });
+      
+      try {
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { email, password } = parsed.data;
+        
+        // Get user by email
+        const user = await app.userService.getUserByEmail(email);
+        if (!user) return { error: 'Invalid credentials' };
+        
+        // Verify password
+        const isValid = await app.userService.verifyPassword(user.id, password);
+        if (!isValid) return { error: 'Invalid credentials' };
+        
+        // Generate tokens
+        const access = jwt.signAccess({ sub: user.id });
+        const refresh = jwt.signRefresh({ sub: user.id });
+        
+        // Log token issuance
+        await app.auditService.logTokenIssued(user.id, 'access');
+        await app.auditService.logTokenIssued(user.id, 'refresh');
+        
+        return { accessToken: access, refreshToken: refresh };
+      } catch (error: any) {
+        return { error: error.message || 'Login failed' };
+      }
     },
   });
 
@@ -75,26 +91,47 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     method: 'POST',
     path: '/auth/refresh',
     handler: async ({ body }) => {
-      const schema = z.object({ refreshToken: z.string().min(1) });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { refreshToken } = parsed.data;
-      const payload = jwt.verify(refreshToken) as any;
-      const userId = payload?.sub as string | undefined;
-      const jti = payload?.jti as string | undefined;
-      if (!userId) return { error: 'Invalid token' };
-      const user = await db.user.findUnique({ where: { id: userId } });
-      if (!user) return { error: 'Invalid token' };
-      if (jti) {
-        // Revoke old refresh on rotation
-        await db.revokedToken.upsert({ where: { jti }, update: {}, create: { jti, userId } });
-        await app.auditService.logTokenRevoked(userId, 'refresh');
+      const schema = z.object({ 
+        refreshToken: z.string().min(1) 
+      });
+      
+      try {
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { refreshToken } = parsed.data;
+        const payload = jwt.verify(refreshToken) as any;
+        const userId = payload?.sub as string | undefined;
+        const jti = payload?.jti as string | undefined;
+        
+        if (!userId) return { error: 'Invalid token' };
+        
+        // Verify user exists
+        const user = await app.userService.getUserById(userId);
+        if (!user) return { error: 'Invalid token' };
+        
+        // Revoke old refresh token if JTI present
+        if (jti) {
+          await db.revokedToken.upsert({ 
+            where: { jti }, 
+            update: {}, 
+            create: { jti, userId } 
+          });
+          await app.auditService.logTokenRevoked(userId, 'refresh');
+        }
+        
+        // Generate new tokens
+        const access = jwt.signAccess({ sub: user.id });
+        const newRefresh = jwt.signRefresh({ sub: user.id });
+        
+        // Log token issuance
+        await app.auditService.logTokenIssued(user.id, 'access');
+        await app.auditService.logTokenIssued(user.id, 'refresh');
+        
+        return { accessToken: access, refreshToken: newRefresh };
+      } catch (error: any) {
+        return { error: error.message || 'Token refresh failed' };
       }
-      const access = jwt.signAccess({ sub: user.id });
-      const newRefresh = jwt.signRefresh({ sub: user.id });
-      await app.auditService.logTokenIssued(user.id, 'access');
-      await app.auditService.logTokenIssued(user.id, 'refresh');
-      return { accessToken: access, refreshToken: newRefresh };
     },
   });
 
@@ -102,18 +139,34 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   app.route({
     method: 'POST',
     path: '/auth/revoke',
-    preHandler: requireAuthMiddleware(),
+    preHandler: requireAuthMiddleware(app),
     handler: async ({ body, user }) => {
-      const schema = z.object({ token: z.string().min(1) });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { token } = parsed.data;
-      const payload = jwt.verify(token) as any;
-      const jti = payload?.jti as string | undefined;
-      if (!jti) return { ok: true };
-      await db.revokedToken.upsert({ where: { jti }, update: {}, create: { jti, userId: user?.id ?? null } });
-      await app.auditService.logTokenRevoked(user?.id ?? 'unknown', 'access');
-      return { ok: true };
+      const schema = z.object({ 
+        token: z.string().min(1) 
+      });
+      
+      try {
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { token } = parsed.data;
+        const payload = jwt.verify(token) as any;
+        const jti = payload?.jti as string | undefined;
+        
+        if (!jti) return { ok: true };
+        
+        // Revoke token
+        await db.revokedToken.upsert({ 
+          where: { jti }, 
+          update: {}, 
+          create: { jti, userId: user?.id ?? null } 
+        });
+        
+        await app.auditService.logTokenRevoked(user?.id ?? 'unknown', 'access');
+        return { ok: true };
+      } catch (error: any) {
+        return { error: error.message || 'Token revocation failed' };
+      }
     },
   });
 
@@ -121,19 +174,27 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   app.route({
     method: 'POST',
     path: '/auth/password/change',
-    preHandler: requireAuthMiddleware(),
+    preHandler: requireAuthMiddleware(app),
     handler: async ({ body, user }) => {
-      const schema = z.object({ oldPassword: z.string().min(6), newPassword: z.string().min(6) });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { oldPassword, newPassword } = parsed.data;
-      const existing = await db.user.findUnique({ where: { id: user!.id } });
-      if (!existing) return { error: 'Invalid user' };
-      const ok = await bcrypt.compare(oldPassword, existing.passwordHash);
-      if (!ok) return { error: 'Invalid credentials' };
-      const passwordHash = await bcrypt.hash(newPassword, 10);
-      await db.user.update({ where: { id: existing.id }, data: { passwordHash } });
-      return { ok: true };
+      const schema = z.object({ 
+        oldPassword: z.string().min(6), 
+        newPassword: z.string().min(6) 
+      });
+      
+      try {
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { oldPassword, newPassword } = parsed.data;
+        
+        await app.userService.changePassword(user!.id, oldPassword, newPassword, {
+          actorId: user!.id
+        });
+        
+        return { ok: true };
+      } catch (error: any) {
+        return { error: error.message || 'Password change failed' };
+      }
     },
   });
 
@@ -142,17 +203,33 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     method: 'POST',
     path: '/auth/password/reset/request',
     handler: async ({ body }) => {
-      const schema = z.object({ email: z.string().email() });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { email } = parsed.data;
-      const user = await db.user.findUnique({ where: { email } });
-      if (!user) return { ok: true };
-      const token = randomUUID();
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
-      await db.passwordResetToken.create({ data: { token, userId: user.id, expiresAt } });
-      // In real impl, email the token. Here we return it for testability.
-      return { ok: true, token };
+      const schema = z.object({ 
+        email: z.string().email() 
+      });
+      
+      try {
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { email } = parsed.data;
+        
+        // Check if user exists
+        const user = await app.userService.getUserByEmail(email);
+        if (!user) return { ok: true }; // Don't reveal if user exists
+        
+        // Generate reset token
+        const token = randomUUID();
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        
+        await db.passwordResetToken.create({ 
+          data: { token, userId: user.id, expiresAt } 
+        });
+        
+        // In real implementation, email the token. Here we return it for testability.
+        return { ok: true, token };
+      } catch (error: any) {
+        return { error: error.message || 'Password reset request failed' };
+      }
     },
   });
 
@@ -161,16 +238,36 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     method: 'POST',
     path: '/auth/password/reset/confirm',
     handler: async ({ body }) => {
-      const schema = z.object({ token: z.string().min(1), newPassword: z.string().min(6) });
-      const parsed = schema.safeParse(body);
-      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-      const { token, newPassword } = parsed.data;
-      const row = await db.passwordResetToken.findUnique({ where: { token } });
-      if (!row || row.expiresAt < new Date()) return { error: 'Invalid token' };
-      const passwordHash = await bcrypt.hash(newPassword, 10);
-      await db.user.update({ where: { id: row.userId }, data: { passwordHash } });
-      await db.passwordResetToken.delete({ where: { token } });
-      return { ok: true };
+      const schema = z.object({ 
+        token: z.string().min(1), 
+        newPassword: z.string().min(6) 
+      });
+      
+      try {
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+        
+        const { token, newPassword } = parsed.data;
+        
+        // Find reset token
+        const row = await db.passwordResetToken.findUnique({ where: { token } });
+        
+        if (!row || row.expiresAt < new Date()) {
+          return { error: 'Invalid or expired token' };
+        }
+        
+        // Update password
+        await app.userService.updateUser(row.userId, { password: newPassword }, {
+          actorId: 'system'
+        });
+        
+        // Delete used token
+        await db.passwordResetToken.delete({ where: { token } });
+        
+        return { ok: true };
+      } catch (error: any) {
+        return { error: error.message || 'Password reset confirmation failed' };
+      }
     },
   });
 }
