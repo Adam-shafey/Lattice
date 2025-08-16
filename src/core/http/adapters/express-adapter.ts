@@ -1,6 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
+import logger from '../utils/logger';
 
 export interface ExpressHttpAdapter extends HttpAdapter {
   getUnderlying: () => Express;
@@ -53,7 +54,7 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
         res.send(result);
       } catch (error) {
         // Handle errors gracefully
-        console.error('Express handler error:', error);
+        logger.error({ err: error }, 'Express handler error');
         res.status(500).send({ 
           error: 'Internal server error',
           message: error instanceof Error ? error.message : 'Unknown error'
@@ -103,7 +104,7 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
     async listen(port: number, host?: string) {
       return new Promise<void>((resolve) => {
         instance.listen(port, host ?? '0.0.0.0', () => {
-          console.log(`Express server listening on http://${host ?? '0.0.0.0'}:${port}`);
+          logger.info({ host: host ?? '0.0.0.0', port }, 'Express server listening');
           resolve();
         });
       });

@@ -4,6 +4,7 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
+import logger from '../utils/logger';
 
 export interface FastifyHttpAdapter extends HttpAdapter {
   getUnderlying: () => FastifyInstance;
@@ -19,8 +20,8 @@ export interface FastifyHttpAdapter extends HttpAdapter {
  * @returns FastifyHttpAdapter instance
  */
 export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
-  const instance: FastifyInstance = fastify({ 
-    logger: true,
+  const instance: FastifyInstance = fastify({
+    logger: logger,
     trustProxy: true
   });
 
@@ -121,7 +122,7 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
         }
       } catch (error) {
         // Handle errors gracefully
-        console.error('Fastify handler error:', error);
+        logger.error({ err: error }, 'Fastify handler error');
         
         // Check if response was already sent
         if (reply.sent) {
