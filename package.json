@@ -20,7 +20,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
     "test": "vitest run",
-    "test:minimal": "vitest run --reporter=basic --silent"
+    "test:minimal": "vitest run --reporter=basic --silent",
+    "swagger": "ts-node swagger.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",
@@ -32,7 +33,10 @@
     "fastify": "^5.5.0",
     "jsonwebtoken": "^9.0.2",
     "minimist": "^1.2.8",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@fastify/swagger": "^8.0.0",
+    "@fastify/swagger-ui": "^1.0.0",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -44,7 +48,8 @@
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.5.4",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "swagger-autogen": "^2.23.7"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

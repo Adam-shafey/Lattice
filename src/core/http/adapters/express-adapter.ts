@@ -1,6 +1,8 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
+import swaggerUi from 'swagger-ui-express';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
+import swaggerDocument from '../../../swagger-output.json';
 
 export interface ExpressHttpAdapter extends HttpAdapter {
   getUnderlying: () => Express;
@@ -17,10 +19,12 @@ export interface ExpressHttpAdapter extends HttpAdapter {
  */
 export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
   const instance: Express = express();
-  
+
   // Configure Express middleware
   instance.use(express.json());
   instance.use(express.urlencoded({ extended: true }));
+
+  instance.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
   /**
    * Wraps a pre-handler function to work with Express middleware
@@ -67,12 +71,12 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
      * Adds a route to the Express application
      */
     addRoute(route: RouteDefinition) {
-      const preHandlers = Array.isArray(route.preHandler) 
-        ? route.preHandler 
-        : route.preHandler 
-          ? [route.preHandler] 
+      const preHandlers = Array.isArray(route.preHandler)
+        ? route.preHandler
+        : route.preHandler
+          ? [route.preHandler]
           : [];
-          
+
       const handlers = [...preHandlers.map(wrapPreHandler), wrapHandler(route.handler)];
       
       // Register the route based on HTTP method
