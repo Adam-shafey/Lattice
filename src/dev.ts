@@ -1,6 +1,4 @@
 import { CoreSaaS } from './index';
-import path from 'path';
-import express from 'express';
 
 async function bootstrap() {
   const app = CoreSaaS({
