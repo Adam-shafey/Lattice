@@ -41,7 +41,7 @@ describe('Auth Service', () => {
     it('signs and verifies access tokens', async () => {
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
       const token = jwt.signAccess({ sub: 'user_1' });
-      const payload = await jwt.verify(token) as any;
+      const payload = await jwt.verify(token);
       expect(payload.sub).toBe('user_1');
       expect(payload.type).toBe('access');
     });
@@ -49,7 +49,7 @@ describe('Auth Service', () => {
     it('signs and verifies refresh tokens', async () => {
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
       const token = jwt.signRefresh({ sub: 'user_1' });
-      const payload = await jwt.verify(token) as any;
+      const payload = await jwt.verify(token);
       expect(payload.sub).toBe('user_1');
       expect(payload.type).toBe('refresh');
     });
@@ -57,7 +57,7 @@ describe('Auth Service', () => {
     it('includes JTI in tokens', async () => {
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
       const token = jwt.signAccess({ sub: 'user_1' });
-      const payload = await jwt.verify(token) as any;
+      const payload = await jwt.verify(token);
       expect(payload.jti).toBeDefined();
       expect(typeof payload.jti).toBe('string');
     });
@@ -153,7 +153,7 @@ describe('Auth Service', () => {
 
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
       const token = jwt.signAccess({ sub: user.id });
-      const payload = await jwt.verify(token) as any;
+      const payload = await jwt.verify(token);
       const jti = payload.jti;
 
       // Revoke token

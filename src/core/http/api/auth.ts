@@ -25,7 +25,7 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
       }
       const token = auth.substring('Bearer '.length);
       const jwt = getJwt(app);
-      const payload = await jwt.verify(token) as any;
+      const payload = await jwt.verify(token);
       (req as any).user = { id: payload.sub };
       if (next) return next();
     } catch (e) {
@@ -90,9 +90,9 @@ export function createAuthRoutes(app: CoreSaaSApp) {
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
         
         const { refreshToken } = parsed.data;
-        const payload = jwt.verifyWithoutRevocationCheck(refreshToken) as any;
-        const userId = payload?.sub as string | undefined;
-        const jti = payload?.jti as string | undefined;
+        const payload = jwt.verifyWithoutRevocationCheck(refreshToken);
+        const userId = payload.sub;
+        const jti = payload.jti;
         
         if (!userId) return { error: 'Invalid token' };
         
@@ -134,8 +134,8 @@ export function createAuthRoutes(app: CoreSaaSApp) {
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
         
         const { token } = parsed.data;
-        const payload = jwt.verifyWithoutRevocationCheck(token) as any;
-        const jti = payload?.jti as string | undefined;
+        const payload = jwt.verifyWithoutRevocationCheck(token);
+        const jti = payload.jti;
         
         if (!jti) return { ok: true };
         
