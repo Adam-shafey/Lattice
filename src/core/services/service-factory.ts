@@ -210,6 +210,7 @@ export class ServiceFactory implements IServiceFactory {
     this._contextService = undefined;
     this._roleService = undefined;
     this._userPermissionService = undefined;
+    this._userService = undefined;
   }
 }
 
