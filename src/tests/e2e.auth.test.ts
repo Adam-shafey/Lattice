@@ -339,7 +339,7 @@ describe('E2E: Authentication', () => {
       expect(invalidEmailRes.statusCode).toBe(200);
       expect(invalidEmailRes.json()).toHaveProperty('error', 'Invalid input');
 
-      // Test short password
+      // Test short password (less than 8 characters)
       const shortPasswordRes = await f.inject({ 
         method: 'POST', 
         url: '/auth/login', 
