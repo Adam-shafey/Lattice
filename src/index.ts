@@ -57,7 +57,7 @@ export interface LatticePlugin {
 
 export interface CheckAccessInput {
   userId: string;
-  context?: { type: string; id: string } | null;
+  context?: { type: string; id: string | null } | null;
   permission: string;
   scope?: 'exact' | 'global' | 'type-wide';
   contextType?: string;
@@ -187,11 +187,16 @@ export class CoreSaaSApp {
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
     const { userId, context, permission, scope, contextType } = input;
 
-    let lookupContext = context ?? null;
+    let lookupContext: { type: string; id: string | null } | null = context ?? null;
     if (scope === 'global') {
       lookupContext = null;
     } else if (scope === 'type-wide') {
-      lookupContext = contextType ? { type: contextType, id: null } : context;
+      const type = contextType ?? context?.type;
+      if (type) {
+        lookupContext = { type, id: null };
+      } else {
+        lookupContext = null;
+      }
     }
 
     try {
