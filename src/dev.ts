@@ -7,6 +7,7 @@ async function bootstrap() {
     db: { provider: 'sqlite' },
     adapter: (process.env.ADAPTER as 'fastify' | 'express') || 'express',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' },
+    apiPrefix: '/api',
   });
 
   // Get the underlying Express app for static file serving
@@ -28,7 +29,7 @@ async function bootstrap() {
     handler: async () => ({ 
       message: 'Lattice Access Control System',
       admin: '/admin',
-      api: '/api',
+      api: app.apiBase || '/api',
       health: '/ping'
     }),
   });

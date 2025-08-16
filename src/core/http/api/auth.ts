@@ -39,12 +39,14 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
   };
 }
 
-export function createAuthRoutes(app: CoreSaaSApp) {
+export function createAuthRoutes(app: CoreSaaSApp, prefix: string = '') {
   const jwt = getJwt(app);
+
+  const p = prefix;
 
   app.route({
     method: 'POST',
-    path: '/auth/login',
+    path: `${p}/auth/login`,
     handler: async ({ body }) => {
       const schema = z.object({
         email: z.string().email(),
@@ -79,7 +81,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
 
   app.route({
     method: 'POST',
-    path: '/auth/refresh',
+    path: `${p}/auth/refresh`,
     handler: async ({ body }) => {
       const schema = z.object({ 
         refreshToken: z.string().min(1) 
@@ -123,7 +125,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   // Explicit revocation endpoint
   app.route({
     method: 'POST',
-    path: '/auth/revoke',
+    path: `${p}/auth/revoke`,
     handler: async ({ body }) => {
       const schema = z.object({ 
         token: z.string().min(1) 
@@ -156,7 +158,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   // Password change (requires auth)
   app.route({
     method: 'POST',
-    path: '/auth/password/change',
+    path: `${p}/auth/password/change`,
     preHandler: requireAuthMiddleware(app),
     handler: async ({ body, user }) => {
       const schema = z.object({ 
@@ -188,7 +190,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   // Password reset request (by email)
   app.route({
     method: 'POST',
-    path: '/auth/password/reset/request',
+    path: `${p}/auth/password/reset/request`,
     handler: async ({ body }) => {
       const schema = z.object({ 
         email: z.string().email() 
@@ -223,7 +225,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   // Password reset confirm
   app.route({
     method: 'POST',
-    path: '/auth/password/reset/confirm',
+    path: `${p}/auth/password/reset/confirm`,
     handler: async ({ body }) => {
       const schema = z.object({ 
         token: z.string().min(1), 

@@ -19,6 +19,7 @@ export interface CoreConfig {
   adapter: SupportedAdapter;
   jwt: { accessTTL: string; refreshTTL: string; secret?: string };
   policy?: RoutePermissionPolicy;
+  apiPrefix?: string;
 }
 
 export interface RouteDefinition<Body = unknown> {
@@ -69,9 +70,11 @@ export class CoreSaaSApp {
   private readonly policy: RoutePermissionPolicy;
   private readonly serviceFactory: ServiceFactory;
   private readonly config: CoreConfig;
+  private readonly apiPrefix: string;
 
   constructor(config: CoreConfig) {
     this.config = config;
+    this.apiPrefix = config.apiPrefix ?? '';
     this.permissionRegistry = new PermissionRegistry();
     this.PermissionRegistry = this.permissionRegistry;
     this.adapterKind = config.adapter;
@@ -106,6 +109,10 @@ export class CoreSaaSApp {
    */
   public get services(): ServiceFactory {
     return this.serviceFactory;
+  }
+
+  public get apiBase() {
+    return this.apiPrefix;
   }
 
   /**
@@ -199,11 +206,11 @@ export class CoreSaaSApp {
     
     // Global request context middleware (only for adapters that support preHandler arrays at route-level)
     // Developers should add it before their own routes if using adapter directly.
-    createAuthRoutes(this);
-    registerUserRoutes(this, this.policy);
-    registerPermissionRoutes(this, this.policy);
-    registerContextRoutes(this, this.policy);
-    registerRoleRoutes(this, this.policy);
+    createAuthRoutes(this, this.apiPrefix);
+    registerUserRoutes(this, this.policy, this.apiPrefix);
+    registerPermissionRoutes(this, this.policy, this.apiPrefix);
+    registerContextRoutes(this, this.policy, this.apiPrefix);
+    registerRoleRoutes(this, this.policy, this.apiPrefix);
     
     await this.httpAdapter.listen(port, host);
   }

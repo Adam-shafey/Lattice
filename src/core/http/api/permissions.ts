@@ -2,10 +2,11 @@ import { CoreSaaSApp } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 
-export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
+  const p = prefix;
   app.route({
     method: 'POST',
-    path: '/permissions/user/grant',
+    path: `${p}/permissions/user/grant`,
     preHandler: app.authorize(policy.permissions!.grantUser),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
@@ -38,7 +39,7 @@ export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissi
 
   app.route({
     method: 'POST',
-    path: '/permissions/user/revoke',
+    path: `${p}/permissions/user/revoke`,
     preHandler: app.authorize(policy.permissions!.revokeUser),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
@@ -71,7 +72,7 @@ export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissi
 
   app.route({
     method: 'GET',
-    path: '/permissions/user/:userId',
+    path: `${p}/permissions/user/:userId`,
     preHandler: app.authorize(policy.permissions!.grantUser),
     handler: async ({ params, query, req }) => {
       try {
@@ -94,7 +95,7 @@ export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissi
 
   app.route({
     method: 'GET',
-    path: '/permissions/user/:userId/effective',
+    path: `${p}/permissions/user/:userId/effective`,
     preHandler: app.authorize(policy.permissions!.grantUser),
     handler: async ({ params, query, req }) => {
       try {
