@@ -2,10 +2,11 @@ import { CoreSaaSApp } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 
-export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
+  const p = prefix;
   app.route({
     method: 'POST',
-    path: '/roles',
+    path: `${p}/roles`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.body;
       return app.authorize(policy.roles!.create.replace('{type}', contextType), { 
@@ -39,7 +40,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'GET',
-    path: '/roles',
+    path: `${p}/roles`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.query;
       return app.authorize(policy.roles!.list.replace('{type}', contextType || 'team'), { 
@@ -63,7 +64,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'GET',
-    path: '/roles/:name',
+    path: `${p}/roles/:name`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.query;
       return app.authorize(policy.roles!.get.replace('{type}', contextType || 'team'), { 
@@ -87,7 +88,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'DELETE',
-    path: '/roles/:name',
+    path: `${p}/roles/:name`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.query;
       return app.authorize(policy.roles!.delete.replace('{type}', contextType || 'team'), { 
@@ -110,7 +111,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'POST',
-    path: '/roles/assign',
+    path: `${p}/roles/assign`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.body;
       if (!contextType) {
@@ -153,7 +154,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'POST',
-    path: '/roles/remove',
+    path: `${p}/roles/remove`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.body;
       if (!contextType) {
@@ -196,7 +197,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'POST',
-    path: '/roles/:name/permissions/add',
+    path: `${p}/roles/:name/permissions/add`,
     preHandler: [
       // Must have role management permission for this type
       (req: any, res: any, next: () => void) => {
@@ -287,7 +288,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'POST',
-    path: '/roles/:name/permissions/remove',
+    path: `${p}/roles/:name/permissions/remove`,
     preHandler: [
       // Must have role management permission for this type
       (req: any, res: any, next: () => void) => {

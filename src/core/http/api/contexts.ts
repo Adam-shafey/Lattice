@@ -2,10 +2,11 @@ import { CoreSaaSApp } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 
-export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
+  const p = prefix;
   app.route({
     method: 'POST',
-    path: '/contexts',
+    path: `${p}/contexts`,
     preHandler: app.authorize(policy.contexts!.create),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
@@ -35,7 +36,7 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
 
   app.route({
     method: 'GET',
-    path: '/contexts/:id',
+    path: `${p}/contexts/:id`,
     preHandler: app.authorize(policy.contexts!.get),
     handler: async ({ params, req }) => {
       try {
@@ -54,7 +55,7 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
 
   app.route({
     method: 'PUT',
-    path: '/contexts/:id',
+    path: `${p}/contexts/:id`,
     preHandler: app.authorize(policy.contexts!.update),
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
@@ -81,7 +82,7 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
 
   app.route({
     method: 'DELETE',
-    path: '/contexts/:id',
+    path: `${p}/contexts/:id`,
     preHandler: app.authorize(policy.contexts!.delete),
     handler: async ({ params, req }) => {
       try {
@@ -98,7 +99,7 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
 
   app.route({
     method: 'POST',
-    path: '/contexts/:id/users/add',
+    path: `${p}/contexts/:id/users/add`,
     preHandler: app.authorize(policy.contexts!.addUser),
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
@@ -126,7 +127,7 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
 
   app.route({
     method: 'POST',
-    path: '/contexts/:id/users/remove',
+    path: `${p}/contexts/:id/users/remove`,
     preHandler: app.authorize(policy.contexts!.removeUser),
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
@@ -154,7 +155,7 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
 
   app.route({
     method: 'GET',
-    path: '/contexts',
+    path: `${p}/contexts`,
     preHandler: app.authorize(policy.contexts!.get),
     handler: async ({ query, req }) => {
       try {
@@ -178,7 +179,7 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
 
   app.route({
     method: 'GET',
-    path: '/contexts/:id/users',
+    path: `${p}/contexts/:id/users`,
     preHandler: app.authorize(policy.contexts!.get),
     handler: async ({ params, req }) => {
       try {

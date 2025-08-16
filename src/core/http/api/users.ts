@@ -2,10 +2,11 @@ import { CoreSaaSApp } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 
-export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
+  const p = prefix;
   app.route({
     method: 'POST',
-    path: '/users',
+    path: `${p}/users`,
     preHandler: app.authorize(policy.users!.create),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
@@ -33,7 +34,7 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'GET',
-    path: '/users',
+    path: `${p}/users`,
     preHandler: app.authorize(policy.users!.list),
     handler: async ({ query, req }) => {
       try {
@@ -59,7 +60,7 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'GET',
-    path: '/users/:id',
+    path: `${p}/users/:id`,
     preHandler: app.authorize(policy.users!.get),
     handler: async ({ params, req }) => {
       try {
@@ -83,7 +84,7 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'PUT',
-    path: '/users/:id',
+    path: `${p}/users/:id`,
     preHandler: app.authorize(policy.users!.update),
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
@@ -110,7 +111,7 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'DELETE',
-    path: '/users/:id',
+    path: `${p}/users/:id`,
     preHandler: app.authorize(policy.users!.delete),
     handler: async ({ params, req }) => {
       try {
