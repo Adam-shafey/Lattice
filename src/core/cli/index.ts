@@ -2,17 +2,15 @@
 import minimist from 'minimist';
 import { CoreSaaS } from '../../index';
 
-function getApp() {
-  const app = CoreSaaS({
+function createApp() {
+  return CoreSaaS({
     db: { provider: 'sqlite' },
     adapter: 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' }
   });
-  return app;
 }
 
-async function listPermissions() {
-  const app = getApp();
+async function listPermissions(app: ReturnType<typeof CoreSaaS>) {
   await app.permissionRegistry.initFromDatabase();
   const list = app.permissionRegistry.list();
   for (const p of list) {
@@ -21,11 +19,10 @@ async function listPermissions() {
   }
 }
 
-async function checkAccess(argv: minimist.ParsedArgs) {
+async function checkAccess(app: ReturnType<typeof CoreSaaS>, argv: minimist.ParsedArgs) {
   const userId = String(argv.userId || argv.u || 'user_123');
   const contextId = (argv.contextId || argv.c) ? String(argv.contextId || argv.c) : undefined;
   const permission = String(argv.permission || argv.p || 'example:read');
-  const app = getApp();
   await app.permissionRegistry.initFromDatabase();
   await app.permissionService.grantToUser({
     userId,
@@ -39,6 +36,7 @@ async function checkAccess(argv: minimist.ParsedArgs) {
 }
 
 async function main() {
+  const app = createApp();
   const argv = minimist(process.argv.slice(2));
   const cmd = argv._[0];
 
@@ -49,27 +47,26 @@ async function main() {
     if (!email) throw new Error('Provide --userId <id> or --email <email>');
     
     // Use the new UserService instead of direct database access
-    const app = getApp();
     const userService = app.userService;
     const user = await userService.getUserByEmail(String(email));
     if (!user) throw new Error(`User not found for email ${email}. Create it first with: lattice users:create --email <email> --password <pw>`);
     return user.id;
   }
 
+  try {
   switch (cmd) {
     case 'list-permissions':
-      await listPermissions();
+      await listPermissions(app);
       break;
     case 'check-access':
-      await checkAccess(argv);
+      await checkAccess(app, argv);
       break;
     case 'users:create': {
       const email = String(argv.email || argv.e);
       const password = String(argv.password || argv.p);
       if (!email || !password) throw new Error('Usage: users:create --email <email> --password <pw>');
-      
+
       // Use the new UserService instead of direct database access
-      const app = getApp();
       const userService = app.userService;
       const user = await userService.createUser({
         email,
@@ -80,7 +77,6 @@ async function main() {
       break;
     }
     case 'users:list': {
-      const app = getApp();
       const userService = app.userService;
       const limit = argv.limit ? parseInt(String(argv.limit)) : 20;
       const offset = argv.offset ? parseInt(String(argv.offset)) : 0;
@@ -98,7 +94,6 @@ async function main() {
       break;
     }
     case 'users:get': {
-      const app = getApp();
       const userService = app.userService;
       const email = argv.email || argv.e;
       const userId = argv.userId || argv.u;
@@ -122,7 +117,6 @@ async function main() {
       break;
     }
     case 'users:delete': {
-      const app = getApp();
       const userService = app.userService;
       const userId = await resolveUserIdFromArgs();
       
@@ -131,7 +125,6 @@ async function main() {
       break;
     }
     case 'roles:create': {
-      const app = getApp();
       const roleService = app.roleService;
       const name = String(argv.name || argv.n);
       const contextType = String(argv.contextType || 'global');
@@ -147,7 +140,6 @@ async function main() {
       break;
     }
     case 'roles:list': {
-      const app = getApp();
       const roleService = app.roleService;
       const contextType = argv.contextType ? String(argv.contextType) : undefined;
       
@@ -159,7 +151,6 @@ async function main() {
       break;
     }
     case 'roles:assign': {
-      const app = getApp();
       const roleService = app.roleService;
       const roleName = String(argv.role || argv.r);
       const userId = await resolveUserIdFromArgs();
@@ -177,7 +168,6 @@ async function main() {
       break;
     }
     case 'roles:remove': {
-      const app = getApp();
       const roleService = app.roleService;
       const roleName = String(argv.role || argv.r);
       const userId = await resolveUserIdFromArgs();
@@ -193,7 +183,6 @@ async function main() {
       break;
     }
     case 'roles:add-perm': {
-      const app = getApp();
       const roleService = app.roleService;
       const roleName = String(argv.role || argv.r);
       const permissionKey = String(argv.permission || argv.p);
@@ -211,7 +200,6 @@ async function main() {
       break;
     }
     case 'roles:remove-perm': {
-      const app = getApp();
       const roleService = app.roleService;
       const roleName = String(argv.role || argv.r);
       const permissionKey = String(argv.permission || argv.p);
@@ -227,7 +215,6 @@ async function main() {
       break;
     }
     case 'roles:user-roles': {
-      const app = getApp();
       const roleService = app.roleService;
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
@@ -245,7 +232,6 @@ async function main() {
       break;
     }
     case 'permissions:grant': {
-      const app = getApp();
       const permissionService = app.permissionService;
       const userId = await resolveUserIdFromArgs();
       const permissionKey = String(argv.permission || argv.p);
@@ -263,7 +249,6 @@ async function main() {
       break;
     }
     case 'permissions:revoke': {
-      const app = getApp();
       const permissionService = app.permissionService;
       const userId = await resolveUserIdFromArgs();
       const permissionKey = String(argv.permission || argv.p);
@@ -279,7 +264,6 @@ async function main() {
       break;
     }
     case 'permissions:user': {
-      const app = getApp();
       const permissionService = app.permissionService;
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
@@ -299,7 +283,6 @@ async function main() {
       break;
     }
     case 'permissions:effective': {
-      const app = getApp();
       const permissionService = app.permissionService;
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
@@ -317,7 +300,6 @@ async function main() {
       break;
     }
     case 'contexts:create': {
-      const app = getApp();
       const contextService = app.contextService;
       const id = String(argv.id);
       const type = String(argv.type);
@@ -333,7 +315,6 @@ async function main() {
       break;
     }
     case 'contexts:list': {
-      const app = getApp();
       const contextService = app.contextService;
       const type = argv.type ? String(argv.type) : undefined;
       const limit = argv.limit ? parseInt(String(argv.limit)) : 20;
@@ -378,6 +359,9 @@ async function main() {
       console.log('  permissions:effective (--userId <id> | --email <email>) [--contextId <ctx>]');
       console.log('  contexts:create --id <id> --type <type> --name <name>');
       console.log('  contexts:list [--type <type>] [--limit <n>] [--offset <n>]');
+  }
+  } finally {
+    await app.shutdown();
   }
 }
 
