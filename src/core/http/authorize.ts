@@ -76,19 +76,12 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         context: contextId ? { id: contextId, type: requestContextType ?? 'unknown' } : null,
         permission: requiredPermission,
         scope: options.scope,
-        contextType
+        contextType: contextType ?? undefined
       });
 
       if (!allowed) {
-        try {
-          await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, false);
-        } catch {}
         return respond(res, next, 403, { statusCode: 403, message: 'Forbidden' });
       }
-
-      try {
-        await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, true);
-      } catch {}
 
       return next?.();
     } catch (error) {

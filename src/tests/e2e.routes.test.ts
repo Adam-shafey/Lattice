@@ -18,7 +18,6 @@ describe('E2E: Protected Routes', () => {
     });
 
     // Clean up database before each test - delete child records first
-    await db.auditLog.deleteMany();
     await db.userPermission.deleteMany();
     await db.rolePermission.deleteMany();
     await db.userRole.deleteMany();
@@ -40,7 +39,6 @@ describe('E2E: Protected Routes', () => {
 
   afterAll(async () => {
     // Final cleanup - delete child records first
-    await db.auditLog.deleteMany();
     await db.userPermission.deleteMany();
     await db.rolePermission.deleteMany();
     await db.userRole.deleteMany();

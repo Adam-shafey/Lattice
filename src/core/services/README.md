@@ -1,6 +1,5 @@
 # Lattice Core Services
 
-This directory contains the refactored, production-ready services for Lattice Core. All services follow consistent patterns for error handling, validation, audit logging, and transaction management.
 
 ## Architecture Overview
 
@@ -8,7 +7,6 @@ This directory contains the refactored, production-ready services for Lattice Co
 
 ```
 BaseService (abstract)
-├── AuditService
 ├── ContextService
 ├── RoleService
 ├── UserService
@@ -21,7 +19,6 @@ ServiceFactory (manages all services)
 
 1. **Consistent Error Handling**: All services use `ServiceError` with standardized error codes and messages
 2. **Input Validation**: Comprehensive validation with descriptive error messages
-3. **Audit Logging**: Automatic audit logging for all operations with configurable sinks
 4. **Transaction Support**: Proper transaction handling for multi-step operations
 5. **Interface Contracts**: All services implement interfaces for better testing and mocking
 6. **Dependency Injection**: Services receive dependencies through constructor injection
@@ -58,19 +55,14 @@ ServiceError.internal('Database connection failed')
 Abstract base class providing common functionality:
 
 - Database client access
-- Audit service integration
 - Transaction support
 - Input validation helpers
-- Standardized audit logging
 
 ## Service Implementations
 
-### AuditService ✅ **COMPLETED**
 
-Enhanced audit logging with batch processing and multiple sinks:
 
 ```typescript
-const auditService = new AuditService({
   enabled: true,
   sampleRate: 1.0,
   sinks: ['db', 'stdout'],
@@ -81,7 +73,6 @@ const auditService = new AuditService({
 });
 
 // Log operations
-await auditService.log({
   actorId: 'user_123',
   action: 'user.created',
   success: true,
@@ -89,9 +80,6 @@ await auditService.log({
 });
 
 // Convenience methods
-await auditService.logPermissionCheck(userId, contextId, permission, success);
-await auditService.logTokenIssued(userId, 'access');
-await auditService.logUserAction(actorId, targetUserId, 'user.updated', true);
 ```
 
 ### ContextService ✅ **COMPLETED**
@@ -99,7 +87,6 @@ await auditService.logUserAction(actorId, targetUserId, 'user.updated', true);
 Context management with full CRUD operations:
 
 ```typescript
-const contextService = new ContextService(db, auditConfig);
 
 // Create context
 const context = await contextService.createContext({
@@ -127,7 +114,6 @@ await contextService.addUserToContext({
 Role management with context-aware assignments:
 
 ```typescript
-const roleService = new RoleService(db, auditConfig);
 
 // Create role
 const role = await roleService.createRole({
@@ -164,7 +150,6 @@ await roleService.bulkAssignRolesToUser({
 User management with authentication and profile operations:
 
 ```typescript
-const userService = new UserService(db, auditConfig);
 
 // Create user
 const user = await userService.createUser({
@@ -202,7 +187,6 @@ await userService.deleteUser('user_123');
 Permission management with effective permission calculation:
 
 ```typescript
-const permissionService = new UserPermissionService(db, auditConfig);
 
 // Grant permission to user
 await permissionService.grantToUser({
@@ -242,7 +226,6 @@ Centralized service management with dependency injection:
 // Initialize service factory
 const serviceFactory = new ServiceFactory({
   db: prismaClient,
-  audit: {
     enabled: true,
     sinks: ['db', 'stdout']
   }
@@ -253,10 +236,8 @@ const contextService = serviceFactory.getContextService();
 const roleService = serviceFactory.getRoleService();
 const permissionService = serviceFactory.getPermissionService();
 const userService = serviceFactory.getUserService();
-const auditService = serviceFactory.auditService;
 
 // Get all services at once
-const { audit, context, role, permission, user } = serviceFactory.getAllServices();
 
 // Graceful shutdown
 await serviceFactory.shutdown();
@@ -270,7 +251,6 @@ For application-wide access:
 // Initialize once at app startup
 getServiceFactory({
   db: prismaClient,
-  audit: { enabled: true }
 });
 
 // Use anywhere in the application
@@ -291,7 +271,6 @@ const app = CoreSaaS({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
-  audit: {
     enabled: true,
     sinks: ['db', 'stdout'],
     batchSize: 100,
@@ -305,7 +284,6 @@ const userService = app.userService;
 const roleService = app.roleService;
 const contextService = app.contextService;
 const permissionService = app.permissionService;
-const auditService = app.auditService;
 
 // Or access the service factory directly
 const services = app.services;
@@ -380,12 +358,9 @@ this.validateEmail(email);
 this.validateUUID(id, 'fieldName');
 ```
 
-## Audit Logging Patterns
 
-Automatic audit logging for all operations:
 
 ```typescript
-return this.withAudit(
   async () => {
     // Operation logic here
     return result;
@@ -479,10 +454,8 @@ const roleService: IRoleService = mockServiceFactory.getRoleService();
 
 ## Configuration
 
-### Audit Configuration
 
 ```typescript
-const auditConfig: AuditConfig = {
   enabled: true,
   sampleRate: 1.0, // 100% of operations
   sinks: ['db', 'stdout'],
@@ -498,7 +471,6 @@ const auditConfig: AuditConfig = {
 ```typescript
 const serviceFactoryConfig: ServiceFactoryConfig = {
   db: prismaClient,
-  audit: auditConfig
 };
 ```
 
@@ -509,7 +481,6 @@ const appConfig: CoreConfig = {
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
-  audit: {
     enabled: true,
     sinks: ['db', 'stdout'],
     batchSize: 100,
@@ -520,7 +491,6 @@ const appConfig: CoreConfig = {
 
 ## Performance Considerations
 
-1. **Batch Processing**: Audit service supports batch logging for high-throughput scenarios
 2. **Connection Pooling**: Services use shared database connections
 3. **Lazy Loading**: Service factory creates services on-demand
 4. **Transaction Optimization**: Use transactions for multi-step operations
@@ -529,7 +499,6 @@ const appConfig: CoreConfig = {
 ## Security Considerations
 
 1. **Input Validation**: All inputs are validated before processing
-2. **Audit Logging**: All operations are logged for security monitoring
 3. **Error Sanitization**: Sensitive information is redacted from logs
 4. **Permission Checking**: Services validate permissions before operations
 5. **SQL Injection Protection**: Use Prisma's parameterized queries
@@ -537,7 +506,6 @@ const appConfig: CoreConfig = {
 
 ## Monitoring and Observability
 
-1. **Audit Logs**: Comprehensive audit trail for all operations
 2. **Error Tracking**: Standardized error codes and messages
 3. **Performance Metrics**: Transaction timing and success rates
 4. **Health Checks**: Service factory provides health check methods
@@ -546,7 +514,6 @@ const appConfig: CoreConfig = {
 ## Current Status
 
 ### ✅ **Completed Services**
-- **AuditService**: Full audit logging with batching, multiple sinks, querying
 - **ContextService**: Complete CRUD operations with context management
 - **RoleService**: Role management with bulk operations and context awareness
 - **UserService**: User management with authentication, password handling, and profile operations

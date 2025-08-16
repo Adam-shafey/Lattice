@@ -12,7 +12,6 @@
  * - Permission revocation and cleanup
  * - Effective permission calculation (direct + role-based)
  * - Bulk permission operations
- * - Comprehensive audit logging
  * 
  * Permission Scoping:
  * - Global: Permission applies to all contexts
@@ -20,7 +19,7 @@
  * - Context-specific: Permission applies only to a specific context
  * 
  * Usage:
- * const permissionService = new UserPermissionService(db, auditConfig);
+ * const permissionService = new UserPermissionService(db);
  * await permissionService.grantToUser({
  *   userId: 'user_123',
  *   permissionKey: 'users:read',
@@ -38,12 +37,12 @@ import type { Prisma } from '../db/db-client';
  * 
  * Implements the IPermissionService interface and provides all permission-related
  * operations for users. Extends BaseService to inherit common functionality like
- * audit logging, validation, and transaction management.
+ * validation and transaction management.
  */
 export class UserPermissionService extends BaseService implements IPermissionService {
-  
-  constructor(db: any, audit: any) {
-    super(db, audit);
+
+  constructor(db: any) {
+    super(db);
   }
   
   /**
@@ -57,7 +56,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
    * @param params.permissionKey - The permission key to grant (e.g., 'users:read')
    * @param params.contextId - Optional specific context ID for context-scoped permissions
    * @param params.contextType - Optional context type for type-wide permissions
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to the created UserPermission record
    * 
    * @throws ServiceError.notFound if user or context doesn't exist
@@ -84,7 +83,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     this.validateString(userId, 'user id');
     this.validateString(permissionKey, 'permission key');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify the user exists before granting permissions
         const user = await this.db.user.findUnique({ where: { id: userId } });
@@ -149,7 +148,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
    * @param params.permissionKey - The permission key to revoke
    * @param params.contextId - Optional specific context ID for context-scoped permissions
    * @param params.contextType - Optional context type for type-wide permissions
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise that resolves when permission is revoked
    * 
    * @throws ServiceError.notFound if user doesn't exist
@@ -175,7 +174,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     this.validateString(userId, 'user id');
     this.validateString(permissionKey, 'permission key');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify the user exists before revoking permissions
         const user = await this.db.user.findUnique({ where: { id: userId } });
@@ -232,7 +231,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
    * @param params.userId - The user's unique identifier
    * @param params.contextId - Optional specific context ID for context-scoped permissions
    * @param params.contextType - Optional context type for type-wide permissions
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of Permission objects
    * 
    * @throws ServiceError.notFound if user doesn't exist
@@ -255,7 +254,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     // Validate required inputs
     this.validateString(userId, 'user id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify the user exists before querying permissions
         const user = await this.db.user.findUnique({ where: { id: userId } });
@@ -308,7 +307,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
    * @param params.roleId - The role's unique identifier
    * @param params.contextId - Optional specific context ID for context-scoped permissions
    * @param params.contextType - Optional context type for type-wide permissions
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of Permission objects
    * 
    * @throws ServiceError.notFound if role doesn't exist
@@ -331,7 +330,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     // Validate required inputs
     this.validateString(roleId, 'role id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify the role exists before querying permissions
         const role = await this.db.role.findUnique({ where: { id: roleId } });
@@ -386,7 +385,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
    * @param params.userId - The user's unique identifier
    * @param params.contextId - Optional specific context ID for context-scoped permissions
    * @param params.contextType - Optional context type for type-wide permissions
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of unique Permission objects
    * 
    * @throws ServiceError.notFound if user doesn't exist
@@ -409,7 +408,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     // Validate required inputs
     this.validateString(userId, 'user id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify the user exists before calculating permissions
         const user = await this.db.user.findUnique({ where: { id: userId } });
@@ -481,7 +480,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
    * @param params.permissionKey - The permission key to check
    * @param params.contextId - Optional specific context ID for context-scoped permissions
    * @param params.contextType - Optional context type for type-wide permissions
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to boolean indicating if user has the permission
    * 
    * @throws ServiceError.notFound if user doesn't exist
@@ -507,7 +506,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     this.validateString(userId, 'user id');
     this.validateString(permissionKey, 'permission key');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Get the user's effective permissions
         const permissions = await this.getUserEffectivePermissions({
@@ -618,7 +617,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
    * 
    * @param params.userId - The user's unique identifier
    * @param params.permissions - Array of permission objects to grant
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of created UserPermission records
    * 
    * @throws ServiceError.notFound if user or any context doesn't exist
@@ -650,7 +649,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
       throw ServiceError.validationError('At least one permission must be provided');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify the user exists before granting permissions
         const user = await this.db.user.findUnique({ where: { id: userId } });

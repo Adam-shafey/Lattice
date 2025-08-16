@@ -5,9 +5,9 @@ import type { Prisma } from '../db/db-client';
 import { randomUUID } from 'crypto';
 
 export class RoleService extends BaseService implements IRoleService {
-  
-  constructor(db: any, audit: any) {
-    super(db, audit);
+
+  constructor(db: any) {
+    super(db);
   }
   
   async createRole(params: {
@@ -22,7 +22,7 @@ export class RoleService extends BaseService implements IRoleService {
     this.validateString(name, 'role name');
     this.validateString(contextType, 'context type');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Check if role with same name already exists
         const existing = await this.db.role.findFirst({ 
@@ -56,7 +56,7 @@ export class RoleService extends BaseService implements IRoleService {
   async getRoleByName(name: string, context?: ServiceContext): Promise<Role | null> {
     this.validateString(name, 'role name');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         return this.db.role.findFirst({ where: { name } });
       },
@@ -73,7 +73,7 @@ export class RoleService extends BaseService implements IRoleService {
   async getRoleByKey(key: string, context?: ServiceContext): Promise<Role | null> {
     this.validateString(key, 'role key');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         return this.db.role.findUnique({ where: { key } });
       },
@@ -90,7 +90,7 @@ export class RoleService extends BaseService implements IRoleService {
   async deleteRole(nameOrKey: string, context?: ServiceContext): Promise<void> {
     this.validateString(nameOrKey, 'role name or key');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         const role = await this.db.role.findFirst({ 
           where: { OR: [{ name: nameOrKey }, { key: nameOrKey }] } 
@@ -127,7 +127,7 @@ export class RoleService extends BaseService implements IRoleService {
       this.validateString(contextType, 'context type');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         const where = contextType ? { contextType } : {};
         return this.db.role.findMany({ 
@@ -160,7 +160,7 @@ export class RoleService extends BaseService implements IRoleService {
       throw ServiceError.validationError('Either roleName or roleKey must be provided');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Find the role
         const role = roleKey
@@ -235,7 +235,7 @@ export class RoleService extends BaseService implements IRoleService {
       throw ServiceError.validationError('Either roleName or roleKey must be provided');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         const role = roleKey
           ? await this.db.role.findUnique({ where: { key: roleKey } })
@@ -280,7 +280,7 @@ export class RoleService extends BaseService implements IRoleService {
       throw ServiceError.validationError('Either roleName or roleKey must be provided');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Find the role
         const role = roleKey
@@ -350,7 +350,7 @@ export class RoleService extends BaseService implements IRoleService {
       throw ServiceError.validationError('Either roleName or roleKey must be provided');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         const role = roleKey
           ? await this.db.role.findUnique({ where: { key: roleKey } })
@@ -407,7 +407,7 @@ export class RoleService extends BaseService implements IRoleService {
     // Validate inputs
     this.validateString(userId, 'user id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify user exists
         const user = await this.db.user.findUnique({ where: { id: userId } });
@@ -452,7 +452,7 @@ export class RoleService extends BaseService implements IRoleService {
     // Validate inputs
     this.validateString(roleId, 'role id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify role exists
         const role = await this.db.role.findUnique({ where: { id: roleId } });
@@ -513,7 +513,7 @@ export class RoleService extends BaseService implements IRoleService {
       throw ServiceError.validationError('At least one role must be provided');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify user exists
         const user = await this.db.user.findUnique({ where: { id: userId } });

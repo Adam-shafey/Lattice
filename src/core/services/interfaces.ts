@@ -26,7 +26,7 @@ export interface IUserService {
    * Creates a new user with the specified email and password
    * @param params.email - User's email address
    * @param params.password - User's password (will be hashed)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to the created User
    */
   createUser(params: {
@@ -38,7 +38,7 @@ export interface IUserService {
   /**
    * Retrieves a user by their unique ID
    * @param id - User's unique identifier
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
   getUserById(id: string, context?: ServiceContext): Promise<User | null>;
@@ -46,7 +46,7 @@ export interface IUserService {
   /**
    * Retrieves a user by their email address
    * @param email - User's email address
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
   getUserByEmail(email: string, context?: ServiceContext): Promise<User | null>;
@@ -55,7 +55,7 @@ export interface IUserService {
    * Updates a user's profile information
    * @param id - User's unique identifier
    * @param updates - Object containing fields to update
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to the updated User
    */
   updateUser(id: string, updates: {
@@ -66,7 +66,7 @@ export interface IUserService {
   /**
    * Permanently deletes a user and all associated data
    * @param id - User's unique identifier
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise that resolves when deletion is complete
    */
   deleteUser(id: string, context?: ServiceContext): Promise<void>;
@@ -75,7 +75,7 @@ export interface IUserService {
    * Lists users with optional pagination
    * @param params.limit - Maximum number of users to return
    * @param params.offset - Number of users to skip (for pagination)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to object containing users array and total count
    */
   listUsers(params?: {
@@ -89,7 +89,7 @@ export interface IUserService {
    * @param userId - User's unique identifier
    * @param oldPassword - Current password for verification
    * @param newPassword - New password to set
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise that resolves when password is changed
    */
   changePassword(userId: string, oldPassword: string, newPassword: string, context?: ServiceContext): Promise<void>;
@@ -97,7 +97,7 @@ export interface IUserService {
   /**
    * Initiates a password reset for a user by email
    * @param email - User's email address
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise that resolves when reset email is sent
    */
   resetPassword(email: string, context?: ServiceContext): Promise<void>;
@@ -126,7 +126,7 @@ export interface IRoleService {
    * @param params.name - Role name (e.g., 'admin', 'member')
    * @param params.contextType - Type of context this role applies to (e.g., 'organization')
    * @param params.key - Optional unique key for the role
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to the created Role
    */
   createRole(params: {
@@ -139,7 +139,7 @@ export interface IRoleService {
   /**
    * Retrieves a role by its name
    * @param name - Role name to search for
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to Role or null if not found
    */
   getRoleByName(name: string, context?: ServiceContext): Promise<Role | null>;
@@ -147,7 +147,7 @@ export interface IRoleService {
   /**
    * Retrieves a role by its unique key
    * @param key - Role key to search for
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to Role or null if not found
    */
   getRoleByKey(key: string, context?: ServiceContext): Promise<Role | null>;
@@ -155,7 +155,7 @@ export interface IRoleService {
   /**
    * Permanently deletes a role and removes all assignments
    * @param nameOrKey - Role name or key to delete
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise that resolves when deletion is complete
    */
   deleteRole(nameOrKey: string, context?: ServiceContext): Promise<void>;
@@ -163,7 +163,7 @@ export interface IRoleService {
   /**
    * Lists roles with optional filtering by context type
    * @param params.contextType - Optional context type filter
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of Roles
    */
   listRoles(params?: {
@@ -178,7 +178,7 @@ export interface IRoleService {
    * @param params.userId - User's unique identifier
    * @param params.contextId - Specific context ID (optional for global roles)
    * @param params.contextType - Context type for type-wide roles (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to the created UserRole assignment
    */
   assignRoleToUser(params: {
@@ -197,7 +197,7 @@ export interface IRoleService {
    * @param params.userId - User's unique identifier
    * @param params.contextId - Specific context ID (optional for global roles)
    * @param params.contextType - Context type for type-wide roles (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise that resolves when role is removed
    */
   removeRoleFromUser(params: {
@@ -216,7 +216,7 @@ export interface IRoleService {
    * @param params.permissionKey - Permission key to add
    * @param params.contextId - Specific context ID (optional for global permissions)
    * @param params.contextType - Context type for type-wide permissions (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to the created RolePermission
    */
   addPermissionToRole(params: {
@@ -235,7 +235,7 @@ export interface IRoleService {
    * @param params.permissionKey - Permission key to remove
    * @param params.contextId - Specific context ID (optional for global permissions)
    * @param params.contextType - Context type for type-wide permissions (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise that resolves when permission is removed
    */
   removePermissionFromRole(params: {
@@ -251,7 +251,7 @@ export interface IRoleService {
    * Lists all roles assigned to a user in a specific context
    * @param params.userId - User's unique identifier
    * @param params.contextId - Specific context ID (optional for global roles)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of role assignments with names and context IDs
    */
   listUserRoles(params: {
@@ -277,7 +277,7 @@ export interface IPermissionService {
    * @param params.permissionKey - Permission key to grant
    * @param params.contextId - Specific context ID (optional for global permissions)
    * @param params.contextType - Context type for type-wide permissions (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to the created UserPermission
    */
   grantToUser(params: {
@@ -294,7 +294,7 @@ export interface IPermissionService {
    * @param params.permissionKey - Permission key to revoke
    * @param params.contextId - Specific context ID (optional for global permissions)
    * @param params.contextType - Context type for type-wide permissions (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise that resolves when permission is revoked
    */
   revokeFromUser(params: {
@@ -310,7 +310,7 @@ export interface IPermissionService {
    * @param params.userId - User's unique identifier
    * @param params.contextId - Specific context ID (optional for global permissions)
    * @param params.contextType - Context type for type-wide permissions (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of Permissions
    */
   getUserPermissions(params: {
@@ -325,7 +325,7 @@ export interface IPermissionService {
    * @param params.roleId - Role's unique identifier
    * @param params.contextId - Specific context ID (optional for global permissions)
    * @param params.contextType - Context type for type-wide permissions (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of Permissions
    */
   getRolePermissions(params: {
@@ -341,7 +341,7 @@ export interface IPermissionService {
    * @param params.permissionKey - Permission key to check
    * @param params.contextId - Specific context ID (optional for global permissions)
    * @param params.contextType - Context type for type-wide permissions (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to boolean indicating if user has permission
    */
   checkUserPermission(params: {
@@ -357,7 +357,7 @@ export interface IPermissionService {
    * @param params.userId - User's unique identifier
    * @param params.contextId - Specific context ID (optional for global permissions)
    * @param params.contextType - Context type for type-wide permissions (optional)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of effective Permissions
    */
   getUserEffectivePermissions(params: {
@@ -371,7 +371,7 @@ export interface IPermissionService {
    * Grants multiple permissions to a user in a single operation
    * @param params.userId - User's unique identifier
    * @param params.permissions - Array of permission objects to grant
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of created UserPermissions
    */
   bulkGrantToUser(params: {
@@ -413,7 +413,7 @@ export interface IContextService {
    * @param params.id - Unique context identifier
    * @param params.type - Context type (e.g., 'organization', 'team')
    * @param params.name - Optional display name for the context
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to the created Context
    */
   createContext(params: {
@@ -426,7 +426,7 @@ export interface IContextService {
   /**
    * Retrieves a context by its unique ID
    * @param id - Context's unique identifier
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to Context or null if not found
    */
   getContext(id: string, context?: ServiceContext): Promise<Context | null>;
@@ -435,7 +435,7 @@ export interface IContextService {
    * Updates a context's properties
    * @param id - Context's unique identifier
    * @param updates - Object containing fields to update
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to the updated Context
    */
   updateContext(id: string, updates: {
@@ -446,7 +446,7 @@ export interface IContextService {
   /**
    * Permanently deletes a context and all associated data
    * @param id - Context's unique identifier
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise that resolves when deletion is complete
    */
   deleteContext(id: string, context?: ServiceContext): Promise<void>;
@@ -456,7 +456,7 @@ export interface IContextService {
    * @param params.type - Optional context type filter
    * @param params.limit - Maximum number of contexts to return
    * @param params.offset - Number of contexts to skip (for pagination)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to object containing contexts array and total count
    */
   listContexts(params?: {
@@ -470,7 +470,7 @@ export interface IContextService {
    * Adds a user to a context (creates membership)
    * @param params.userId - User's unique identifier
    * @param params.contextId - Context's unique identifier
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise that resolves when user is added to context
    */
   addUserToContext(params: {
@@ -483,7 +483,7 @@ export interface IContextService {
    * Removes a user from a context (removes membership)
    * @param params.userId - User's unique identifier
    * @param params.contextId - Context's unique identifier
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise that resolves when user is removed from context
    */
   removeUserFromContext(params: {
@@ -495,7 +495,7 @@ export interface IContextService {
   /**
    * Gets all users who are members of a specific context
    * @param params.contextId - Context's unique identifier
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to array of Users
    */
   getContextUsers(params: {

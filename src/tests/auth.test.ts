@@ -14,15 +14,11 @@ describe('Auth Service', () => {
     // Create fresh app instance for each test
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
-      adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test-secret' },
-      audit: {
-        enabled: false // Disable audit logging for tests
-      }
+      adapter: 'fastify',
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test-secret' }
     });
 
     // Clean up database before each test - delete child records first
-    await db.auditLog.deleteMany();
     await db.userPermission.deleteMany();
     await db.rolePermission.deleteMany();
     await db.userRole.deleteMany();

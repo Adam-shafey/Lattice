@@ -8,13 +8,12 @@
  * Key Features:
  * - Singleton pattern for global access
  * - Lazy loading of services (created on-demand)
- * - Dependency injection for database and audit configuration
+ * - Dependency injection for the database
  * - Graceful shutdown of all services
  * - Testing support with reset capabilities
  */
 
 import type { PrismaClient as PrismaClientType } from '../../../prisma/generated/client';
-import { AuditService, type AuditConfig } from './audit-service';
 import { ContextService } from './context-service';
 import { RoleService } from './role-service';
 import { UserPermissionService } from './user-permission-service';
@@ -30,8 +29,6 @@ import { IServiceFactory, type IUserService, type IRoleService, type IPermission
 export interface ServiceFactoryConfig {
   /** Database client instance for all services */
   db: PrismaClientType;
-  /** Optional audit configuration for audit service */
-  audit?: AuditConfig;
 }
 
 /**
@@ -42,18 +39,12 @@ export interface ServiceFactoryConfig {
  * memory usage and startup time.
  * 
  * Usage:
- * const factory = new ServiceFactory({ db: prismaClient, audit: auditConfig });
+ * const factory = new ServiceFactory({ db: prismaClient });
  * const roleService = factory.getRoleService();
  */
 export class ServiceFactory implements IServiceFactory {
   /** Database client shared across all services */
   private readonly db: PrismaClientType;
-  
-  /** Optional audit configuration for audit service */
-  private readonly auditConfig?: AuditConfig;
-  
-  /** Lazy-loaded audit service instance */
-  private _auditService?: AuditService;
   
   /** Lazy-loaded context service instance */
   private _contextService?: ContextService;
@@ -69,26 +60,10 @@ export class ServiceFactory implements IServiceFactory {
 
   /**
    * Constructor for ServiceFactory
-   * @param config - Configuration object containing database client and optional audit config
+   * @param config - Configuration object containing the database client
    */
   constructor(config: ServiceFactoryConfig) {
     this.db = config.db;
-    this.auditConfig = config.audit;
-  }
-
-  /**
-   * Gets the audit service instance (lazy-loaded)
-   * 
-   * Creates the audit service on first access and reuses the same instance
-   * for subsequent calls.
-   * 
-   * @returns AuditService instance
-   */
-  get auditService(): AuditService {
-    if (!this._auditService) {
-      this._auditService = new AuditService(this.auditConfig);
-    }
-    return this._auditService;
   }
 
   /**
@@ -96,13 +71,13 @@ export class ServiceFactory implements IServiceFactory {
    * 
    * Creates the context service on first access and reuses the same instance
    * for subsequent calls. The service is configured with the shared database
-   * client and audit configuration.
+   * client.
    * 
    * @returns IContextService instance
    */
   getContextService(): IContextService {
     if (!this._contextService) {
-      this._contextService = new ContextService(this.db, this.auditService);
+      this._contextService = new ContextService(this.db);
     }
     return this._contextService;
   }
@@ -112,13 +87,13 @@ export class ServiceFactory implements IServiceFactory {
    * 
    * Creates the role service on first access and reuses the same instance
    * for subsequent calls. The service is configured with the shared database
-   * client and audit configuration.
+   * client.
    * 
    * @returns IRoleService instance
    */
   getRoleService(): IRoleService {
     if (!this._roleService) {
-      this._roleService = new RoleService(this.db, this.auditService);
+      this._roleService = new RoleService(this.db);
     }
     return this._roleService;
   }
@@ -128,13 +103,13 @@ export class ServiceFactory implements IServiceFactory {
    * 
    * Creates the user permission service on first access and reuses the same
    * instance for subsequent calls. The service is configured with the shared
-   * database client and audit service.
+   * database client.
    * 
    * @returns IPermissionService instance
    */
   getPermissionService(): IPermissionService {
     if (!this._userPermissionService) {
-      this._userPermissionService = new UserPermissionService(this.db, this.auditService);
+      this._userPermissionService = new UserPermissionService(this.db);
     }
     return this._userPermissionService;
   }
@@ -144,13 +119,13 @@ export class ServiceFactory implements IServiceFactory {
    * 
    * Creates the user service on first access and reuses the same instance
    * for subsequent calls. The service is configured with the shared database
-   * client and audit service.
+   * client.
    * 
    * @returns IUserService instance
    */
   getUserService(): IUserService {
     if (!this._userService) {
-      this._userService = new UserService(this.db, this.auditService);
+      this._userService = new UserService(this.db);
     }
     return this._userService;
   }
@@ -165,7 +140,6 @@ export class ServiceFactory implements IServiceFactory {
    */
   getAllServices() {
     return {
-      audit: this.auditService,
       context: this.getContextService(),
       role: this.getRoleService(),
       permission: this.getPermissionService(),
@@ -176,25 +150,14 @@ export class ServiceFactory implements IServiceFactory {
   /**
    * Gracefully shuts down all services
    * 
-   * This method ensures that all services are properly cleaned up,
-   * including flushing audit logs and closing database connections.
+   * This method ensures that all services are properly cleaned up.
    * Should be called during application shutdown.
    * 
    * @returns Promise that resolves when all services are shut down
    */
   async shutdown(): Promise<void> {
-    const promises: Promise<void>[] = [];
-
-    // Shutdown audit service if it exists
-    if (this._auditService) {
-      promises.push(this._auditService.shutdown());
-    }
-
-    // Add other service shutdown logic here as needed
-    // For example, close database connections, clear caches, etc.
-
-    // Wait for all shutdown operations to complete
-    await Promise.allSettled(promises);
+    // Add service shutdown logic here as needed
+    await Promise.resolve();
   }
 
   /**
@@ -205,7 +168,6 @@ export class ServiceFactory implements IServiceFactory {
    * clean state between tests.
    */
   reset(): void {
-    this._auditService = undefined;
     this._contextService = undefined;
     this._roleService = undefined;
     this._userPermissionService = undefined;
@@ -235,8 +197,8 @@ let globalServiceFactory: ServiceFactory | null = null;
  * 
  * Usage:
  * // Initialize the global factory
- * getServiceFactory({ db: prismaClient, audit: auditConfig });
- * 
+ * getServiceFactory({ db: prismaClient });
+ *
  * // Use the global factory anywhere in the application
  * const factory = getServiceFactory();
  * const roleService = factory.getRoleService();
