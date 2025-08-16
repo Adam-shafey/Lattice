@@ -1,4 +1,7 @@
 import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import fastifyCors from '@fastify/cors';
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUi from '@fastify/swagger-ui';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
 
@@ -19,6 +22,77 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
   const instance: FastifyInstance = fastify({ 
     logger: true,
     trustProxy: true
+  });
+
+  // Register CORS plugin to allow requests from frontend development server
+  instance.register(fastifyCors, {
+    origin: [
+      'http://localhost:5173', // Vite dev server
+      'http://localhost:3000', // Production admin UI
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000'
+    ],
+    credentials: true, // Allow cookies/credentials
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  });
+
+  // Register Swagger for API documentation
+  instance.register(fastifySwagger, {
+    swagger: {
+      info: {
+        title: 'Lattice Access Control API',
+        description: 'API documentation for Lattice Access Control System',
+        version: '1.0.0',
+        contact: {
+          name: 'Lattice Team',
+          email: 'support@lattice.dev'
+        }
+      },
+      host: 'localhost:3000',
+      schemes: ['http', 'https'],
+      consumes: ['application/json'],
+      produces: ['application/json'],
+      securityDefinitions: {
+        Bearer: {
+          type: 'apiKey',
+          name: 'Authorization',
+          in: 'header',
+          description: 'Bearer token for authentication'
+        }
+      },
+      security: [
+        {
+          Bearer: []
+        }
+      ],
+      tags: [
+        { name: 'auth', description: 'Authentication endpoints' },
+        { name: 'users', description: 'User management endpoints' },
+        { name: 'roles', description: 'Role management endpoints' },
+        { name: 'permissions', description: 'Permission management endpoints' },
+        { name: 'contexts', description: 'Context management endpoints' }
+      ]
+    }
+  });
+
+  // Register Swagger UI
+  instance.register(fastifySwaggerUi, {
+    routePrefix: '/docs',
+    uiConfig: {
+      docExpansion: 'list',
+      deepLinking: true
+    },
+    uiHooks: {
+      onRequest: function (request, reply, next) {
+        next();
+      },
+      preHandler: function (request, reply, next) {
+        next();
+      }
+    },
+    staticCSP: true,
+    transformStaticCSP: (header) => header
   });
 
   /**
