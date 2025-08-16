@@ -1,10 +1,36 @@
 import { CoreSaaS } from './index';
+import path from 'path';
+import express from 'express';
 
 async function bootstrap() {
   const app = CoreSaaS({
     db: { provider: 'sqlite' },
-    adapter: (process.env.ADAPTER as 'fastify' | 'express') || 'fastify',
+    adapter: (process.env.ADAPTER as 'fastify' | 'express') || 'express',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' },
+  });
+
+  // Get the underlying Express app for static file serving
+  const expressApp = app.express;
+  if (expressApp) {
+    // Serve static files from the built AccessControlUI
+    const adminUIPath = path.join(__dirname, '../AccessControlUI/dist');
+    expressApp.use('/admin', express.static(adminUIPath));
+    
+    // Serve the admin UI for all /admin routes (SPA routing)
+    expressApp.get('/admin/*', (req, res) => {
+      res.sendFile(path.join(adminUIPath, 'index.html'));
+    });
+  }
+
+  app.route({
+    method: 'GET',
+    path: '/',
+    handler: async () => ({ 
+      message: 'Lattice Access Control System',
+      admin: '/admin',
+      api: '/api',
+      health: '/ping'
+    }),
   });
 
   app.route({
@@ -27,7 +53,12 @@ async function bootstrap() {
     context: { actorId: 'system' }
   });
 
-  await app.listen(Number(process.env.PORT) || 3000);
+  const port = Number(process.env.PORT) || 3000;
+  await app.listen(port);
+  
+  console.log(`🚀 Lattice server running on http://localhost:${port}`);
+  console.log(`📊 Admin UI available at http://localhost:${port}/admin`);
+  console.log(`🔌 API available at http://localhost:${port}/api`);
 }
 
 bootstrap().catch((err) => {

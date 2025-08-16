@@ -10,7 +10,9 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:admin": "cd AccessControlUI && npm install && npm run build",
     "dev": "ts-node-dev --respawn --transpile-only src/dev.ts",
+    "dev:with-admin": "npm run build:admin && npm run dev",
     "start": "node dist/dev.js",
     "cli": "node dist/core/cli/index.js --help",
     "prisma:generate": "prisma generate",
