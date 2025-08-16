@@ -13,7 +13,6 @@
  * - Testing support with reset capabilities
  */
 
-import { db as PrismaClient } from '../db/db-client';
 import type { PrismaClient as PrismaClientType } from '../../../prisma/generated/client';
 import { AuditService, type AuditConfig } from './audit-service';
 import { ContextService } from './context-service';
