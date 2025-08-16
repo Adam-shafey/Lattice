@@ -290,45 +290,42 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     method: 'POST',
     path: `${p}/roles/:name/permissions/remove`,
     preHandler: [
-      // Must have role management permission for this type
+      // 1) Must have role management permission for this type
       (req: any, res: any, next: () => void) => {
         const { contextType } = req.body;
-        return app.authorize(policy.roles!.removePerm.roleManage.replace('{type}', contextType), {
+        return app.authorize(
+          policy.roles!.removePerm.roleManage.replace('{type}', contextType),
+          { scope: 'type-wide', contextType: 'required' }
+        )(req, res, next);
+      },
+      // 2) Must have permission revoke ability for this permission in this context type
+      (req: any, res: any, next: () => void) => {
+        const { permissionKey, contextType } = req.body;
+  
+        const requiredPermission = policy.roles!.removePerm.permissionRevoke
+          .replace('{perm}', permissionKey)
+          .replace('{type}', contextType);
+  
+        return app.authorize(requiredPermission, {
           scope: 'type-wide',
           contextType: 'required'
         })(req, res, next);
-      },
-      // Must have permission revoke ability for this permission in this context
-      async (req: any, res: any, next: () => void) => {
-        const { permissionKey, contextType } = req.body;
-        const allowed = await app.checkAccess({
-          userId: req.user.id,
-          permission: policy.roles!.removePerm.permissionRevoke
-            .replace('{perm}', permissionKey)
-            .replace('{type}', contextType),
-          scope: 'type-wide',
-          contextType
-        });
-        if (!allowed) {
-          return res.status(403).send({ error: 'Cannot revoke permissions you do not have' });
-        }
-        next();
       }
     ],
     handler: async ({ params, body, req }) => {
       try {
         const { name } = z.object({ name: z.string().min(1) }).parse(params);
-        const schema = z.object({ 
-          permissionKey: z.string().min(1), 
-          contextId: z.string().min(1).optional(), 
-          contextType: z.string().min(1).optional() 
-        }).refine((d) => !(d.contextId && d.contextType), { 
-          message: 'Provide either contextId for exact, or contextType for type-wide, not both' 
+        const schema = z.object({
+          permissionKey: z.string().min(1),
+          contextId: z.string().min(1).optional(),
+          contextType: z.string().min(1).optional()
+        }).refine((d) => !(d.contextId && d.contextType), {
+          message: 'Provide either contextId for exact, or contextType for type-wide, not both'
         });
-        
+  
         const parsed = schema.safeParse(body);
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
+  
         const { permissionKey, contextId, contextType } = parsed.data;
         await app.roleService.removePermissionFromRole({
           roleName: name,
