@@ -1,5 +1,6 @@
 import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
+import { extractRequestContext } from '../utils/extract-request-context';
 
 export interface FastifyHttpAdapter extends HttpAdapter {
   getUnderlying: () => FastifyInstance;
@@ -29,33 +30,14 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
   function wrapHandler(handler: RouteDefinition['handler']) {
     return async function (request: FastifyRequest, reply: FastifyReply) {
       try {
-        // Extract user ID from middleware or headers
-        const userId = (request as any).user?.id || (request.headers['x-user-id'] as string) || null;
-        
-        // Extract context information from various sources
-        const contextId =
-          (request.params as Record<string, string | undefined>)?.['contextId'] ||
-          (request.headers['x-context-id'] as string) ||
-          (request.query as Record<string, string | undefined>)?.['contextId'] ||
-          null;
-          
-        const contextType =
-          (request.params as Record<string, string | undefined>)?.['contextType'] ||
-          (request.headers['x-context-type'] as string) ||
-          (request.query as Record<string, string | undefined>)?.['contextType'] ||
-          null;
+        const { user, context, body, params, query } = extractRequestContext(request);
 
-        // Create standardized context and user objects
-        const context = contextId ? { id: contextId, type: contextType ?? 'unknown' } : null;
-        const user = userId ? { id: userId } : null;
-
-        // Call the handler with standardized parameters
         const result = await handler({
           user,
           context,
-          body: (request.body ?? {}) as unknown,
-          params: (request.params as Record<string, string>) ?? {},
-          query: (request.query as Record<string, string | string[]>) ?? {},
+          body,
+          params: params as Record<string, string>,
+          query: query as Record<string, string | string[]>,
           req: request,
         });
         

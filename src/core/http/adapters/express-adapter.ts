@@ -1,5 +1,6 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
+import { extractRequestContext } from '../utils/extract-request-context';
 
 export interface ExpressHttpAdapter extends HttpAdapter {
   getUnderlying: () => Express;
@@ -37,33 +38,14 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
   function wrapHandler(handler: RouteDefinition['handler']) {
     return async function (req: Request, res: Response) {
       try {
-        // Extract user ID from headers
-        const userId = (req.header('x-user-id') as string) || null;
-        
-        // Extract context information from various sources
-        const contextId =
-          (req.params?.['contextId'] as string) ||
-          (req.header('x-context-id') as string) ||
-          (req.query?.['contextId'] as string) ||
-          null;
-          
-        const contextType =
-          (req.params?.['contextType'] as string) ||
-          (req.header('x-context-type') as string) ||
-          (req.query?.['contextType'] as string) ||
-          null;
+        const { user, context, body, params, query } = extractRequestContext(req);
 
-        // Create standardized context and user objects
-        const context = contextId ? { id: contextId, type: contextType ?? 'unknown' } : null;
-        const user = userId ? { id: userId } : null;
-
-        // Call the handler with standardized parameters
         const result = await handler({
           user,
           context,
-          body: (req.body ?? {}) as unknown,
-          params: (req.params as Record<string, string>) ?? {},
-          query: (req.query as Record<string, string | string[]>) ?? {},
+          body,
+          params: params as Record<string, string>,
+          query: query as Record<string, string | string[]>,
           req,
         });
         
