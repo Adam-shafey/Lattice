@@ -251,7 +251,7 @@ const services = app.services;
 - [ ] Adapter parity improvements (Express vs Fastify features)
 - [ ] Lifecycle hooks framework (`core.hooks`) with typed registration and execution
 - [ ] Emit hooks for: onUserCreated/onUserDeleted, onRoleCreated/onRoleDeleted, onPermissionAdded/onPermissionRemoved, onContextCreated/onContextDeleted, onUserAddedToContext/onUserRemovedFromContext, onTokenIssued/onTokenRevoked, onPluginRegistered/onPluginUnregistered. Don't forget also hooks for role assignment, role removal, etc
-- [ ] Hook execution policy (sequential vs parallel where safe) and cancelation support
+- [ ] Hook execution policy (sequential vs parallel where safe) and cancellation support
 - [ ] Hook tests and docs
 
 ---
