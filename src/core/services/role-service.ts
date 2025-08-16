@@ -1,12 +1,11 @@
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IRoleService } from './interfaces';
-import type { Role, UserRole, RolePermission } from '../db/db-client';
-import type { Prisma } from '../db/db-client';
+import type { PrismaClient, Prisma, Role, UserRole, RolePermission } from '../db/db-client';
 import { randomUUID } from 'crypto';
 
 export class RoleService extends BaseService implements IRoleService {
 
-  constructor(db: any) {
+  constructor(db: PrismaClient) {
     super(db);
   }
   
@@ -415,20 +414,21 @@ export class RoleService extends BaseService implements IRoleService {
           throw ServiceError.notFound('User', userId);
         }
 
-        const userRoles = await this.db.userRole.findMany({
-          where: {
-            userId,
-            OR: [
-              { contextId: null },
-              ...(contextId ? [{ contextId }] : []),
-            ],
-          },
-          include: { role: true },
-        });
+        const userRoles: Prisma.UserRoleGetPayload<{ include: { role: true } }>[] =
+          await this.db.userRole.findMany({
+            where: {
+              userId,
+              OR: [
+                { contextId: null },
+                ...(contextId ? [{ contextId }] : []),
+              ],
+            },
+            include: { role: true },
+          });
 
-        return userRoles.map((ur: any) => ({ 
-          name: ur.role.name, 
-          contextId: ur.contextId 
+        return userRoles.map((ur) => ({
+          name: ur.role.name,
+          contextId: ur.contextId
         }));
       },
       {
@@ -461,7 +461,7 @@ export class RoleService extends BaseService implements IRoleService {
         }
 
         // Build where clause
-        const where: any = { roleId };
+        const where: Prisma.RolePermissionWhereInput = { roleId };
         if (contextId) {
           where.contextId = contextId;
         } else if (contextType) {
@@ -472,12 +472,13 @@ export class RoleService extends BaseService implements IRoleService {
           where.contextType = null;
         }
 
-        const rolePermissions = await this.db.rolePermission.findMany({
-          where,
-          include: { permission: true },
-        });
+        const rolePermissions: Prisma.RolePermissionGetPayload<{ include: { permission: true } }>[] =
+          await this.db.rolePermission.findMany({
+            where,
+            include: { permission: true },
+          });
 
-        return rolePermissions.map((rp: any) => ({
+        return rolePermissions.map((rp) => ({
           key: rp.permission.key,
           label: rp.permission.label,
           contextId: rp.contextId,
