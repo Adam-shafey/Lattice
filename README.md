@@ -41,6 +41,7 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
 | **AuthZ Middleware**         | Checks permissions per request, ensures context alignment. Works for both adapters.                          |
 | **Plugin System**            | Register plugins with contexts, roles, permissions, and routes.                                                     |
 | **Built-in REST APIs**       | Users CRUD, Contexts CRUD + membership, Roles CRUD + assign/remove + role-perm ops, User permission grant/revoke; all guarded by a modifiable policy. |
+| **API Documentation**        | Comprehensive OpenAPI 3.0 specification with Swagger UI integration. Auto-generated documentation with detailed schemas, request/response examples, and authentication requirements. |
 | **Developer Tooling**        | CLI: list-permissions, check-access, roles commands, user management, permission management, context management. TypeScript types for permissions, roles, and contexts. |
 | **Caching**                  | WIP: Optional Redis-backed cache for effective permissions to optimize performance.                               |
 | **Service Layer**            | Production-ready services with standardized error handling, input validation, and transaction management. |
@@ -676,6 +677,50 @@ Policy keys used:
 
 All input is validated with Zod. Context type is validated against context records.
 
+## API Documentation
+
+Lattice Core provides comprehensive API documentation through OpenAPI 3.0 specification and Swagger UI integration.
+
+### Accessing Documentation
+
+- **Swagger UI**: `http://localhost:3000/docs` (when running `npm run dev`)
+- **OpenAPI Spec**: `http://localhost:3000/docs/json` (raw JSON specification)
+
+### Features
+
+- **Complete API Coverage**: All authentication, user management, role management, permission management, and context management endpoints
+- **Interactive Testing**: Use the "Try it out" buttons to test API endpoints directly from the browser
+- **Authentication Support**: Includes JWT token authentication with proper security schemes
+- **Request/Response Examples**: Detailed examples for all endpoints with proper schemas
+- **Error Documentation**: Comprehensive error responses and status codes
+
+### Generating Documentation
+
+```bash
+# Generate the OpenAPI specification
+npm run swagger:gen
+
+# The specification is automatically generated when running the dev server
+npm run dev
+```
+
+### Documentation Structure
+
+The API documentation is organized into logical groups:
+
+- **Authentication**: Login, refresh, revoke, password management
+- **Users**: User CRUD operations and management
+- **Contexts**: Context creation, management, and user membership
+- **Roles**: Role management, assignments, and permissions
+- **Permissions**: Direct permission grants and effective permission queries
+
+### CORS Configuration
+
+The Swagger UI is configured with proper CORS settings to allow cross-origin requests from:
+- `http://localhost:3000` (main API server)
+- `http://localhost:5173` (Vite dev server)
+- `http://localhost:8080` (additional development ports)
+
 1. Environment
    - Node.js 18+
    - Set `DATABASE_URL` to `file:./dev.db`
@@ -690,6 +735,7 @@ All input is validated with Zod. Context type is validated against context recor
 3. Run dev server
    - `npm run dev`
    - Test: `GET http://localhost:3000/ping` → `{ pong: true }`
+   - API Documentation: `http://localhost:3000/docs` (Swagger UI)
    - Protected example: `GET http://localhost:3000/secure/ctx_1/info` with header `x-user-id: user_123`
 
 4. CLI
@@ -706,10 +752,11 @@ Notes
 
 Done now:
 - Built-in REST APIs guarded by policy (Users, Contexts, Roles, User-Permissions)
+- **Comprehensive API documentation** with OpenAPI 3.0 specification and Swagger UI integration
 - E2E tests for auth/login/refresh, protected routes, role/permission flows, context membership
 - Policy overrides for route permissions
 - Input validation on all REST endpoints (Zod)
-  - **Production-ready service layer** with standardized patterns and error handling
+- **Production-ready service layer** with standardized patterns and error handling
 - **Service factory** for centralized service management
 - **Enhanced CLI** with comprehensive user, permission, and context management
 - **Application integration** with convenient service access patterns

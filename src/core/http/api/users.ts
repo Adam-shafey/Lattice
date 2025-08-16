@@ -7,7 +7,7 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
   app.route({
     method: 'POST',
     path: `${p}/users`,
-    preHandler: app.authorize(policy.users!.create),
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.create, { scope: 'global' })],
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         email: z.string().email(), 
@@ -35,7 +35,7 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
   app.route({
     method: 'GET',
     path: `${p}/users`,
-    preHandler: app.authorize(policy.users!.list),
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.list, { scope: 'global' })],
     handler: async ({ query, req }) => {
       try {
         const limit = query.limit ? parseInt(query.limit as string) : undefined;
@@ -61,7 +61,7 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
   app.route({
     method: 'GET',
     path: `${p}/users/:id`,
-    preHandler: app.authorize(policy.users!.get),
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.get, { scope: 'global' })],
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
@@ -85,7 +85,7 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
   app.route({
     method: 'PUT',
     path: `${p}/users/:id`,
-    preHandler: app.authorize(policy.users!.update),
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.update, { scope: 'global' })],
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
         email: z.string().email().optional(),
@@ -112,7 +112,7 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
   app.route({
     method: 'DELETE',
     path: `${p}/users/:id`,
-    preHandler: app.authorize(policy.users!.delete),
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.delete, { scope: 'global' })],
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);

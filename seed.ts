@@ -1,5 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './prisma/generated/client';
 import bcrypt from 'bcryptjs';
+
+// Set the database URL if not already set
+import path from 'path';
+const dbPath = path.resolve(process.cwd(), 'prisma', 'dev.db');
+process.env.DATABASE_URL = process.env.DATABASE_URL || `file:${dbPath}`;
 
 const db = new PrismaClient();
 

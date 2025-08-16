@@ -1,5 +1,10 @@
 import { PrismaClient } from '../../../prisma/generated/client';
 
+// Set the database URL if not already set - this must happen before PrismaClient instantiation
+import path from 'path';
+const dbPath = path.resolve(process.cwd(), 'prisma', 'dev.db');
+process.env.DATABASE_URL = process.env.DATABASE_URL || `file:${dbPath}`;
+
 /**
  * Singleton instance of PrismaClient for application use.
  * Note: For tests, create new PrismaClient instances directly to ensure test isolation.

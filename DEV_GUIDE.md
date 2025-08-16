@@ -17,6 +17,7 @@
 3. **Running the Development Server:**
    - Start the server with `npm run dev`.
    - Test the server by accessing `GET http://localhost:3000/ping` which should return `{ pong: true }`.
+   - Access API documentation at `http://localhost:3000/docs` (Swagger UI).
 
 4. **Using the CLI:**
    - Build the project with `npm run build`.
@@ -38,6 +39,57 @@
    - Tests are located in the `src/tests` directory.
    - Use `describe`, `it`, and `expect` from `vitest` to structure your tests.
    - Ensure to clean up any test data created during the tests to maintain a clean state.
+
+## API Documentation
+
+Lattice Core provides comprehensive API documentation through OpenAPI 3.0 specification and Swagger UI integration.
+
+### Accessing Documentation
+
+- **Swagger UI**: `http://localhost:3000/docs` (when running `npm run dev`)
+- **OpenAPI Spec**: `http://localhost:3000/docs/json` (raw JSON specification)
+
+### Features
+
+- **Complete API Coverage**: All authentication, user management, role management, permission management, and context management endpoints
+- **Interactive Testing**: Use the "Try it out" buttons to test API endpoints directly from the browser
+- **Authentication Support**: Includes JWT token authentication with proper security schemes
+- **Request/Response Examples**: Detailed examples for all endpoints with proper schemas
+- **Error Documentation**: Comprehensive error responses and status codes
+
+### Generating Documentation
+
+```bash
+# Generate the OpenAPI specification
+npm run swagger:gen
+
+# The specification is automatically generated when running the dev server
+npm run dev
+```
+
+### Documentation Structure
+
+The API documentation is organized into logical groups:
+
+- **Authentication**: Login, refresh, revoke, password management
+- **Users**: User CRUD operations and management
+- **Contexts**: Context creation, management, and user membership
+- **Roles**: Role management, assignments, and permissions
+- **Permissions**: Direct permission grants and effective permission queries
+
+### Testing APIs with Swagger UI
+
+1. **Authentication**: First, use the `/auth/login` endpoint to get a JWT token
+2. **Authorization**: Click the "Authorize" button and enter your token as `Bearer <token>`
+3. **Testing Endpoints**: Use the "Try it out" buttons to test any endpoint with real data
+4. **Response Inspection**: View detailed response schemas and status codes
+
+### CORS Configuration
+
+The Swagger UI is configured with proper CORS settings to allow cross-origin requests from:
+- `http://localhost:3000` (main API server)
+- `http://localhost:5173` (Vite dev server)
+- `http://localhost:8080` (additional development ports)
 
 ## Using the Service Layer
 

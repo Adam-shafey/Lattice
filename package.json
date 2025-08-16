@@ -53,6 +53,6 @@
     "vitest": "^1.6.0"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node seed.ts"
   }
 }
