@@ -27,7 +27,8 @@
     "fastify": "^4.28.1",
     "jsonwebtoken": "^9.0.2",
     "minimist": "^1.2.8",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "pino": "^9.9.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
