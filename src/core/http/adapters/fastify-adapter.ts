@@ -3,6 +3,7 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
+import swaggerDocument from '../../../swagger-output.json';
 
 export interface FastifyHttpAdapter extends HttpAdapter {
   getUnderlying: () => FastifyInstance;
@@ -22,12 +23,6 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
     logger: true,
     trustProxy: true
   });
-
-  const swaggerDocument: any = {
-    openapi: '3.0.0',
-    info: { title: 'Lattice API', version: '1.0.0' },
-    paths: {}
-  };
 
   instance.register(swagger, {
     mode: 'static',
@@ -165,12 +160,6 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
         : route.preHandler
           ? [route.preHandler]
           : [];
-
-      const pathItem = swaggerDocument.paths[route.path] || {};
-      pathItem[route.method.toLowerCase()] = {
-        responses: { 200: { description: 'Successful response' } }
-      };
-      swaggerDocument.paths[route.path] = pathItem;
 
       instance.route({
         method: route.method,

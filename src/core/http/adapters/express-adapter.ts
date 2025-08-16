@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import swaggerUi from 'swagger-ui-express';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
+import swaggerDocument from '../../../swagger-output.json';
 
 export interface ExpressHttpAdapter extends HttpAdapter {
   getUnderlying: () => Express;
@@ -23,11 +24,6 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
   instance.use(express.json());
   instance.use(express.urlencoded({ extended: true }));
 
-  const swaggerDocument: any = {
-    openapi: '3.0.0',
-    info: { title: 'Lattice API', version: '1.0.0' },
-    paths: {}
-  };
   instance.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
   /**
@@ -82,12 +78,6 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
           : [];
 
       const handlers = [...preHandlers.map(wrapPreHandler), wrapHandler(route.handler)];
-
-      const pathItem = swaggerDocument.paths[route.path] || {};
-      pathItem[route.method.toLowerCase()] = {
-        responses: { 200: { description: 'Successful response' } }
-      };
-      swaggerDocument.paths[route.path] = pathItem;
       
       // Register the route based on HTTP method
       switch (route.method) {
