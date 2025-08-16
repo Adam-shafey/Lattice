@@ -4,35 +4,82 @@ import bcrypt from 'bcryptjs';
 const db = new PrismaClient();
 
 async function main() {
-  // Seed default permissions
+  // Seed permissions used by the admin UI
   const permissions = [
+    { key: '*', label: 'All permissions' },
+    { key: 'users:*', label: 'User management' },
+    { key: 'users:read', label: 'Read users' },
+    { key: 'roles:*', label: 'Role management' },
+    { key: 'permissions:*', label: 'Permission management' },
+    { key: 'contexts:*', label: 'Context management' },
     { key: 'example:read', label: 'Read example' },
     { key: 'example:write', label: 'Write example' },
   ];
+
   for (const p of permissions) {
-    await db.permission.upsert({ where: { key: p.key }, update: {}, create: { key: p.key, label: p.label } });
+    await db.permission.upsert({
+      where: { key: p.key },
+      update: {},
+      create: { key: p.key, label: p.label }
+    });
   }
 
-  // Seed a role
-  const role = await db.role.upsert({ where: { name: 'admin' }, update: {}, create: { name: 'admin' } });
-  const readPerm = await db.permission.findUniqueOrThrow({ where: { key: 'example:read' } });
-  const writePerm = await db.permission.findUniqueOrThrow({ where: { key: 'example:write' } });
-  const rp1Id = `${role.id}-${readPerm.id}-global`;
-  const rp2Id = `${role.id}-${writePerm.id}-global`;
-  await db.rolePermission.upsert({ where: { id: rp1Id }, update: {}, create: { id: rp1Id, roleId: role.id, permissionId: readPerm.id, contextId: null } });
-  await db.rolePermission.upsert({ where: { id: rp2Id }, update: {}, create: { id: rp2Id, roleId: role.id, permissionId: writePerm.id, contextId: null } });
-
-  // Seed a user
-  const passwordHash = await bcrypt.hash('password123', 10);
-  const user = await db.user.upsert({
-    where: { email: 'admin@example.com' },
+  // Seed a sample context
+  await db.context.upsert({
+    where: { id: 'org_1' },
     update: {},
-    create: { email: 'admin@example.com', passwordHash },
+    create: { id: 'org_1', type: 'org', name: 'Example Org' }
   });
-  await db.userRole.upsert({
-    where: { id: `${user.id}-${role.id}-global` },
+
+  const passwordHash = await bcrypt.hash('password123', 10);
+
+  // Super admin with all permissions
+  const admin = await db.user.upsert({
+    where: { id: 'user_admin' },
     update: {},
-    create: { id: `${user.id}-${role.id}-global`, userId: user.id, roleId: role.id, contextId: null },
+    create: { id: 'user_admin', email: 'admin@example.com', passwordHash }
+  });
+  const allPerm = await db.permission.findUniqueOrThrow({ where: { key: '*' } });
+  await db.userPermission.upsert({
+    where: { id: `${admin.id}-${allPerm.id}-global` },
+    update: {},
+    create: { id: `${admin.id}-${allPerm.id}-global`, userId: admin.id, permissionId: allPerm.id, contextId: null }
+  });
+
+  // Manager with user and role management
+  const manager = await db.user.upsert({
+    where: { id: 'user_manager' },
+    update: {},
+    create: { id: 'user_manager', email: 'manager@example.com', passwordHash }
+  });
+  const managerPerms = [
+    await db.permission.findUniqueOrThrow({ where: { key: 'users:*' } }),
+    await db.permission.findUniqueOrThrow({ where: { key: 'roles:*' } })
+  ];
+  for (const perm of managerPerms) {
+    await db.userPermission.upsert({
+      where: { id: `${manager.id}-${perm.id}-global` },
+      update: {},
+      create: { id: `${manager.id}-${perm.id}-global`, userId: manager.id, permissionId: perm.id, contextId: null }
+    });
+  }
+
+  // Viewer with read-only access to users
+  const viewer = await db.user.upsert({
+    where: { id: 'user_viewer' },
+    update: {},
+    create: { id: 'user_viewer', email: 'viewer@example.com', passwordHash }
+  });
+  const readUsersPerm = await db.permission.findUniqueOrThrow({ where: { key: 'users:read' } });
+  await db.userPermission.upsert({
+    where: { id: `${viewer.id}-${readUsersPerm.id}-global` },
+    update: {},
+    create: {
+      id: `${viewer.id}-${readUsersPerm.id}-global`,
+      userId: viewer.id,
+      permissionId: readUsersPerm.id,
+      contextId: null
+    }
   });
 }
 
