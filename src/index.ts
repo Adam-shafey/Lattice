@@ -59,8 +59,6 @@ export interface CheckAccessInput {
   userId: string;
   context?: { type: string; id: string } | null;
   permission: string;
-  requireGlobal?: boolean;
-  requireTypeWide?: boolean;
   scope?: 'exact' | 'global' | 'type-wide';
   contextType?: string;
 }
@@ -187,47 +185,22 @@ export class CoreSaaSApp {
   }
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
-    const { userId, context, permission, requireGlobal, requireTypeWide, scope, contextType } = input;
-    
-    console.log('checkAccess called with:', { userId, permission, scope, contextType, context });
-    
-    // Always use database-driven permission checking
-    let effective: Set<string> = new Set();
+    const { userId, context, permission, scope, contextType } = input;
+
+    let lookupContext = context ?? null;
+    if (scope === 'global') {
+      lookupContext = null;
+    } else if (scope === 'type-wide') {
+      lookupContext = contextType ? { type: contextType, id: null } : context;
+    }
+
     try {
-      effective = await fetchEffectivePermissions({ userId, context: context ?? null });
+      const effective = await fetchEffectivePermissions({ userId, context: lookupContext });
+      return this.permissionRegistry.isAllowed(permission, effective);
     } catch (error) {
       console.error('Failed to fetch effective permissions:', error);
       return false;
     }
-
-    console.log('checkAccess: effective permissions:', Array.from(effective));
-
-    // Apply scope restrictions
-    if (requireGlobal || scope === 'global') {
-      // For global scope, we need to fetch permissions without any context
-      // This means only permissions that are truly global (no contextId or contextType)
-      const globalPerms = await fetchEffectivePermissions({ userId, context: null });
-      const result = this.permissionRegistry.isAllowed(permission, globalPerms);
-      console.log('checkAccess: global scope result:', result);
-      return result;
-    }
-
-    if (requireTypeWide || scope === 'type-wide') {
-      // For type-wide scope, check global and type-wide permissions for the specific context type
-      // We need to fetch permissions with the specific context type
-      const typeWideContext = contextType ? { type: contextType, id: null as string | null } : context;
-      console.log('checkAccess: type-wide context:', typeWideContext);
-      const typeWidePerms = await fetchEffectivePermissions({ userId, context: typeWideContext });
-      console.log('checkAccess: type-wide permissions:', Array.from(typeWidePerms));
-      const result = this.permissionRegistry.isAllowed(permission, typeWidePerms);
-      console.log('checkAccess: type-wide scope result:', result);
-      return result;
-    }
-
-    // For exact scope or no scope specified, check all permissions
-    const result = this.permissionRegistry.isAllowed(permission, effective);
-    console.log('checkAccess: default scope result:', result);
-    return result;
   }
 
   // Remove the in-memory grantUserPermission function - everything should be DB-driven
