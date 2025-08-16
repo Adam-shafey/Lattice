@@ -38,6 +38,9 @@ export function createJwtUtil(config: JwtConfig) {
       
       return payload;
     },
+    verifyWithoutRevocationCheck(token: string): unknown {
+      return jwt.verify(token, config.secret as Secret);
+    },
   };
 }
 

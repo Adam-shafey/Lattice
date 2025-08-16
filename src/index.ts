@@ -78,11 +78,10 @@ export class CoreSaaSApp {
   private readonly httpAdapter: HttpAdapter;
   private readonly policy: RoutePermissionPolicy;
   private readonly serviceFactory: ServiceFactory;
-
-  private readonly userGrants: Map<string, Set<string>> = new Map();
-  private readonly userContextGrants: Map<string, Map<string, Set<string>>> = new Map();
+  private readonly config: CoreConfig;
 
   constructor(config: CoreConfig) {
+    this.config = config;
     this.permissionRegistry = new PermissionRegistry();
     this.PermissionRegistry = this.permissionRegistry;
     this.adapterKind = config.adapter;
@@ -111,6 +110,13 @@ export class CoreSaaSApp {
 
     // Set global service factory for application-wide access
     setServiceFactory(this.serviceFactory);
+  }
+
+  /**
+   * Get the JWT configuration
+   */
+  public get jwtConfig() {
+    return this.config.jwt;
   }
 
   /**
@@ -181,63 +187,51 @@ export class CoreSaaSApp {
   }
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
-    const { userId, context, permission, requireGlobal, requireTypeWide, scope } = input;
+    const { userId, context, permission, requireGlobal, requireTypeWide, scope, contextType } = input;
+    
+    console.log('checkAccess called with:', { userId, permission, scope, contextType, context });
+    
+    // Always use database-driven permission checking
     let effective: Set<string> = new Set();
     try {
       effective = await fetchEffectivePermissions({ userId, context: context ?? null });
-    } catch {
-      // If DB lookup fails (e.g., tests without DB), fall back to empty set
-      effective = new Set();
+    } catch (error) {
+      console.error('Failed to fetch effective permissions:', error);
+      return false;
     }
-    const merged = new Set<string>([...effective]);
-    const global = this.userGrants.get(userId);
-    if (global) for (const p of global) merged.add(p);
-    if (context?.id) {
-      const byUser = this.userContextGrants.get(userId)?.get(context.id);
-      if (byUser) for (const p of byUser) merged.add(p);
-    }
+
+    console.log('checkAccess: effective permissions:', Array.from(effective));
 
     // Apply scope restrictions
     if (requireGlobal || scope === 'global') {
-      // For global scope, only check global permissions (no context-specific ones)
-      const globalPerms = new Set<string>();
-      if (global) for (const p of global) globalPerms.add(p);
-      return this.permissionRegistry.isAllowed(permission, globalPerms);
+      // For global scope, we need to fetch permissions without any context
+      // This means only permissions that are truly global (no contextId or contextType)
+      const globalPerms = await fetchEffectivePermissions({ userId, context: null });
+      const result = this.permissionRegistry.isAllowed(permission, globalPerms);
+      console.log('checkAccess: global scope result:', result);
+      return result;
     }
 
     if (requireTypeWide || scope === 'type-wide') {
-      // For type-wide scope, check global and type-wide permissions
-      const typeWidePerms = new Set<string>([...effective]);
-      if (global) for (const p of global) typeWidePerms.add(p);
-      return this.permissionRegistry.isAllowed(permission, typeWidePerms);
+      // For type-wide scope, check global and type-wide permissions for the specific context type
+      // We need to fetch permissions with the specific context type
+      const typeWideContext = contextType ? { type: contextType, id: null as string | null } : context;
+      console.log('checkAccess: type-wide context:', typeWideContext);
+      const typeWidePerms = await fetchEffectivePermissions({ userId, context: typeWideContext });
+      console.log('checkAccess: type-wide permissions:', Array.from(typeWidePerms));
+      const result = this.permissionRegistry.isAllowed(permission, typeWidePerms);
+      console.log('checkAccess: type-wide scope result:', result);
+      return result;
     }
 
     // For exact scope or no scope specified, check all permissions
-    return this.permissionRegistry.isAllowed(permission, merged);
+    const result = this.permissionRegistry.isAllowed(permission, effective);
+    console.log('checkAccess: default scope result:', result);
+    return result;
   }
 
-  public grantUserPermission(userId: string, permission: string, contextId?: string): void {
-    if (contextId) {
-      let perUser = this.userContextGrants.get(userId);
-      if (!perUser) {
-        perUser = new Map();
-        this.userContextGrants.set(userId, perUser);
-      }
-      let perContext = perUser.get(contextId);
-      if (!perContext) {
-        perContext = new Set();
-        perUser.set(contextId, perContext);
-      }
-      perContext.add(permission);
-      return;
-    }
-    let set = this.userGrants.get(userId);
-    if (!set) {
-      set = new Set();
-      this.userGrants.set(userId, set);
-    }
-    set.add(permission);
-  }
+  // Remove the in-memory grantUserPermission function - everything should be DB-driven
+  // public grantUserPermission(userId: string, permission: string, contextId?: string): void { ... }
 
   public registerPlugin(plugin: LatticePlugin): void {
     if (plugin.permissions) {

@@ -27,66 +27,112 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         (req?.body?.contextType as string) ||
         null;
 
-      const send = (statusCode: number, body: any) => {
-        if (typeof res?.status === 'function') {
-          return res.status(statusCode).send(body);
-        }
-        if (typeof res?.code === 'function') {
-          return res.code(statusCode).send(body);
-        }
-        if (typeof next === 'function') return next(body);
-      };
+             const send = (statusCode: number, body: any) => {
+         console.log('Authorize: Sending response:', statusCode, body);
+         // Check if response was already sent
+         if (res?.sent) {
+           console.log('Authorize: Response already sent, skipping');
+           return true; // Indicate response was sent
+         }
+         
+         if (typeof res?.status === 'function') {
+           console.log('Authorize: Using res.status');
+           res.status(statusCode).send(body);
+           return true; // Indicate response was sent
+         }
+         if (typeof res?.code === 'function') {
+           console.log('Authorize: Using res.code');
+           res.code(statusCode).send(body);
+           return true; // Indicate response was sent
+         }
+         if (typeof next === 'function') {
+           console.log('Authorize: Using next with error');
+           next(body);
+           return true; // Indicate response was sent
+         }
+         console.log('Authorize: No response method found');
+         return false; // Indicate no response was sent
+       };
 
       if (!userId) {
         const err = { statusCode: 401, message: 'Unauthorized' };
-        return send(401, err);
+        if (send(401, err)) return;
       }
 
       if (options?.contextRequired && !contextId) {
         const err = { statusCode: 400, message: 'Context required' };
-        return send(400, err);
+        if (send(400, err)) return;
       }
 
       // Scope validation
       if (options?.scope === 'global' && (contextId !== null || contextType !== null)) {
         const err = { statusCode: 403, message: 'This operation requires global scope' };
-        return send(403, err);
+        if (send(403, err)) return;
       }
 
-      // For type-wide scope, we need contextType, but we can derive it from contextId if missing
-      if (options?.scope === 'type-wide' && !contextType) {
-        if (contextId) {
-          // Derive contextType from contextId (assuming 'team' for now)
-          const derivedContextType = 'team';
-          const allowed = await app.checkAccess({ 
-            userId, 
-            context: { id: contextId, type: derivedContextType }, 
-            permission: requiredPermission,
-            scope: options?.scope
-          });
-          
-          if (!allowed) {
+      // For type-wide scope, we need contextType
+      if (options?.scope === 'type-wide') {
+        if (!contextType) {
+          if (contextId) {
+            // Derive contextType from contextId (assuming 'team' for now)
+            const derivedContextType = 'team';
+            const allowed = await app.checkAccess({ 
+              userId, 
+              context: { id: contextId, type: derivedContextType }, 
+              permission: requiredPermission,
+              scope: options?.scope
+            });
+            
+            if (!allowed) {
+              try {
+                await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, false);
+              } catch {}
+              const err = { statusCode: 403, message: 'Forbidden' };
+              if (send(403, err)) return;
+            }
+            
             try {
-              await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, false);
+              await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, true);
             } catch {}
-            const err = { statusCode: 403, message: 'Forbidden' };
-            return send(403, err);
+            if (next) return next();
+            return;
+          } else {
+            const err = { statusCode: 400, message: 'Context type required for type-wide operation' };
+            if (send(400, err)) return;
           }
-          
-          try {
-            await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, true);
-          } catch {}
-          if (next) return next();
-          return;
-        } else {
-          const err = { statusCode: 400, message: 'Context type required for type-wide operation' };
-          return send(400, err);
-        }
+                 } else {
+           // We have contextType, check type-wide permissions
+           console.log('Authorize: Checking type-wide permission:', requiredPermission, 'for user:', userId, 'contextType:', contextType);
+           const allowed = await app.checkAccess({ 
+             userId, 
+             context: null, // For type-wide, we don't need a specific context
+             permission: requiredPermission,
+             scope: options?.scope,
+             contextType: contextType!
+           });
+           
+           console.log('Authorize: Type-wide check result:', allowed);
+           
+                       if (!allowed) {
+              try {
+                await app.auditService.logPermissionCheck(userId, null, requiredPermission, false);
+              } catch {}
+              const err = { statusCode: 403, message: 'Forbidden' };
+              console.log('Authorize: Permission denied, sending 403');
+              if (send(403, err)) return;
+            }
+           
+           try {
+             await app.auditService.logPermissionCheck(userId, null, requiredPermission, true);
+           } catch {}
+           if (next) return next();
+           return;
+         }
       }
 
       if (options?.scope === 'exact' && !contextId) {
         const err = { statusCode: 400, message: 'Context ID required for exact scope operation' };
-        return send(400, err);
+        if (send(400, err)) return;
       }
 
       const allowed = await app.checkAccess({ 
@@ -101,7 +147,7 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
           await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, false);
         } catch {}
         const err = { statusCode: 403, message: 'Forbidden' };
-        return send(403, err);
+        if (send(403, err)) return;
       }
 
       try {
@@ -110,6 +156,11 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
       if (next) return next();
       return;
     } catch (error) {
+      // Check if response was already sent
+      if (res?.sent) {
+        return;
+      }
+      
       if (typeof res?.status === 'function') return res.status(500).send({ message: 'Internal Server Error' });
       if (typeof res?.code === 'function') return res.code(500).send({ message: 'Internal Server Error' });
       if (next) return next(error);

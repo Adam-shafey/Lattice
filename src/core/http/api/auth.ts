@@ -4,9 +4,11 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { db } from '../../db/db-client';
 
-function getJwt() {
-  const secret = process.env.JWT_SECRET || 'dev-secret';
-  return createJwtUtil({ secret, accessTTL: '15m', refreshTTL: '7d' });
+function getJwt(app: CoreSaaSApp) {
+  const secret = app.jwtConfig?.secret || process.env.JWT_SECRET || 'dev-secret';
+  const accessTTL = app.jwtConfig?.accessTTL || '15m';
+  const refreshTTL = app.jwtConfig?.refreshTTL || '7d';
+  return createJwtUtil({ secret, accessTTL, refreshTTL });
 }
 
 export function requireAuthMiddleware(app: CoreSaaSApp) {
@@ -15,18 +17,20 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
       const auth = req?.headers?.authorization as string | undefined;
       if (!auth || !auth.startsWith('Bearer ')) {
         const err = { statusCode: 401, message: 'Unauthorized' };
+        if (res?.sent) return;
         if (res?.status) return res.status(401).send(err);
         if (res?.code) return res.code(401).send(err);
         if (next) return next(err);
         return;
       }
       const token = auth.substring('Bearer '.length);
-      const jwt = getJwt();
+      const jwt = getJwt(app);
       const payload = await jwt.verify(token) as any;
       (req as any).user = { id: payload.sub };
       if (next) return next();
     } catch (e) {
       const err = { statusCode: 401, message: 'Unauthorized' };
+      if (res?.sent) return;
       if (res?.status) return res.status(401).send(err);
       if (res?.code) return res.code(401).send(err);
       if (next) return next(err);
@@ -36,7 +40,7 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
 }
 
 export function createAuthRoutes(app: CoreSaaSApp) {
-  const jwt = getJwt();
+  const jwt = getJwt(app);
 
   app.route({
     method: 'POST',
@@ -89,7 +93,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
         
         const { refreshToken } = parsed.data;
-        const payload = await jwt.verify(refreshToken) as any;
+        const payload = jwt.verifyWithoutRevocationCheck(refreshToken) as any;
         const userId = payload?.sub as string | undefined;
         const jti = payload?.jti as string | undefined;
         
@@ -138,13 +142,13 @@ export function createAuthRoutes(app: CoreSaaSApp) {
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
         
         const { token } = parsed.data;
-        const payload = jwt.verify(token) as any;
+        const payload = jwt.verifyWithoutRevocationCheck(token) as any;
         const jti = payload?.jti as string | undefined;
         
         if (!jti) return { ok: true };
         
         // Revoke token
-        await db.revokedToken.upsert({ 
+        const revokedToken = await db.revokedToken.upsert({ 
           where: { jti }, 
           update: {}, 
           create: { jti, userId: payload?.sub ?? null } 

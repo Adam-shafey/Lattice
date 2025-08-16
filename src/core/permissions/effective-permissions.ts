@@ -2,7 +2,7 @@ import { db } from '../db/db-client';
 
 export interface EffectivePermissionsQuery {
   userId: string;
-  context?: { type: string; id: string } | null;
+  context?: { type: string; id: string | null } | null;
 }
 
 /**

@@ -15,12 +15,9 @@ describe('E2E: Access Flows', () => {
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' },
-      audit: {
-        enabled: false // Disable audit logging for tests
-      }
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
     });
-    
+
     // Clean up database before each test - delete child records first
     await db.auditLog.deleteMany();
     await db.userPermission.deleteMany();
@@ -33,6 +30,10 @@ describe('E2E: Access Flows', () => {
     await db.context.deleteMany();
     await db.role.deleteMany();
     await db.permission.deleteMany();
+
+    // Initialize auth routes for testing
+    const { createAuthRoutes } = await import('../core/http/api/auth');
+    createAuthRoutes(app);
   });
 
   afterAll(async () => {
@@ -182,7 +183,7 @@ describe('E2E: Access Flows', () => {
           contextType: 'team',
           context: { actorId: 'system' }
         })
-      ).rejects.toThrow('Role member has type org, cannot be assigned in team context');
+      ).rejects.toThrow('Role \'member\' has type \'org\', cannot be assigned in \'team\' context');
 
       // Assigning with correct type should work
       await expect(

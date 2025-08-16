@@ -148,14 +148,21 @@ describe('Auth Service', () => {
 
   describe('Token revocation', () => {
     it('tracks revoked tokens', async () => {
+      // Create a real user first
+      const user = await app.userService.createUser({
+        email: 'revoke-test@example.com',
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
       const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
-      const token = jwt.signAccess({ sub: 'user_1' });
+      const token = jwt.signAccess({ sub: user.id });
       const payload = await jwt.verify(token) as any;
       const jti = payload.jti;
 
       // Revoke token
       await db.revokedToken.create({
-        data: { jti, userId: 'user_1' }
+        data: { jti, userId: user.id }
       });
 
       // Verify token is now invalid

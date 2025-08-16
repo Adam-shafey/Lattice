@@ -29,8 +29,8 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
   function wrapHandler(handler: RouteDefinition['handler']) {
     return async function (request: FastifyRequest, reply: FastifyReply) {
       try {
-        // Extract user ID from headers
-        const userId = (request.headers['x-user-id'] as string) || null;
+        // Extract user ID from middleware or headers
+        const userId = (request as any).user?.id || (request.headers['x-user-id'] as string) || null;
         
         // Extract context information from various sources
         const contextId =
@@ -60,10 +60,17 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
         });
         
         // Send the response
-        reply.send(result);
+        if (!reply.sent) {
+          reply.send(result);
+        }
       } catch (error) {
         // Handle errors gracefully
         console.error('Fastify handler error:', error);
+        
+        // Check if response was already sent
+        if (reply.sent) {
+          return;
+        }
         
         // Check for custom error with status code
         if (error && typeof error === 'object' && 'statusCode' in error) {
@@ -97,20 +104,56 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
   function wrapPreHandler(pre: unknown) {
     return function (request: FastifyRequest, reply: FastifyReply, done: (err?: any) => void) {
       try {
-        const maybePromise = (pre as any)(request, reply, undefined);
+        // Create a next function that the middleware can call
+        const next = (err?: any) => {
+          if (err) {
+            // If there's an error, pass it to done
+            done(err);
+          } else {
+            // If no error, continue
+            done();
+          }
+        };
+        
+        const maybePromise = (pre as any)(request, reply, next);
         
         if (maybePromise && typeof (maybePromise as Promise<unknown>).then === 'function') {
           // Handle async middleware
           (maybePromise as Promise<unknown>)
             .then(() => {
-              if (!reply.sent) done();
+              // Check if reply was sent by middleware
+              if (reply.sent) {
+                // Middleware already sent a response, don't call done
+                return;
+              }
+              // No response sent, continue
+              done();
             })
-            .catch(done);
+            .catch((err) => {
+              // Check if reply was sent by middleware
+              if (reply.sent) {
+                // Middleware already sent a response, don't call done
+                return;
+              }
+              // No response sent, pass error to done
+              done(err);
+            });
         } else {
-          // Handle sync middleware
-          if (!reply.sent) done();
+          // Check if reply was sent by middleware
+          if (reply.sent) {
+            // Middleware already sent a response, don't call done
+            return;
+          }
+          // No response sent, continue
+          done();
         }
       } catch (err) {
+        // Check if reply was sent by middleware
+        if (reply.sent) {
+          // Middleware already sent a response, don't call done
+          return;
+        }
+        // No response sent, pass error to done
         done(err);
       }
     };

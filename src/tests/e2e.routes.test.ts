@@ -25,9 +25,9 @@ describe('E2E: Protected Routes', () => {
     await db.userContext.deleteMany();
     await db.passwordResetToken.deleteMany();
     await db.revokedToken.deleteMany();
+    await db.user.deleteMany();
     await db.context.deleteMany();
     await db.role.deleteMany();
-    await db.user.deleteMany();
     await db.permission.deleteMany();
   });
 
@@ -47,9 +47,9 @@ describe('E2E: Protected Routes', () => {
     await db.userContext.deleteMany();
     await db.passwordResetToken.deleteMany();
     await db.revokedToken.deleteMany();
+    await db.user.deleteMany();
     await db.context.deleteMany();
     await db.role.deleteMany();
-    await db.user.deleteMany();
     await db.permission.deleteMany();
   });
 
@@ -88,7 +88,12 @@ describe('E2E: Protected Routes', () => {
       });
 
       // Grant permission to user in specific context
-      app.grantUserPermission(user.id, 'exact:scope:test', context.id);
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'exact:scope:test',
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
 
       // Add protected route
       app.route({
@@ -146,7 +151,11 @@ describe('E2E: Protected Routes', () => {
       });
 
       // Grant global permission to user
-      app.grantUserPermission(user.id, 'global:scope:test');
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'global:scope:test',
+        context: { actorId: 'system' }
+      });
 
       // Add protected route
       app.route({
@@ -209,7 +218,11 @@ describe('E2E: Protected Routes', () => {
       });
 
       // Grant type-wide permission to user
-      app.grantUserPermission(user.id, 'typewide:scope:test');
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'typewide:scope:test',
+        context: { actorId: 'system' }
+      });
 
       // Add protected route
       app.route({
@@ -267,7 +280,11 @@ describe('E2E: Protected Routes', () => {
       });
 
       // Grant global permission
-      app.grantUserPermission(user.id, 'mixed:global:test');
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'mixed:global:test',
+        context: { actorId: 'system' }
+      });
 
       // Add protected route that requires global permission
       app.route({
@@ -322,7 +339,11 @@ describe('E2E: Protected Routes', () => {
       });
 
       // Grant wildcard permission to user
-      app.grantUserPermission(user.id, 'wildcard:users:*');
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'wildcard:users:*',
+        context: { actorId: 'system' }
+      });
 
       // Add protected route
       app.route({

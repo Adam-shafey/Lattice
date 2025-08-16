@@ -136,7 +136,11 @@ describe('E2E: Role Management', () => {
       expect(r1.statusCode).toBe(403);
 
       // Global permission not enough, needs type-wide context
-      app.grantUserPermission(user1.id, 'roles:assign');
+      await app.permissionService.grantToUser({
+        userId: user1.id,
+        permissionKey: 'roles:assign',
+        context: { actorId: 'system' }
+      });
       
       const r2 = await f.inject({ 
         method: 'POST', 
@@ -147,7 +151,12 @@ describe('E2E: Role Management', () => {
       expect(r2.statusCode).toBe(403);
 
       // Type-wide permission works
-      app.grantUserPermission(user1.id, 'roles:assign:team');
+      await app.permissionService.grantToUser({
+        userId: user1.id,
+        permissionKey: 'roles:assign:team',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
       
       const r3 = await f.inject({ 
         method: 'POST', 
@@ -163,6 +172,13 @@ describe('E2E: Role Management', () => {
     it('requires both role management and permission grant abilities', async () => {
       const f = app.fastify!;
 
+      // Create the editor role first
+      await app.roleService.createRole({
+        name: 'editor',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
+
       // Create test user for first test
       const user1 = await app.userService.createUser({
         email: `role_manage_1_${Date.now()}@example.com`,
@@ -171,7 +187,41 @@ describe('E2E: Role Management', () => {
       });
 
       // Only role management permission not enough
-      app.grantUserPermission(user1.id, 'roles:team:manage');
+      await app.permissionService.grantToUser({
+        userId: user1.id,
+        permissionKey: 'roles:team:manage',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
+      
+      // Debug: Check what permissions the user actually has
+      const effectivePerms = await app.checkAccess({
+        userId: user1.id,
+        permission: 'roles:team:manage',
+        scope: 'type-wide',
+        contextType: 'team'
+      });
+      console.log('User1 has roles:team:manage:', effectivePerms);
+      
+      const effectivePerms2 = await app.checkAccess({
+        userId: user1.id,
+        permission: 'permissions:example:read:grant:team',
+        scope: 'type-wide',
+        contextType: 'team'
+      });
+      console.log('User1 has permissions:example:read:grant:team:', effectivePerms2);
+      
+      // Debug: Check what the route will be checking for
+      const routePermission1 = 'roles:team:manage';
+      const routePermission2 = 'permissions:example:read:grant:team';
+      console.log('Route will check for:', { routePermission1, routePermission2 });
+      
+      // Debug: Check what permissions the user actually has
+      const allPerms = await app.permissionService.getUserEffectivePermissions({
+        userId: user1.id,
+        contextType: 'team'
+      });
+      console.log('User1 all permissions:', allPerms.map(p => p.key));
       
       const r1 = await f.inject({ 
         method: 'POST', 
@@ -179,6 +229,7 @@ describe('E2E: Role Management', () => {
         payload: { permissionKey: 'example:read', contextType: 'team' },
         headers: { 'x-user-id': user1.id }
       });
+      console.log('Response status:', r1.statusCode, 'Response body:', r1.json());
       expect(r1.statusCode).toBe(403);
 
       // Create new user for second test
@@ -189,7 +240,12 @@ describe('E2E: Role Management', () => {
       });
 
       // Only permission grant ability not enough
-      app.grantUserPermission(user2.id, 'permissions:example:read:grant:team');
+      await app.permissionService.grantToUser({
+        userId: user2.id,
+        permissionKey: 'permissions:example:read:grant:team',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
       
       const r2 = await f.inject({ 
         method: 'POST', 
@@ -207,8 +263,18 @@ describe('E2E: Role Management', () => {
       });
 
       // Both permissions work
-      app.grantUserPermission(user3.id, 'roles:team:manage');
-      app.grantUserPermission(user3.id, 'permissions:example:read:grant:team');
+      await app.permissionService.grantToUser({
+        userId: user3.id,
+        permissionKey: 'roles:team:manage',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
+      await app.permissionService.grantToUser({
+        userId: user3.id,
+        permissionKey: 'permissions:example:read:grant:team',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
       
       const r3 = await f.inject({ 
         method: 'POST', 
@@ -239,8 +305,18 @@ describe('E2E: Role Management', () => {
       });
 
       // Grant both required permissions for the test
-      app.grantUserPermission(user.id, 'roles:team:manage');
-      app.grantUserPermission(user.id, 'permissions:example:read:grant:team');
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'roles:team:manage',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
+      await app.permissionService.grantToUser({
+        userId: user.id,
+        permissionKey: 'permissions:example:read:grant:team',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
 
       // Cannot provide both contextId and contextType
       const r1 = await f.inject({ 
@@ -303,10 +379,20 @@ describe('E2E: Role Management', () => {
       });
 
       // Grant permissions for both create and list operations
-      app.grantUserPermission(admin.id, 'roles:team:create');
+      await app.permissionService.grantToUser({
+        userId: admin.id,
+        permissionKey: 'roles:team:create',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
 
       // The list roles endpoint now requires a type-specific permission
-      app.grantUserPermission(admin.id, 'roles:team:list');
+      await app.permissionService.grantToUser({
+        userId: admin.id,
+        permissionKey: 'roles:team:list',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
 
       // Create role
       const createRes = await f.inject({ 
@@ -372,8 +458,18 @@ describe('E2E: Role Management', () => {
       });
 
       // Grant permissions - role assignment now requires type-wide scope
-      app.grantUserPermission(admin.id, 'roles:assign:team');
-      app.grantUserPermission(admin.id, 'roles:remove:team');
+      await app.permissionService.grantToUser({
+        userId: admin.id,
+        permissionKey: 'roles:assign:team',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
+      await app.permissionService.grantToUser({
+        userId: admin.id,
+        permissionKey: 'roles:remove:team',
+        contextType: 'team',
+        context: { actorId: 'system' }
+      });
 
       // Assign role
       const assignRes = await f.inject({ 

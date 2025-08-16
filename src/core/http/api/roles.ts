@@ -227,16 +227,24 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
         // For type-wide (contextType only), use the provided contextType
         const effectiveContextType = contextType || (contextId ? 'team' : null);
         
+        console.log('PreHandler 2 - Starting check for permission grant ability');
         console.log('PreHandler 2:', { permissionKey, contextType, contextId, effectiveContextType });
         
         if (!effectiveContextType) {
+          console.log('PreHandler 2 - Missing contextType or contextId, denying');
           res.status(403).send({ error: 'Missing contextType or contextId' });
           return;
         }
         
-        return app.authorize(policy.roles!.addPerm.permissionGrant
+        const requiredPermission = policy.roles!.addPerm.permissionGrant
           .replace('{perm}', permissionKey)
-          .replace('{type}', effectiveContextType), {
+          .replace('{type}', effectiveContextType);
+        
+        console.log('PreHandler 2 - Required permission:', requiredPermission);
+        console.log('PreHandler 2 - User ID:', req.user?.id || req.headers['x-user-id']);
+        
+        console.log('PreHandler 2 - About to call authorize middleware');
+        return app.authorize(requiredPermission, {
           scope: 'type-wide',
           contextType: 'required'
         })(req, res, next);

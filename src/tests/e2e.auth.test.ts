@@ -20,7 +20,6 @@ describe('E2E: Authentication', () => {
         enabled: false // Disable audit logging for tests
       }
     });
-    createAuthRoutes(app);
 
     // Clean up database before each test - delete child records first
     await db.auditLog.deleteMany();
@@ -34,6 +33,9 @@ describe('E2E: Authentication', () => {
     await db.context.deleteMany();
     await db.role.deleteMany();
     await db.permission.deleteMany();
+
+    // Initialize auth routes for testing
+    createAuthRoutes(app);
   });
 
   afterAll(async () => {
@@ -151,7 +153,6 @@ describe('E2E: Authentication', () => {
         headers: { authorization: `Bearer ${accessToken}` }
       });
       
-      console.log('Password change response:', changePasswordRes.statusCode, changePasswordRes.json());
       expect(changePasswordRes.statusCode).toBe(200);
 
       // Small delay to ensure database transaction is committed
