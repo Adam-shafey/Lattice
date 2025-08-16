@@ -25,6 +25,13 @@ function respond(res: any, next: ((err?: any) => void) | undefined, status: numb
 
 export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, options: AuthorizeOptions = {}) {
   return async function authorize(req: any, res: any, next?: (err?: any) => void) {
+    console.log('🚨 [AUTHORIZE] ===== AUTHORIZE MIDDLEWARE CALLED =====');
+    console.log('🚨 [AUTHORIZE] Starting authorization check');
+    console.log('🚨 [AUTHORIZE] Required permission:', requiredPermission);
+    console.log('🚨 [AUTHORIZE] Options:', options);
+    console.log('🚨 [AUTHORIZE] Request headers:', req?.headers);
+    console.log('🚨 [AUTHORIZE] Request user:', req?.user);
+    
     try {
       const userId =
         getValue(req, [r => r?.headers?.['x-user-id'], r => r?.user?.id]);
@@ -42,15 +49,24 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
       ]);
       const contextType = requestContextType ?? options.contextType;
 
+      console.log('🔐 [AUTHORIZE] Extracted values:');
+      console.log('🔐 [AUTHORIZE] - userId:', userId);
+      console.log('🔐 [AUTHORIZE] - contextId:', contextId);
+      console.log('🔐 [AUTHORIZE] - requestContextType:', requestContextType);
+      console.log('🔐 [AUTHORIZE] - final contextType:', contextType);
+
       if (!userId) {
+        console.log('🔐 [AUTHORIZE] ❌ No userId found - returning 401');
         return respond(res, next, 401, { statusCode: 401, message: 'Unauthorized' });
       }
 
       if (options.contextRequired && !contextId) {
+        console.log('🔐 [AUTHORIZE] ❌ Context required but not provided - returning 400');
         return respond(res, next, 400, { statusCode: 400, message: 'Context required' });
       }
 
       if (options.scope === 'global' && (contextId || contextType)) {
+        console.log('🔐 [AUTHORIZE] ❌ Global scope but context provided - returning 403');
         return respond(res, next, 403, {
           statusCode: 403,
           message: 'This operation requires global scope'
@@ -58,6 +74,7 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
       }
 
       if (options.scope === 'type-wide' && !contextType) {
+        console.log('🔐 [AUTHORIZE] ❌ Type-wide scope but no contextType - returning 400');
         return respond(res, next, 400, {
           statusCode: 400,
           message: 'Context type required for type-wide operation'
@@ -65,11 +82,21 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
       }
 
       if (options.scope === 'exact' && !contextId) {
+        console.log('🔐 [AUTHORIZE] ❌ Exact scope but no contextId - returning 400');
         return respond(res, next, 400, {
           statusCode: 400,
           message: 'Context ID required for exact scope operation'
         });
       }
+
+      console.log('🔐 [AUTHORIZE] ✅ All validation passed, calling checkAccess');
+      console.log('🔐 [AUTHORIZE] checkAccess params:', {
+        userId,
+        context: contextId ? { id: contextId, type: requestContextType ?? 'unknown' } : null,
+        permission: requiredPermission,
+        scope: options.scope,
+        contextType: contextType ?? undefined
+      });
 
       const allowed = await app.checkAccess({
         userId,
@@ -79,12 +106,17 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         contextType: contextType ?? undefined
       });
 
+      console.log('🔐 [AUTHORIZE] checkAccess result:', allowed);
+
       if (!allowed) {
+        console.log('🔐 [AUTHORIZE] ❌ Access denied - returning 403');
         return respond(res, next, 403, { statusCode: 403, message: 'Forbidden' });
       }
 
+      console.log('🔐 [AUTHORIZE] ✅ Access granted - calling next()');
       return next?.();
     } catch (error) {
+      console.log('🔐 [AUTHORIZE] ❌ Error during authorization:', error);
       if (res?.sent) return;
       if (typeof res?.status === 'function') return res.status(500).send({ message: 'Internal Server Error' });
       if (typeof res?.code === 'function') return res.code(500).send({ message: 'Internal Server Error' });

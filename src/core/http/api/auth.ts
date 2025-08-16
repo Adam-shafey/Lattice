@@ -13,9 +13,15 @@ function getJwt(app: CoreSaaSApp) {
 
 export function requireAuthMiddleware(app: CoreSaaSApp) {
   return async function (req: any, res: any, next?: (err?: any) => void) {
+    console.log('🔑 [REQUIRE_AUTH] ===== REQUIRE AUTH MIDDLEWARE CALLED =====');
+    console.log('🔑 [REQUIRE_AUTH] Request headers:', req?.headers);
+    
     try {
       const auth = req?.headers?.authorization as string | undefined;
+      console.log('🔑 [REQUIRE_AUTH] Authorization header:', auth);
+      
       if (!auth || !auth.startsWith('Bearer ')) {
+        console.log('🔑 [REQUIRE_AUTH] ❌ No Bearer token found');
         const err = { statusCode: 401, message: 'Unauthorized' };
         if (res?.sent) return;
         if (res?.status) return res.status(401).send(err);
@@ -23,12 +29,20 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
         if (next) return next(err);
         return;
       }
+      
       const token = auth.substring('Bearer '.length);
+      console.log('🔑 [REQUIRE_AUTH] Token extracted:', token.substring(0, 20) + '...');
+      
       const jwt = getJwt(app);
       const payload = await jwt.verify(token) as any;
+      console.log('🔑 [REQUIRE_AUTH] JWT payload:', payload);
+      
       (req as any).user = { id: payload.sub };
+      console.log('🔑 [REQUIRE_AUTH] ✅ Set req.user to:', req.user);
+      
       if (next) return next();
     } catch (e) {
+      console.log('🔑 [REQUIRE_AUTH] ❌ Error during auth:', e);
       const err = { statusCode: 401, message: 'Unauthorized' };
       if (res?.sent) return;
       if (res?.status) return res.status(401).send(err);

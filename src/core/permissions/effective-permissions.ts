@@ -19,10 +19,18 @@ export interface EffectivePermissionsQuery {
  * @returns Promise resolving to a Set of permission keys
  */
 export async function fetchEffectivePermissions({ userId, context }: EffectivePermissionsQuery): Promise<Set<string>> {
+  console.log('📋 [FETCH_EFFECTIVE] Starting fetchEffectivePermissions');
+  console.log('📋 [FETCH_EFFECTIVE] userId:', userId);
+  console.log('📋 [FETCH_EFFECTIVE] context:', context);
+  
   const targetContextId = context?.id ?? null;
   const targetContextType = context?.type ?? null;
+  
+  console.log('📋 [FETCH_EFFECTIVE] targetContextId:', targetContextId);
+  console.log('📋 [FETCH_EFFECTIVE] targetContextType:', targetContextType);
 
   // Gather user direct permissions (global, type-wide, and context-specific)
+  console.log('📋 [FETCH_EFFECTIVE] Fetching user direct permissions...');
   const userPerms = await db.userPermission.findMany({
     where: {
       userId,
@@ -34,8 +42,16 @@ export async function fetchEffectivePermissions({ userId, context }: EffectivePe
     },
     include: { permission: true },
   });
+  
+  console.log('📋 [FETCH_EFFECTIVE] User direct permissions found:', userPerms.length);
+  console.log('📋 [FETCH_EFFECTIVE] User direct permissions:', userPerms.map(up => ({
+    permissionKey: up.permission.key,
+    contextId: up.contextId,
+    contextType: up.contextType
+  })));
 
   // Find roles assigned to the user (global and context-specific)
+  console.log('📋 [FETCH_EFFECTIVE] Fetching user roles...');
   const userRoles = await db.userRole.findMany({
     where: {
       userId,
@@ -48,21 +64,33 @@ export async function fetchEffectivePermissions({ userId, context }: EffectivePe
   });
 
   const roleIds = [...new Set(userRoles.map((r: { roleId: string }) => r.roleId))];
+  console.log('📋 [FETCH_EFFECTIVE] User roles found:', userRoles.length);
+  console.log('📋 [FETCH_EFFECTIVE] Unique role IDs:', roleIds);
 
   // Gather role permissions (global, type-wide, and context-specific)
-  const rolePerms = roleIds.length > 0
-    ? await db.rolePermission.findMany({
-        where: {
-          roleId: { in: roleIds },
-          OR: [
-            { contextId: null, contextType: null }, // global
-            { contextId: null, contextType: targetContextType }, // type-wide
-            { contextId: targetContextId }, // exact context
-          ],
-        },
-        include: { permission: true },
-      })
-    : [];
+  let rolePerms: any[] = [];
+  if (roleIds.length > 0) {
+    console.log('📋 [FETCH_EFFECTIVE] Fetching role permissions...');
+    rolePerms = await db.rolePermission.findMany({
+      where: {
+        roleId: { in: roleIds },
+        OR: [
+          { contextId: null, contextType: null }, // global
+          { contextId: null, contextType: targetContextType }, // type-wide
+          { contextId: targetContextId }, // exact context
+        ],
+      },
+      include: { permission: true },
+    });
+  }
+  
+  console.log('📋 [FETCH_EFFECTIVE] Role permissions found:', rolePerms.length);
+  console.log('📋 [FETCH_EFFECTIVE] Role permissions:', rolePerms.map(rp => ({
+    permissionKey: rp.permission.key,
+    roleId: rp.roleId,
+    contextId: rp.contextId,
+    contextType: rp.contextType
+  })));
 
   // Combine all permissions into a single set
   const result = new Set<string>();
@@ -76,6 +104,9 @@ export async function fetchEffectivePermissions({ userId, context }: EffectivePe
   for (const rp of rolePerms) {
     result.add(rp.permission.key);
   }
+  
+  console.log('📋 [FETCH_EFFECTIVE] Final combined permissions count:', result.size);
+  console.log('📋 [FETCH_EFFECTIVE] Final combined permissions:', Array.from(result));
   
   return result;
 }

@@ -37,6 +37,10 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     path: `${p}/users`,
     preHandler: [app.requireAuth(), app.authorize(policy.users!.list, { scope: 'global' })],
     handler: async ({ query, req }) => {
+      console.log('👥 [USERS_ROUTE] ===== GET /users ROUTE HANDLER CALLED =====');
+      console.log('👥 [USERS_ROUTE] Query params:', query);
+      console.log('👥 [USERS_ROUTE] Request user:', req?.user);
+      
       try {
         const limit = query.limit ? parseInt(query.limit as string) : undefined;
         const offset = query.offset ? parseInt(query.offset as string) : undefined;

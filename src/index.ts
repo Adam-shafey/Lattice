@@ -168,19 +168,37 @@ export class CoreSaaSApp {
   }
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
+    console.log('🔍 [CHECK_ACCESS] Starting checkAccess');
+    console.log('🔍 [CHECK_ACCESS] Input:', input);
+    
     const { userId, context, permission, scope, contextType } = input;
 
     let lookupContext: { type: string; id: string | null } | null = context ?? null;
     if (scope === 'global') {
       lookupContext = null;
+      console.log('🔍 [CHECK_ACCESS] Global scope - setting lookupContext to null');
     } else if (scope === 'type-wide') {
       lookupContext = contextType ? { type: contextType, id: null } : (context ?? null);
+      console.log('🔍 [CHECK_ACCESS] Type-wide scope - setting lookupContext to:', lookupContext);
+    } else {
+      console.log('🔍 [CHECK_ACCESS] Exact scope or undefined - using provided context:', lookupContext);
     }
 
+    console.log('🔍 [CHECK_ACCESS] Final lookupContext:', lookupContext);
+
     try {
+      console.log('🔍 [CHECK_ACCESS] Calling fetchEffectivePermissions');
       const effective = await fetchEffectivePermissions({ userId, context: lookupContext });
-      return this.permissionRegistry.isAllowed(permission, effective);
+      console.log('🔍 [CHECK_ACCESS] fetchEffectivePermissions result - permissions count:', effective.size);
+      console.log('🔍 [CHECK_ACCESS] Effective permissions:', Array.from(effective));
+      
+      console.log('🔍 [CHECK_ACCESS] Calling permissionRegistry.isAllowed');
+      const result = this.permissionRegistry.isAllowed(permission, effective);
+      console.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', result);
+      
+      return result;
     } catch (error) {
+      console.log('🔍 [CHECK_ACCESS] ❌ Error during checkAccess:', error);
       console.error('Failed to fetch effective permissions:', error);
       return false;
     }
