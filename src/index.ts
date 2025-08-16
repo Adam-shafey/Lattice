@@ -18,14 +18,6 @@ export interface CoreConfig {
   db: { provider: 'postgres' | 'sqlite'; url?: string };
   adapter: SupportedAdapter;
   jwt: { accessTTL: string; refreshTTL: string; secret?: string };
-  audit?: { 
-    enabled?: boolean;
-    sampleRate?: number;
-    sinks?: ('db' | 'stdout')[];
-    batchSize?: number;
-    flushInterval?: number;
-    redactKeys?: string[];
-  };
   policy?: RoutePermissionPolicy;
 }
 
@@ -95,15 +87,7 @@ export class CoreSaaSApp {
 
     // Initialize service factory with configuration
     this.serviceFactory = new ServiceFactory({
-      db,
-      audit: {
-        enabled: config.audit?.enabled !== false,
-        sampleRate: config.audit?.sampleRate ?? 1.0,
-        sinks: config.audit?.sinks ?? ['db'],
-        batchSize: config.audit?.batchSize ?? 100,
-        flushInterval: config.audit?.flushInterval ?? 5000,
-        redactKeys: config.audit?.redactKeys ?? ['password', 'token', 'secret']
-      }
+      db
     });
 
     // Set global service factory for application-wide access
@@ -122,13 +106,6 @@ export class CoreSaaSApp {
    */
   public get services(): ServiceFactory {
     return this.serviceFactory;
-  }
-
-  /**
-   * Get the audit service instance
-   */
-  public get auditService() {
-    return this.serviceFactory.auditService;
   }
 
   /**
@@ -172,7 +149,6 @@ export class CoreSaaSApp {
   }
 
   public route(def: RouteDefinition): void {
-    // Wrap handler to inject request-context to audit logs
     this.httpAdapter.addRoute(def);
   }
 

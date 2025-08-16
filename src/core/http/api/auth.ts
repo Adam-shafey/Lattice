@@ -70,10 +70,6 @@ export function createAuthRoutes(app: CoreSaaSApp) {
         const access = jwt.signAccess({ sub: user.id });
         const refresh = jwt.signRefresh({ sub: user.id });
         
-        // Log token issuance
-        await app.auditService.logTokenIssued(user.id, 'access');
-        await app.auditService.logTokenIssued(user.id, 'refresh');
-        
         return { accessToken: access, refreshToken: refresh };
       } catch (error: any) {
         return { error: error.message || 'Login failed' };
@@ -106,21 +102,16 @@ export function createAuthRoutes(app: CoreSaaSApp) {
         
         // Revoke old refresh token if JTI present
         if (jti) {
-          await db.revokedToken.upsert({ 
-            where: { jti }, 
-            update: {}, 
-            create: { jti, userId } 
+          await db.revokedToken.upsert({
+            where: { jti },
+            update: {},
+            create: { jti, userId }
           });
-          await app.auditService.logTokenRevoked(userId, 'refresh');
         }
         
         // Generate new tokens
         const access = jwt.signAccess({ sub: user.id });
         const newRefresh = jwt.signRefresh({ sub: user.id });
-        
-        // Log token issuance
-        await app.auditService.logTokenIssued(user.id, 'access');
-        await app.auditService.logTokenIssued(user.id, 'refresh');
         
         return { accessToken: access, refreshToken: newRefresh };
       } catch (error: any) {
@@ -155,7 +146,6 @@ export function createAuthRoutes(app: CoreSaaSApp) {
           create: { jti, userId: payload?.sub ?? null } 
         });
         
-        await app.auditService.logTokenRevoked(payload?.sub ?? 'unknown', 'access');
         return { ok: true };
       } catch (error: any) {
         return { error: error.message || 'Token revocation failed' };

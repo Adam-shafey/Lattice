@@ -15,26 +15,24 @@ describe('E2E: Role Management', () => {
     // Create fresh app instance for each test
     app = CoreSaaS({ 
       db: { provider: 'sqlite' }, 
-      adapter: 'fastify', 
-      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' },
-      audit: {
-        enabled: false // Disable audit logging for tests
-      }
+      adapter: 'fastify',
+      jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
     });
     registerRoleRoutes(app, defaultRoutePermissionPolicy);
     
     // Clean up database before each test - delete child records first
-    await db.auditLog.deleteMany();
-    await db.userPermission.deleteMany();
-    await db.rolePermission.deleteMany();
-    await db.userRole.deleteMany();
-    await db.userContext.deleteMany();
-    await db.passwordResetToken.deleteMany();
-    await db.revokedToken.deleteMany();
-    await db.user.deleteMany();
-    await db.context.deleteMany();
-    await db.role.deleteMany();
-    await db.permission.deleteMany();
+    await db.$transaction([
+      db.userPermission.deleteMany(),
+      db.rolePermission.deleteMany(),
+      db.userRole.deleteMany(),
+      db.userContext.deleteMany(),
+      db.passwordResetToken.deleteMany(),
+      db.revokedToken.deleteMany(),
+      db.user.deleteMany(),
+      db.context.deleteMany(),
+      db.role.deleteMany(),
+      db.permission.deleteMany(),
+    ]);
 
     // Register permissions used in tests
     app.permissionRegistry.register({ key: 'roles:assign:team', label: 'Assign Team Roles' });

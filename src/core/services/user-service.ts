@@ -8,7 +8,7 @@
  * - User listing and search
  * 
  * The service extends BaseService to inherit common functionality like
- * audit logging, validation, and transaction management.
+ * validation and transaction management.
  */
 
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
@@ -24,9 +24,9 @@ import { randomUUID } from 'crypto';
  * operations. Extends BaseService to inherit common functionality.
  */
 export class UserService extends BaseService implements IUserService {
-  
-  constructor(db: any, audit: any) {
-    super(db, audit);
+
+  constructor(db: any) {
+    super(db);
   }
   
   /**
@@ -34,7 +34,7 @@ export class UserService extends BaseService implements IUserService {
    * 
    * @param params.email - The user's email address
    * @param params.password - The user's password (will be hashed)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to the created User
    * 
    * @throws ServiceError.validationError if email or password are invalid
@@ -55,7 +55,7 @@ export class UserService extends BaseService implements IUserService {
       throw ServiceError.validationError('Password must be at least 8 characters long');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Check if user with email already exists
         const existing = await this.db.user.findUnique({ where: { email } });
@@ -92,13 +92,13 @@ export class UserService extends BaseService implements IUserService {
    * Retrieves a user by their unique ID
    * 
    * @param id - The user's unique identifier
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
   async getUserById(id: string, context?: ServiceContext): Promise<User | null> {
     this.validateString(id, 'user id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         return this.db.user.findUnique({ where: { id } });
       },
@@ -116,13 +116,13 @@ export class UserService extends BaseService implements IUserService {
    * Retrieves a user by their email address
    * 
    * @param email - The user's email address
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
   async getUserByEmail(email: string, context?: ServiceContext): Promise<User | null> {
     this.validateEmail(email);
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         return this.db.user.findUnique({ where: { email } });
       },
@@ -141,7 +141,7 @@ export class UserService extends BaseService implements IUserService {
    * 
    * @param id - The user's unique identifier
    * @param updates - Object containing fields to update
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise resolving to the updated User
    * 
    * @throws ServiceError.notFound if user doesn't exist
@@ -164,7 +164,7 @@ export class UserService extends BaseService implements IUserService {
       }
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Check if user exists
         const existing = await this.db.user.findUnique({ where: { id } });
@@ -210,7 +210,7 @@ export class UserService extends BaseService implements IUserService {
    * Permanently deletes a user and all associated data
    * 
    * @param id - The user's unique identifier
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise that resolves when deletion is complete
    * 
    * @throws ServiceError.notFound if user doesn't exist
@@ -218,7 +218,7 @@ export class UserService extends BaseService implements IUserService {
   async deleteUser(id: string, context?: ServiceContext): Promise<void> {
     this.validateString(id, 'user id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Check if user exists
         const user = await this.db.user.findUnique({ where: { id } });
@@ -236,16 +236,6 @@ export class UserService extends BaseService implements IUserService {
           
           // Delete user contexts
           await tx.userContext.deleteMany({ where: { userId: id } });
-          
-          // Delete audit logs where user is actor or target
-          await tx.auditLog.deleteMany({
-            where: {
-              OR: [
-                { actorId: id },
-                { targetUserId: id }
-              ]
-            }
-          });
           
           // Delete revoked tokens
           await tx.revokedToken.deleteMany({ where: { userId: id } });
@@ -273,7 +263,7 @@ export class UserService extends BaseService implements IUserService {
    * 
    * @param params.limit - Maximum number of users to return
    * @param params.offset - Number of users to skip (for pagination)
-   * @param params.context - Optional service context for audit logging
+   * @param params.context - Optional service context
    * @returns Promise resolving to object containing users array and total count
    */
   async listUsers(params?: {
@@ -291,7 +281,7 @@ export class UserService extends BaseService implements IUserService {
       throw ServiceError.validationError('Offset must be non-negative');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         const [users, total] = await Promise.all([
           this.db.user.findMany({
@@ -348,7 +338,7 @@ export class UserService extends BaseService implements IUserService {
    * @param userId - The user's unique identifier
    * @param oldPassword - Current password for verification
    * @param newPassword - New password to set
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise that resolves when password is changed
    * 
    * @throws ServiceError.notFound if user doesn't exist
@@ -364,7 +354,7 @@ export class UserService extends BaseService implements IUserService {
       throw ServiceError.validationError('New password must be at least 8 characters long');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Get user with password
         const user = await this.db.user.findUnique({ where: { id: userId } });
@@ -402,7 +392,7 @@ export class UserService extends BaseService implements IUserService {
    * Initiates a password reset for a user by email
    * 
    * @param email - The user's email address
-   * @param context - Optional service context for audit logging
+   * @param context - Optional service context
    * @returns Promise that resolves when reset email is sent
    * 
    * @throws ServiceError.notFound if user doesn't exist
@@ -410,7 +400,7 @@ export class UserService extends BaseService implements IUserService {
   async resetPassword(email: string, context?: ServiceContext): Promise<void> {
     this.validateEmail(email);
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Check if user exists
         const user = await this.db.user.findUnique({ where: { email } });

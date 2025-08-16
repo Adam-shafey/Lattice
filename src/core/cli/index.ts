@@ -9,13 +9,7 @@ function getApp() {
   const app = CoreSaaS({
     db: { provider: 'sqlite' },
     adapter: 'fastify',
-    jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' },
-    audit: {
-      enabled: true,
-      sinks: ['db', 'stdout'],
-      batchSize: 50,
-      flushInterval: 2000
-    }
+    jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' }
   });
   return app;
 }

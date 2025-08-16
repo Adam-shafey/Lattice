@@ -15,9 +15,9 @@ export interface ContextObject {
 }
 
 export class ContextService extends BaseService implements IContextService {
-  
-  constructor(db: any, audit: any) {
-    super(db, audit);
+
+  constructor(db: any) {
+    super(db);
   }
   
   resolveContext(input: ResolveContextInput): ContextObject | null {
@@ -41,7 +41,7 @@ export class ContextService extends BaseService implements IContextService {
     this.validateString(type, 'context type');
     if (name) this.validateString(name, 'context name');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Check if context already exists
         const existing = await this.db.context.findUnique({ where: { id } });
@@ -73,7 +73,7 @@ export class ContextService extends BaseService implements IContextService {
   async getContext(id: string, context?: ServiceContext): Promise<Context | null> {
     this.validateString(id, 'context id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         return this.db.context.findUnique({ where: { id } });
       },
@@ -101,7 +101,7 @@ export class ContextService extends BaseService implements IContextService {
       this.validateString(updates.type, 'context type');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         const existing = await this.db.context.findUnique({ where: { id } });
         if (!existing) {
@@ -132,7 +132,7 @@ export class ContextService extends BaseService implements IContextService {
   async deleteContext(id: string, context?: ServiceContext): Promise<void> {
     this.validateString(id, 'context id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         const existing = await this.db.context.findUnique({ where: { id } });
         if (!existing) {
@@ -146,7 +146,6 @@ export class ContextService extends BaseService implements IContextService {
           await tx.userRole.deleteMany({ where: { contextId: id } });
           await tx.rolePermission.deleteMany({ where: { contextId: id } });
           await tx.userPermission.deleteMany({ where: { contextId: id } });
-          await tx.auditLog.deleteMany({ where: { contextId: id } });
           
           // Finally delete the context
           await tx.context.delete({ where: { id } });
@@ -178,7 +177,7 @@ export class ContextService extends BaseService implements IContextService {
       throw ServiceError.validationError('Offset must be non-negative');
     }
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         const where = type ? { type } : {};
 
@@ -213,7 +212,7 @@ export class ContextService extends BaseService implements IContextService {
     this.validateString(userId, 'user id');
     this.validateString(contextId, 'context id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify user and context exist
         const [user, contextRecord] = await Promise.all([
@@ -261,7 +260,7 @@ export class ContextService extends BaseService implements IContextService {
     this.validateString(userId, 'user id');
     this.validateString(contextId, 'context id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify user and context exist
         const [user, contextRecord] = await Promise.all([
@@ -301,7 +300,7 @@ export class ContextService extends BaseService implements IContextService {
 
     this.validateString(contextId, 'context id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         // Verify context exists
         const context = await this.db.context.findUnique({ where: { id: contextId } });
@@ -333,7 +332,7 @@ export class ContextService extends BaseService implements IContextService {
   }> {
     this.validateString(contextId, 'context id');
 
-    return this.withAudit(
+    return this.execute(
       async () => {
         const current = await this.db.context.findUnique({ where: { id: contextId } });
         if (!current) {

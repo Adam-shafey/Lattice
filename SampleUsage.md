@@ -7,7 +7,6 @@ const app = CoreSaaS({
   db: { provider: 'postgres', url: process.env.DATABASE_URL },
   adapter: 'fastify', // can also be 'express'
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
-  audit: {
     enabled: true,
     sinks: ['db', 'stdout'],
     batchSize: 100,
@@ -35,7 +34,6 @@ const userService = app.userService;
 const roleService = app.roleService;
 const contextService = app.contextService;
 const permissionService = app.permissionService;
-const auditService = app.auditService;
 
 // Or access the service factory directly
 const services = app.services;
@@ -73,7 +71,6 @@ await permissionService.grantToUser({
 ```
 
 * **Standardized error handling** with `ServiceError` types.
-* **Automatic audit logging** for all operations.
 * **Input validation** with descriptive error messages.
 * **Transaction support** for multi-step operations.
 

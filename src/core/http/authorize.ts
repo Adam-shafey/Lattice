@@ -80,15 +80,8 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
       });
 
       if (!allowed) {
-        try {
-          await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, false);
-        } catch {}
         return respond(res, next, 403, { statusCode: 403, message: 'Forbidden' });
       }
-
-      try {
-        await app.auditService.logPermissionCheck(userId, contextId, requiredPermission, true);
-      } catch {}
 
       return next?.();
     } catch (error) {

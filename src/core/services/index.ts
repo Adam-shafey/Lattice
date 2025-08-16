@@ -29,7 +29,6 @@ export type {
 // Service implementations
 // Exports the concrete service classes that implement the interfaces
 // Each service extends BaseService and provides specific business logic
-export { AuditService, type AuditConfig, type AuditLogEntry } from './audit-service';
 export { ContextService, type ResolveContextInput, type ContextObject } from './context-service';
 export { RoleService } from './role-service';
 export { UserPermissionService } from './user-permission-service';
@@ -57,7 +56,6 @@ export type {
   UserRole,
   RolePermission,
   UserContext,
-  AuditLog,
   RevokedToken,
   PasswordResetToken,
   Prisma,

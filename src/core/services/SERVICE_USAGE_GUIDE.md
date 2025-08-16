@@ -1,6 +1,5 @@
 # Lattice Core Services - Complete Usage Guide
 
-This guide provides comprehensive documentation for all service interactions in the Lattice Core system. Each service is designed to be production-ready with proper error handling, audit logging, and transaction management.
 
 ## Table of Contents
 
@@ -8,7 +7,6 @@ This guide provides comprehensive documentation for all service interactions in 
 2. [Service Factory](#service-factory)
 3. [Application Integration](#application-integration)
 4. [CLI Usage](#cli-usage)
-5. [Audit Service](#audit-service)
 6. [Context Service](#context-service)
 7. [Role Service](#role-service)
 8. [User Service](#user-service)
@@ -28,7 +26,6 @@ import { db } from './src/core/db/db-client';
 // Initialize the service factory
 const factory = new ServiceFactory({
   db,
-  audit: {
     enabled: true,
     sinks: ['db', 'stdout'],
     batchSize: 100,
@@ -38,7 +35,6 @@ const factory = new ServiceFactory({
 });
 
 // Access all services
-const auditService = factory.auditService;
 const contextService = factory.getContextService();
 const roleService = factory.getRoleService();
 const permissionService = factory.getPermissionService();
@@ -47,7 +43,6 @@ const userService = factory.getUserService();
 
 ### Service Context
 
-Most service methods accept an optional `ServiceContext` for audit logging:
 
 ```typescript
 const serviceContext = {
@@ -80,7 +75,6 @@ Returns the user service instance.
 Returns all service instances for debugging/testing.
 
 #### `shutdown(): Promise<void>`
-Gracefully shuts down all services (flushes audit logs, closes connections).
 
 #### `reset(): void`
 Resets all service instances (useful for testing).
@@ -111,7 +105,6 @@ const app = CoreSaaS({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
-  audit: {
     enabled: true,
     sinks: ['db', 'stdout'],
     batchSize: 100,
@@ -125,7 +118,6 @@ const userService = app.userService;
 const roleService = app.roleService;
 const contextService = app.contextService;
 const permissionService = app.permissionService;
-const auditService = app.auditService;
 
 // Or access the service factory directly
 const services = app.services;
@@ -145,7 +137,6 @@ const userService = app.userService;
 const roleService = app.roleService;
 const contextService = app.contextService;
 const permissionService = app.permissionService;
-const auditService = app.auditService;
 
 // Service factory access
 const services = app.services;
@@ -241,14 +232,11 @@ lattice check-access --userId user_123 --contextId org_123 --permission users:re
 lattice help
 ```
 
-## Audit Service
 
-The `AuditService` provides comprehensive logging for all system events.
 
 ### Configuration
 
 ```typescript
-const auditConfig = {
   enabled: true,
   sampleRate: 1.0, // Log 100% of events
   redactKeys: ['password', 'token', 'secret'],
@@ -261,12 +249,9 @@ const auditConfig = {
 
 ### Core Methods
 
-#### `log(entry: AuditLogEntry): Promise<void>`
 
-Logs a custom audit event:
 
 ```typescript
-await auditService.log({
   actorId: 'user_123',
   targetUserId: 'user_456',
   contextId: 'org_789',
@@ -288,7 +273,6 @@ await auditService.log({
 Logs permission check events:
 
 ```typescript
-await auditService.logPermissionCheck(
   'user_123',
   'org_456',
   'users:delete',
@@ -302,7 +286,6 @@ await auditService.logPermissionCheck(
 Logs context resolution events:
 
 ```typescript
-await auditService.logContextResolved(
   'user_123',
   'org_456',
   'route',
@@ -315,7 +298,6 @@ await auditService.logContextResolved(
 Logs token issuance:
 
 ```typescript
-await auditService.logTokenIssued(
   'user_123',
   'access',
   { expiresIn: '1h' }
@@ -327,7 +309,6 @@ await auditService.logTokenIssued(
 Logs token revocation:
 
 ```typescript
-await auditService.logTokenRevoked(
   'user_123',
   'access',
   { reason: 'logout' }
@@ -339,7 +320,6 @@ await auditService.logTokenRevoked(
 Logs user-related actions:
 
 ```typescript
-await auditService.logUserAction(
   'admin_123',
   'user_456',
   'user.updated',
@@ -353,7 +333,6 @@ await auditService.logUserAction(
 Logs role-related actions:
 
 ```typescript
-await auditService.logRoleAction(
   'admin_123',
   'role.created',
   true,
@@ -361,12 +340,9 @@ await auditService.logRoleAction(
 );
 ```
 
-#### `getAuditLogs(params): Promise<{ logs: any[], total: number }>`
 
-Queries audit logs with filtering:
 
 ```typescript
-const result = await auditService.getAuditLogs({
   actorId: 'user_123',
   action: 'user.deleted',
   success: true,
@@ -381,10 +357,8 @@ console.log(`Found ${result.total} logs, showing ${result.logs.length}`);
 
 #### `shutdown(): Promise<void>`
 
-Gracefully shuts down the audit service:
 
 ```typescript
-await auditService.shutdown(); // Flushes remaining logs
 ```
 
 ## Context Service
@@ -1131,12 +1105,9 @@ function resolveContextFromRequest(req: any) {
 }
 ```
 
-### 3. Audit Logging Pattern
 
 ```typescript
-async function executeWithAudit<T>(
   action: () => Promise<T>,
-  auditParams: {
     actorId: string;
     action: string;
     resourceType: string;
@@ -1145,14 +1116,10 @@ async function executeWithAudit<T>(
 ): Promise<T> {
   try {
     const result = await action();
-    await auditService.log({
-      ...auditParams,
       success: true
     });
     return result;
   } catch (error) {
-    await auditService.log({
-      ...auditParams,
       success: false,
       error: error.message
     });
@@ -1167,7 +1134,6 @@ async function executeWithAudit<T>(
 // Initialize once at application startup
 const factory = new ServiceFactory({
   db,
-  audit: { enabled: true, sinks: ['db'] }
 });
 
 // Use throughout the application
@@ -1221,7 +1187,6 @@ const app = CoreSaaS({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
-  audit: {
     enabled: true,
     sinks: ['db', 'stdout'],
     batchSize: 100,
@@ -1250,4 +1215,3 @@ process.on('SIGTERM', async () => {
 });
 ```
 
-This completes the comprehensive service usage guide. All services are designed to work together seamlessly while maintaining proper separation of concerns and providing robust error handling and audit logging.

@@ -12,7 +12,7 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
 - Extensible plugin architecture for routes, contexts, and permissions
 - Developer-first experience: CLI, TypeScript types, hot-reloadable permissions
 - Minimal core routes: focus on auth and infrastructure, not business logic
-- **Production-ready service layer** with standardized patterns, error handling, and audit logging
+- **Production-ready service layer** with standardized patterns and error handling
 
 **Goal:** Enable developers to spin up secure, modular SaaS apps quickly while leaving domain-specific features to plugins.
 
@@ -25,7 +25,7 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
 3. **Plugin-driven:** Core provides infrastructure; plugins add features and routes.
 4. **Open-source & DX-first:** Documentation, CLI tooling, type safety, and hot-reloadable registry.
 5. **Adapter-agnostic:** Core works with Fastify or Express via a shared interface.
-6. **Service-oriented:** Production-ready services with consistent patterns, error handling, and audit logging.
+6. **Service-oriented:** Production-ready services with consistent patterns and error handling.
 
 ---
 
@@ -41,10 +41,9 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
 | **AuthZ Middleware**         | Checks permissions per request, ensures context alignment. Works for both adapters.                          |
 | **Plugin System**            | Register plugins with contexts, roles, permissions, and routes.                                                     |
 | **Built-in REST APIs**       | Users CRUD, Contexts CRUD + membership, Roles CRUD + assign/remove + role-perm ops, User permission grant/revoke; all guarded by a modifiable policy. |
-| **Audit Logging**            | Records permission checks, context resolutions, token issued/revoked, role and permission grants/revokes.    |
 | **Developer Tooling**        | CLI: list-permissions, check-access, roles commands, user management, permission management, context management. TypeScript types for permissions, roles, and contexts. |
 | **Caching**                  | WIP: Optional Redis-backed cache for effective permissions to optimize performance.                               |
-| **Service Layer**            | Production-ready services with standardized error handling, input validation, audit logging, and transaction management. |
+| **Service Layer**            | Production-ready services with standardized error handling, input validation, and transaction management. |
 
 ---
 
@@ -82,14 +81,12 @@ Lattice Core is the foundation of a permission-first SaaS backend, providing:
     base-service.ts - Abstract base class providing common service functionality.
     interfaces.ts - TypeScript interfaces for all core services.
     service-factory.ts - Centralized service management and instantiation.
-    audit-service.ts - Provides auditing capabilities for logging actions.
     context-service.ts - Manages context operations and resolutions.
     role-service.ts - Handles role management and operations.
     user-service.ts - Manages user accounts, authentication, and profile operations.
     user-permission-service.ts - Manages user permissions and operations.
     index.ts - Comprehensive barrel file exporting all service components.
   /tests
-    audit.test.ts - Tests for auditing functionality.
     auth.test.ts - Tests for authentication functionality.
     authz.test.ts - Tests for authorization middleware.
     context.test.ts - Tests for context management.
@@ -116,7 +113,6 @@ Lattice Core provides a production-ready service layer with consistent patterns:
 
 ```
 BaseService (abstract)
-├── AuditService - Comprehensive audit logging with batching and multiple sinks
 ├── ContextService - Context management with full CRUD operations
 ├── RoleService - Role management with context-aware assignments
 ├── UserService - User management with authentication and profile operations
@@ -129,7 +125,6 @@ ServiceFactory - Centralized service management with dependency injection
 
 - **Standardized Error Handling**: All services use `ServiceError` with predefined error types
 - **Input Validation**: Comprehensive validation with descriptive error messages
-- **Audit Logging**: Automatic audit logging for all operations with configurable sinks
 - **Transaction Support**: Proper transaction handling for multi-step operations
 - **Interface Contracts**: All services implement TypeScript interfaces for better testing
 - **Dependency Injection**: Services receive dependencies through constructor injection
@@ -141,22 +136,15 @@ The `ServiceFactory` manages all service instances and provides centralized acce
 
 ```typescript
 // Initialize service factory
-const factory = new ServiceFactory({
-  db: prismaClient,
-  audit: {
-    enabled: true,
-    sinks: ['db', 'stdout'],
-    batchSize: 100,
-    flushInterval: 5000
-  }
-});
+  const factory = new ServiceFactory({
+    db: prismaClient,
+  });
 
 // Access services
 const userService = factory.getUserService();
 const roleService = factory.getRoleService();
 const contextService = factory.getContextService();
-const permissionService = factory.getPermissionService();
-const auditService = factory.auditService;
+  const permissionService = factory.getPermissionService();
 ```
 
 ### Application Integration
@@ -167,13 +155,7 @@ The main application provides convenient access to all services:
 const app = CoreSaaS({
   db: { provider: 'postgres' },
   adapter: 'fastify',
-  jwt: { accessTTL: '15m', refreshTTL: '7d' },
-  audit: {
-    enabled: true,
-    sinks: ['db', 'stdout'],
-    batchSize: 100,
-    flushInterval: 5000
-  }
+  jwt: { accessTTL: '15m', refreshTTL: '7d' }
 });
 
 // Access services through the application
@@ -181,7 +163,6 @@ const userService = app.userService;
 const roleService = app.roleService;
 const contextService = app.contextService;
 const permissionService = app.permissionService;
-const auditService = app.auditService;
 
 // Or access the service factory directly
 const services = app.services;
@@ -191,7 +172,7 @@ const services = app.services;
 
 ## Core DB Schema (Prisma)
 
-- Tables: `User`, `Role`, `Permission`, `UserPermission`, `RolePermission`, `UserRole`, `Context`, `UserContext`, `AuditLog`, `RevokedToken`, `PasswordResetToken`.
+- Tables: `User`, `Role`, `Permission`, `UserPermission`, `RolePermission`, `UserRole`, `Context`, `UserContext`, `RevokedToken`, `PasswordResetToken`.
 - Row-level scoping and V2: hierarchical contexts supported.
 - Plugin permissions synced at boot via `PermissionRegistry`.
 - All tables implemented and functional.
@@ -204,7 +185,7 @@ const services = app.services;
 - **Type-safe permissions & roles** in TypeScript.
 - WIP: Minimal friction to add a plugin: `registerPlugin()`.
 - **CLI tooling** for inspecting permissions and simulating access.
-- Clear logging & audit trail for debugging and security.
+- Clear logging for debugging and security.
 - **Production-ready services** with consistent patterns and error handling.
 
 ---
@@ -233,14 +214,6 @@ const services = app.services;
 - [ ] Hierarchical contexts (parent → child)
 - [ ] Hot-reloadable plugin permissions at runtime
 - [ ] Caching layer for effective permissions (Redis)
-- [x] Audit logging
-  - Implemented full-featured:
-    - Schema: added actorId, targetUserId, requestId, ip, userAgent, resourceType, resourceId, plugin, error, indexes.
-    - Config: audit in CoreSaaS supports enable/disable, sampleRate, redactKeys, sinks (db/stdout).
-    - Service: logs now accept enriched fields and respect config.
-    - Wired existing calls to use actorId vs targetUserId.
-    - Tests: added src/tests/audit.test.ts to verify enabled/disabled behavior.
-    - Permission checks, token issued events, role assign/remove, role perm grant/revoke, user perm grant/revoke logged to `AuditLog`.
 - [x] **Service factory and dependency injection** - Centralized service management
 - [x] **User service implementation** - Complete user management with authentication
 - [x] **Enhanced CLI** - User management, permission management, context management commands
@@ -495,24 +468,6 @@ await app.contextService.addUserToContext({
 });
 ```
 
-### Audit Logging
-
-```typescript
-// Log custom events
-await app.auditService.log({
-  actorId: 'user_123',
-  action: 'user.deleted',
-  success: true,
-  targetUserId: 'user_456',
-  contextId: 'org_789',
-  metadata: { reason: 'account_closed' }
-});
-
-// Convenience methods
-await app.auditService.logPermissionCheck('user_123', 'org_456', 'users:delete', true);
-await app.auditService.logUserAction('admin_123', 'user_456', 'user.updated', true);
-```
-
 ## Roles Quickstart
 
 CLI examples:
@@ -557,7 +512,6 @@ const app = CoreSaaS({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
-  audit: { enabled: true, sinks: ['db', 'stdout'] }
 })
 
 // Use services
@@ -568,25 +522,6 @@ await app.roleService.addPermissionToRole({ roleName: 'admin', permissionKey: 'e
 ```
 
 ---
-
-## Audit Logging (Full)
-
-Capabilities:
-- Events: permission.check (success/failure), context.resolve, token.issued/token.revoked, role.created/role.deleted, role.assigned/role.removed, permission.user.granted/permission.user.revoked, permission.role.granted/permission.role.revoked.
-- Schema enrichment: actorId vs targetUserId, requestId, ip, userAgent, resourceType/resourceId, plugin, error, metadata; indexed for querying.
-- Configurable: enable/disable, sampleRate, redactKeys, sinks (db/stdout).
-- Toggle via `audit` in `CoreSaaS` config.
-
-Example:
-
-```ts
-const app = CoreSaaS({
-  db: { provider: 'sqlite' },
-  adapter: 'fastify',
-  jwt: { accessTTL: '15m', refreshTTL: '7d', secret: '...' },
-  audit: { enabled: true, sampleRate: 1.0, redactKeys: ['password'], sinks: ['db', 'stdout'] },
-})
-```
 
 ---
 
@@ -772,10 +707,9 @@ Notes
 Done now:
 - Built-in REST APIs guarded by policy (Users, Contexts, Roles, User-Permissions)
 - E2E tests for auth/login/refresh, protected routes, role/permission flows, context membership
-- Full audit logging with config and request metadata
 - Policy overrides for route permissions
 - Input validation on all REST endpoints (Zod)
-- **Production-ready service layer** with standardized patterns, error handling, and audit logging
+  - **Production-ready service layer** with standardized patterns and error handling
 - **Service factory** for centralized service management
 - **Enhanced CLI** with comprehensive user, permission, and context management
 - **Application integration** with convenient service access patterns
@@ -786,6 +720,6 @@ Next to consider:
 - Prisma migrations for all environments, plus indexes for hot queries
 - Rate limiting, password policy, secure reset delivery
 - Caching (Redis) for effective permissions and ancestor chains
-- CLI additions (generate-plugin, audit queries) and docs for Roles API and route-permission matrix
+  - CLI additions (generate-plugin) and docs for Roles API and route-permission matrix
 - Proper email implementation for user reset and so on
 - Hooks

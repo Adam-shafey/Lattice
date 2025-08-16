@@ -41,7 +41,6 @@
 
 ## Using the Service Layer
 
-Lattice Core provides a production-ready service layer with consistent patterns for error handling, validation, audit logging, and transaction management.
 
 ### Service Factory
 
@@ -54,7 +53,6 @@ import { db } from './src/core/db/db-client';
 // Initialize the service factory
 const factory = new ServiceFactory({
   db,
-  audit: {
     enabled: true,
     sinks: ['db', 'stdout'],
     batchSize: 100,
@@ -64,7 +62,6 @@ const factory = new ServiceFactory({
 });
 
 // Access all services
-const auditService = factory.auditService;
 const contextService = factory.getContextService();
 const roleService = factory.getRoleService();
 const permissionService = factory.getPermissionService();
@@ -82,7 +79,6 @@ const app = CoreSaaS({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
-  audit: {
     enabled: true,
     sinks: ['db', 'stdout'],
     batchSize: 100,
@@ -95,7 +91,6 @@ const userService = app.userService;
 const roleService = app.roleService;
 const contextService = app.contextService;
 const permissionService = app.permissionService;
-const auditService = app.auditService;
 
 // Or access the service factory directly
 const services = app.services;
@@ -103,7 +98,6 @@ const services = app.services;
 
 ### Service Context
 
-Most service methods accept an optional `ServiceContext` for audit logging:
 
 ```typescript
 const serviceContext = {
@@ -271,13 +265,10 @@ const contexts = await contextService.listContexts({
 });
 ```
 
-## Using the Audit Service
 
-The `AuditService` provides comprehensive logging for all system events:
 
 ```typescript
 // Log custom events
-await auditService.log({
   actorId: 'user_123',
   action: 'user.deleted',
   success: true,
@@ -287,12 +278,7 @@ await auditService.log({
 });
 
 // Convenience methods
-await auditService.logPermissionCheck('user_123', 'org_456', 'users:delete', true);
-await auditService.logTokenIssued('user_123', 'access', { expiresIn: '1h' });
-await auditService.logUserAction('admin_123', 'user_456', 'user.updated', true);
 
-// Query audit logs
-const result = await auditService.getAuditLogs({
   actorId: 'user_123',
   action: 'user.deleted',
   startDate: new Date('2024-01-01'),

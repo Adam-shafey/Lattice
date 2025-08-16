@@ -27,7 +27,6 @@ export type {
   UserPermission,
   Context,
   UserContext,
-  AuditLog,
   RevokedToken,
   PasswordResetToken
 } from '../../../prisma/generated/client';
