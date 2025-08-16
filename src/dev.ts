@@ -20,7 +20,12 @@ async function bootstrap() {
     handler: async ({ user, context }) => ({ user, context, ok: true }),
   });
 
-  app.grantUserPermission('user_123', 'example:*', 'ctx_1');
+  await app.permissionService.grantToUser({
+    userId: 'user_123',
+    permissionKey: 'example:*',
+    contextId: 'ctx_1',
+    context: { actorId: 'system' }
+  });
 
   await app.listen(Number(process.env.PORT) || 3000);
 }

@@ -30,7 +30,12 @@ async function checkAccess(argv: minimist.ParsedArgs) {
   const permission = String(argv.permission || argv.p || 'example:read');
   const app = getApp();
   await app.permissionRegistry.initFromDatabase();
-  app.grantUserPermission(userId, permission, contextId);
+  await app.permissionService.grantToUser({
+    userId,
+    permissionKey: permission,
+    contextId: contextId || null,
+    context: { actorId: 'system' }
+  });
   const ok = await app.checkAccess({ userId, context: contextId ? { id: contextId, type: 'unknown' } : null, permission });
   // eslint-disable-next-line no-console
   console.log(ok ? 'ALLOWED' : 'DENIED');

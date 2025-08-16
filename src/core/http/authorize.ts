@@ -76,7 +76,7 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         context: contextId ? { id: contextId, type: requestContextType ?? 'unknown' } : null,
         permission: requiredPermission,
         scope: options.scope,
-        contextType
+        contextType: contextType ?? undefined
       });
 
       if (!allowed) {

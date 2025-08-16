@@ -49,10 +49,10 @@ export interface LatticePlugin {
 
 export interface CheckAccessInput {
   userId: string;
-  context?: { type: string; id: string } | null;
+  context?: { type: string; id: string | null } | null;
   permission: string;
   scope?: 'exact' | 'global' | 'type-wide';
-  contextType?: string;
+  contextType?: string | null;
 }
 
 export interface HttpAdapter {
@@ -167,7 +167,7 @@ export class CoreSaaSApp {
     if (scope === 'global') {
       lookupContext = null;
     } else if (scope === 'type-wide') {
-      lookupContext = contextType ? { type: contextType, id: null } : context;
+      lookupContext = contextType ? { type: contextType, id: null } : (context ?? null);
     }
 
     try {
