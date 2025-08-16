@@ -40,7 +40,7 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         r => r?.query?.['contextType'],
         r => r?.body?.contextType
       ]);
-      const contextType = requestContextType ?? options.contextType ?? null;
+      const contextType = requestContextType ?? options.contextType;
 
       if (!userId) {
         return respond(res, next, 401, { statusCode: 401, message: 'Unauthorized' });

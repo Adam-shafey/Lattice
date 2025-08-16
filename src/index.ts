@@ -163,7 +163,7 @@ export class CoreSaaSApp {
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
     const { userId, context, permission, scope, contextType } = input;
 
-    let lookupContext = context ?? null;
+    let lookupContext: { type: string; id: string | null } | null = context ?? null;
     if (scope === 'global') {
       lookupContext = null;
     } else if (scope === 'type-wide') {

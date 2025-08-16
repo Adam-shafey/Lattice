@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 import minimist from 'minimist';
 import { CoreSaaS } from '../../index';
-import { defaultRoutePermissionPolicy } from '../policy/policy';
-import { PrismaClient } from '@prisma/client';
-import { getServiceFactory } from '../services';
 
 function getApp() {
   const app = CoreSaaS({
