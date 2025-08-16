@@ -1,4 +1,5 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
+import swaggerUi from 'swagger-ui-express';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
 
@@ -17,10 +18,17 @@ export interface ExpressHttpAdapter extends HttpAdapter {
  */
 export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
   const instance: Express = express();
-  
+
   // Configure Express middleware
   instance.use(express.json());
   instance.use(express.urlencoded({ extended: true }));
+
+  const swaggerDocument: any = {
+    openapi: '3.0.0',
+    info: { title: 'Lattice API', version: '1.0.0' },
+    paths: {}
+  };
+  instance.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
   /**
    * Wraps a pre-handler function to work with Express middleware
@@ -67,13 +75,19 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
      * Adds a route to the Express application
      */
     addRoute(route: RouteDefinition) {
-      const preHandlers = Array.isArray(route.preHandler) 
-        ? route.preHandler 
-        : route.preHandler 
-          ? [route.preHandler] 
+      const preHandlers = Array.isArray(route.preHandler)
+        ? route.preHandler
+        : route.preHandler
+          ? [route.preHandler]
           : [];
-          
+
       const handlers = [...preHandlers.map(wrapPreHandler), wrapHandler(route.handler)];
+
+      const pathItem = swaggerDocument.paths[route.path] || {};
+      pathItem[route.method.toLowerCase()] = {
+        responses: { 200: { description: 'Successful response' } }
+      };
+      swaggerDocument.paths[route.path] = pathItem;
       
       // Register the route based on HTTP method
       switch (route.method) {
