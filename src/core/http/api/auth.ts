@@ -46,9 +46,10 @@ export function createAuthRoutes(app: CoreSaaSApp) {
     method: 'POST',
     path: '/auth/login',
     handler: async ({ body }) => {
-      const schema = z.object({ 
-        email: z.string().email(), 
-        password: z.string().min(6) 
+      const schema = z.object({
+        email: z.string().email(),
+        // Require passwords to be at least 8 characters
+        password: z.string().min(8)
       });
       
       try {
