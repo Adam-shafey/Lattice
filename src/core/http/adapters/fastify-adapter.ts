@@ -4,7 +4,8 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
-import swaggerDocument from '../../../swagger-output.json';
+import fs from 'fs';
+import path from 'path';
 
 export interface FastifyHttpAdapter extends HttpAdapter {
   getUnderlying: () => FastifyInstance;
@@ -24,20 +25,37 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
     origin: [
       'http://localhost:5173', // Vite dev server
       'http://localhost:3000', // Production admin UI
+      'http://localhost:8080', // Swagger UI
       'http://127.0.0.1:5173',
-      'http://127.0.0.1:3000'
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080'
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   });
 
-  // Swagger using static document (from codex), with UI config (from main)
+  // Read the generated swagger spec
+  const swaggerSpecPath = path.join(__dirname, '../../../swagger-output.json');
+  let swaggerSpec: any = {};
+  
+  try {
+    if (fs.existsSync(swaggerSpecPath)) {
+      swaggerSpec = JSON.parse(fs.readFileSync(swaggerSpecPath, 'utf8'));
+    }
+  } catch (error) {
+    console.warn('Could not load swagger spec, using minimal configuration');
+  }
+
+  // Swagger configuration using our generated spec
   instance.register(swagger, {
     mode: 'static',
-    specification: { document: swaggerDocument }
+    specification: {
+      document: swaggerSpec
+    }
   });
 
+  // Swagger UI configuration
   instance.register(swaggerUi, {
     routePrefix: '/docs',
     uiConfig: {

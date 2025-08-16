@@ -1,8 +1,7 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
-import swaggerUi from 'swagger-ui-express';
+import cors from 'cors';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
-import swaggerDocument from '../../../swagger-output.json';
 
 export interface ExpressHttpAdapter extends HttpAdapter {
   getUnderlying: () => Express;
@@ -20,11 +19,24 @@ export interface ExpressHttpAdapter extends HttpAdapter {
 export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
   const instance: Express = express();
 
+  // Configure CORS
+  instance.use(cors({
+    origin: [
+      'http://localhost:5173', // Vite dev server
+      'http://localhost:3000', // Production admin UI
+      'http://localhost:8080', // Swagger UI
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  }));
+
   // Configure Express middleware
   instance.use(express.json());
   instance.use(express.urlencoded({ extended: true }));
-
-  instance.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
   /**
    * Wraps a pre-handler function to work with Express middleware

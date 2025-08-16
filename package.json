@@ -9,9 +9,10 @@
     "lattice": "dist/core/cli/index.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "swagger:gen": "ts-node src/scripts/swagger.ts",
+    "build": "npm run swagger:gen && tsc -p tsconfig.json",
     "build:admin": "cd AccessControlUI && npm install && npm run build",
-    "dev": "ts-node-dev --respawn --transpile-only src/dev.ts",
+    "dev": "npm run swagger:gen && ts-node-dev --respawn --transpile-only src/dev.ts",
     "dev:with-admin": "npm run build:admin && npm run dev",
     "start": "node dist/dev.js",
     "cli": "node dist/core/cli/index.js --help",
@@ -28,15 +29,15 @@
     "@fastify/swagger": "^9.5.1",
     "@fastify/swagger-ui": "^5.2.3",
     "@prisma/client": "^6.14.0",
+    "@types/cors": "^2.8.19",
     "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
     "express": "^4.19.2",
     "fastify": "^5.5.0",
     "jsonwebtoken": "^9.0.2",
     "minimist": "^1.2.8",
-    "zod": "^3.23.8",
-    "@fastify/swagger": "^8.0.0",
-    "@fastify/swagger-ui": "^1.0.0",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-autogen": "^2.23.7",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -44,12 +45,12 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/minimist": "^1.2.5",
     "@types/node": "^20.14.9",
+    "fast-glob": "^3.3.2",
     "prisma": "^6.14.0",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.5.4",
-    "vitest": "^1.6.0",
-    "swagger-autogen": "^2.23.7"
+    "vitest": "^1.6.0"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
