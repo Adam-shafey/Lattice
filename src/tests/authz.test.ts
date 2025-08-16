@@ -158,6 +158,35 @@ describe('Authorization Middleware', () => {
 
       // No manual cleanup needed - beforeEach handles it
     });
+
+    it('denies access without permission', async () => {
+      const user = await app.userService.createUser({
+        email: 'no-perm@example.com',
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
+      app.permissionRegistry.register({
+        key: 'some:perm',
+        label: 'Some Permission',
+        plugin: 'test'
+      });
+
+      app.route({
+        method: 'GET',
+        path: '/no-access',
+        handler: async () => ({ ok: true }),
+        preHandler: app.authorize('some:perm')
+      });
+
+      const response = await app.fastify!.inject({
+        method: 'GET',
+        url: '/no-access',
+        headers: { 'x-user-id': user.id }
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
   });
 
   describe('role-based permissions', () => {
