@@ -3,6 +3,7 @@ import { CoreSaaS } from '../index';
 import { registerRoleRoutes } from '../core/http/api/roles';
 import { defaultRoutePermissionPolicy } from '../core/policy/policy';
 import { db } from '../core/db/db-client';
+import { logger } from '../core/logger';
 
 describe('E2E: Role Management', () => {
   let app: ReturnType<typeof CoreSaaS>;
@@ -199,7 +200,7 @@ describe('E2E: Role Management', () => {
         scope: 'type-wide',
         contextType: 'team'
       });
-      console.log('User1 has roles:team:manage:', effectivePerms);
+      logger.log('User1 has roles:team:manage:', effectivePerms);
       
       const effectivePerms2 = await app.checkAccess({
         userId: user1.id,
@@ -207,19 +208,19 @@ describe('E2E: Role Management', () => {
         scope: 'type-wide',
         contextType: 'team'
       });
-      console.log('User1 has permissions:example:read:grant:team:', effectivePerms2);
+      logger.log('User1 has permissions:example:read:grant:team:', effectivePerms2);
       
       // Debug: Check what the route will be checking for
       const routePermission1 = 'roles:team:manage';
       const routePermission2 = 'permissions:example:read:grant:team';
-      console.log('Route will check for:', { routePermission1, routePermission2 });
+      logger.log('Route will check for:', { routePermission1, routePermission2 });
       
       // Debug: Check what permissions the user actually has
       const allPerms = await app.permissionService.getUserEffectivePermissions({
         userId: user1.id,
         contextType: 'team'
       });
-      console.log('User1 all permissions:', allPerms.map(p => p.key));
+      logger.log('User1 all permissions:', allPerms.map(p => p.key));
       
       const r1 = await f.inject({ 
         method: 'POST', 
@@ -227,7 +228,7 @@ describe('E2E: Role Management', () => {
         payload: { permissionKey: 'example:read', contextType: 'team' },
         headers: { 'x-user-id': user1.id }
       });
-      console.log('Response status:', r1.statusCode, 'Response body:', r1.json());
+      logger.log('Response status:', r1.statusCode, 'Response body:', r1.json());
       expect(r1.statusCode).toBe(403);
 
       // Create new user for second test

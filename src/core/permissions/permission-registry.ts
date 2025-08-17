@@ -1,5 +1,6 @@
 import { isAllowedByWildcard } from './wildcard-utils';
 import { db } from '../db/db-client';
+import { logger } from '../logger';
 
 export interface RegisteredPermission {
   key: string;
@@ -59,13 +60,13 @@ export class PermissionRegistry {
    * @returns Boolean indicating if the required permission is allowed
    */
   isAllowed(required: string, granted: Set<string>): boolean {
-    console.log('🎯 [PERMISSION_REGISTRY] Starting isAllowed check');
-    console.log('🎯 [PERMISSION_REGISTRY] Required permission:', required);
-    console.log('🎯 [PERMISSION_REGISTRY] Granted permissions count:', granted.size);
-    console.log('🎯 [PERMISSION_REGISTRY] Granted permissions:', Array.from(granted));
+    logger.log('🎯 [PERMISSION_REGISTRY] Starting isAllowed check');
+    logger.log('🎯 [PERMISSION_REGISTRY] Required permission:', required);
+    logger.log('🎯 [PERMISSION_REGISTRY] Granted permissions count:', granted.size);
+    logger.log('🎯 [PERMISSION_REGISTRY] Granted permissions:', Array.from(granted));
     
     const result = isAllowedByWildcard(required, granted);
-    console.log('🎯 [PERMISSION_REGISTRY] isAllowedByWildcard result:', result);
+    logger.log('🎯 [PERMISSION_REGISTRY] isAllowedByWildcard result:', result);
     
     return result;
   }

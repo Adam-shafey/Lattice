@@ -16,6 +16,7 @@ import { IUserService } from './interfaces';
 import type { User } from '../db/db-client';
 import { hash, compare } from 'bcryptjs';
 import { randomUUID } from 'crypto';
+import { logger } from '../logger';
 
 /**
  * UserService Class
@@ -423,7 +424,7 @@ export class UserService extends BaseService implements IUserService {
 
         // TODO: Send email with reset link
         // This would typically integrate with an email service
-        console.log(`Password reset token for ${email}: ${resetToken}`);
+        logger.log(`Password reset token for ${email}: ${resetToken}`);
       },
       {
         action: 'user.password_reset_initiated',

@@ -1,6 +1,7 @@
 import { CoreSaaSApp } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
+import { logger } from '../../logger';
 
 export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
   const p = prefix;
@@ -37,9 +38,9 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     path: `${p}/users`,
     preHandler: [app.requireAuth(), app.authorize(policy.users!.list, { scope: 'global' })],
     handler: async ({ query, req }) => {
-      console.log('👥 [USERS_ROUTE] ===== GET /users ROUTE HANDLER CALLED =====');
-      console.log('👥 [USERS_ROUTE] Query params:', query);
-      console.log('👥 [USERS_ROUTE] Request user:', req?.user);
+      logger.log('👥 [USERS_ROUTE] ===== GET /users ROUTE HANDLER CALLED =====');
+      logger.log('👥 [USERS_ROUTE] Query params:', query);
+      logger.log('👥 [USERS_ROUTE] Request user:', req?.user);
       
       try {
         const limit = query.limit ? parseInt(query.limit as string) : undefined;

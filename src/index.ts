@@ -11,6 +11,7 @@ import { registerRoleRoutes } from './core/http/api/roles';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
 import { ServiceFactory, getServiceFactory, setServiceFactory } from './core/services';
 import { db } from './core/db/db-client';
+import { logger } from './core/logger';
 
 export type SupportedAdapter = 'fastify' | 'express';
 
@@ -168,38 +169,38 @@ export class CoreSaaSApp {
   }
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
-    console.log('🔍 [CHECK_ACCESS] Starting checkAccess');
-    console.log('🔍 [CHECK_ACCESS] Input:', input);
+      logger.log('🔍 [CHECK_ACCESS] Starting checkAccess');
+      logger.log('🔍 [CHECK_ACCESS] Input:', input);
     
     const { userId, context, permission, scope, contextType } = input;
 
     let lookupContext: { type: string; id: string | null } | null = context ?? null;
     if (scope === 'global') {
       lookupContext = null;
-      console.log('🔍 [CHECK_ACCESS] Global scope - setting lookupContext to null');
+        logger.log('🔍 [CHECK_ACCESS] Global scope - setting lookupContext to null');
     } else if (scope === 'type-wide') {
       lookupContext = contextType ? { type: contextType, id: null } : (context ?? null);
-      console.log('🔍 [CHECK_ACCESS] Type-wide scope - setting lookupContext to:', lookupContext);
+        logger.log('🔍 [CHECK_ACCESS] Type-wide scope - setting lookupContext to:', lookupContext);
     } else {
-      console.log('🔍 [CHECK_ACCESS] Exact scope or undefined - using provided context:', lookupContext);
+        logger.log('🔍 [CHECK_ACCESS] Exact scope or undefined - using provided context:', lookupContext);
     }
 
-    console.log('🔍 [CHECK_ACCESS] Final lookupContext:', lookupContext);
+      logger.log('🔍 [CHECK_ACCESS] Final lookupContext:', lookupContext);
 
     try {
-      console.log('🔍 [CHECK_ACCESS] Calling fetchEffectivePermissions');
+      logger.log('🔍 [CHECK_ACCESS] Calling fetchEffectivePermissions');
       const effective = await fetchEffectivePermissions({ userId, context: lookupContext });
-      console.log('🔍 [CHECK_ACCESS] fetchEffectivePermissions result - permissions count:', effective.size);
-      console.log('🔍 [CHECK_ACCESS] Effective permissions:', Array.from(effective));
+      logger.log('🔍 [CHECK_ACCESS] fetchEffectivePermissions result - permissions count:', effective.size);
+      logger.log('🔍 [CHECK_ACCESS] Effective permissions:', Array.from(effective));
       
-      console.log('🔍 [CHECK_ACCESS] Calling permissionRegistry.isAllowed');
+      logger.log('🔍 [CHECK_ACCESS] Calling permissionRegistry.isAllowed');
       const result = this.permissionRegistry.isAllowed(permission, effective);
-      console.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', result);
+      logger.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', result);
       
       return result;
     } catch (error) {
-      console.log('🔍 [CHECK_ACCESS] ❌ Error during checkAccess:', error);
-      console.error('Failed to fetch effective permissions:', error);
+      logger.error('🔍 [CHECK_ACCESS] ❌ Error during checkAccess:', error);
+      logger.error('Failed to fetch effective permissions:', error);
       return false;
     }
   }

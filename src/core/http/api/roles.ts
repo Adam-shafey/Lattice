@@ -1,6 +1,7 @@
 import { CoreSaaSApp } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
+import { logger } from '../../logger';
 
 export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
   const p = prefix;
@@ -206,7 +207,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
         // For type-wide (contextType only), use the provided contextType
         const effectiveContextType = contextType || (contextId ? 'team' : null);
         
-        console.log('PreHandler 1:', { contextType, contextId, effectiveContextType });
+        logger.log('PreHandler 1:', { contextType, contextId, effectiveContextType });
         
         if (!effectiveContextType) {
           res.status(403).send({ error: 'Missing contextType or contextId' });
@@ -214,7 +215,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
         }
         
         const permissionKey = policy.roles!.addPerm.roleManage.replace('{type}', effectiveContextType);
-        console.log('Checking permission:', permissionKey);
+        logger.log('Checking permission:', permissionKey);
         
         return app.authorize(permissionKey, {
           scope: 'type-wide',
@@ -228,11 +229,11 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
         // For type-wide (contextType only), use the provided contextType
         const effectiveContextType = contextType || (contextId ? 'team' : null);
         
-        console.log('PreHandler 2 - Starting check for permission grant ability');
-        console.log('PreHandler 2:', { permissionKey, contextType, contextId, effectiveContextType });
+        logger.log('PreHandler 2 - Starting check for permission grant ability');
+        logger.log('PreHandler 2:', { permissionKey, contextType, contextId, effectiveContextType });
         
         if (!effectiveContextType) {
-          console.log('PreHandler 2 - Missing contextType or contextId, denying');
+          logger.log('PreHandler 2 - Missing contextType or contextId, denying');
           res.status(403).send({ error: 'Missing contextType or contextId' });
           return;
         }
@@ -241,10 +242,10 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
           .replace('{perm}', permissionKey)
           .replace('{type}', effectiveContextType);
         
-        console.log('PreHandler 2 - Required permission:', requiredPermission);
-        console.log('PreHandler 2 - User ID:', req.user?.id || req.headers['x-user-id']);
-        
-        console.log('PreHandler 2 - About to call authorize middleware');
+        logger.log('PreHandler 2 - Required permission:', requiredPermission);
+        logger.log('PreHandler 2 - User ID:', req.user?.id || req.headers['x-user-id']);
+
+        logger.log('PreHandler 2 - About to call authorize middleware');
         return app.authorize(requiredPermission, {
           scope: 'type-wide',
           contextType: 'required'
@@ -262,7 +263,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
       });
       
       const parsed = schema.safeParse(body);
-      console.log('Validation result:', { success: parsed.success, body, issues: parsed.error?.issues });
+      logger.log('Validation result:', { success: parsed.success, body, issues: parsed.error?.issues });
       if (!parsed.success) {
         const error = new Error('Validation failed');
         (error as any).statusCode = 400;

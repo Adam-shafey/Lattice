@@ -1,5 +1,6 @@
 import { PrismaClient } from './prisma/generated/client';
 import bcrypt from 'bcryptjs';
+import { logger } from './src/core/logger';
 
 // Set the database URL if not already set
 import path from 'path';
@@ -90,7 +91,7 @@ async function main() {
 
 main()
   .catch((e) => {
-    console.error(e);
+    logger.error(e);
     process.exit(1);
   })
   .finally(async () => {
