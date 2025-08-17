@@ -1,6 +1,7 @@
 // scripts/swagger.ts
 import fs from 'fs';
 import path from 'path';
+import { logger } from '../core/logger';
 
 const swaggerSpec = {
   openapi: "3.0.0",
@@ -1677,4 +1678,4 @@ const swaggerSpec = {
 const outputFile = './src/swagger-output.json';
 fs.writeFileSync(outputFile, JSON.stringify(swaggerSpec, null, 2));
 
-console.log(`✅ Swagger documentation generated successfully at ${outputFile}`);
+logger.log(`✅ Swagger documentation generated successfully at ${outputFile}`);

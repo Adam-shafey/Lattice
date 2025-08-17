@@ -6,6 +6,7 @@ import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
 import fs from 'fs';
 import path from 'path';
+import { logger } from '../../logger';
 
 export interface FastifyHttpAdapter extends HttpAdapter {
   getUnderlying: () => FastifyInstance;
@@ -44,7 +45,7 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
       swaggerSpec = JSON.parse(fs.readFileSync(swaggerSpecPath, 'utf8'));
     }
   } catch (error) {
-    console.warn('Could not load swagger spec, using minimal configuration');
+    logger.warn('Could not load swagger spec, using minimal configuration');
   }
 
   // Swagger configuration using our generated spec
@@ -87,7 +88,7 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
           reply.send(result);
         }
       } catch (error) {
-        console.error('Fastify handler error:', error);
+        logger.error('Fastify handler error:', error);
 
         if (reply.sent) return;
 

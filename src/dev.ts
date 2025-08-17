@@ -1,4 +1,5 @@
 import { CoreSaaS } from './index';
+import { logger } from './core/logger';
 
 async function bootstrap() {
   const app = CoreSaaS({
@@ -29,15 +30,14 @@ async function bootstrap() {
   const port = Number(process.env.PORT) || 3000;
   await app.listen(port);
   
-  console.log(`🚀 Lattice server running on http://localhost:${port}`);
-  console.log(`📊 Admin UI available at http://localhost:${port}/admin`);
-  console.log(`🔌 API available at http://localhost:${port}/api`);
-  console.log(`📚 API Documentation available at http://localhost:${port}/docs`);
+  logger.log(`🚀 Lattice server running on http://localhost:${port}`);
+  logger.log(`📊 Admin UI available at http://localhost:${port}/admin`);
+  logger.log(`🔌 API available at http://localhost:${port}/api`);
+  logger.log(`📚 API Documentation available at http://localhost:${port}/docs`);
 }
 
 bootstrap().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error(err);
+  logger.error(err);
   process.exit(1);
 });
 
