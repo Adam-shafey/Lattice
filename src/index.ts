@@ -44,6 +44,7 @@ export interface RouteDefinition<Body = unknown> {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   path: string;
   preHandler?: Array<unknown> | unknown;
+  config?: unknown;
   handler: (args: {
     user: { id: string } | null;
     context: { id: string } | null;

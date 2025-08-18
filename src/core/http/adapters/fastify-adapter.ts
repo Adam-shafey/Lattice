@@ -1,5 +1,6 @@
 import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import fastifyCors from '@fastify/cors';
+import fastifyRateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import type { LatticeCore, HttpAdapter, RouteDefinition } from '../../../index';
@@ -35,6 +36,9 @@ export function createFastifyAdapter(app: LatticeCore): FastifyHttpAdapter {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   });
+
+  // Rate limiting plugin (configured per-route)
+  instance.register(fastifyRateLimit, { global: false });
 
   // Read the generated swagger spec
   const swaggerSpecPath = path.join(__dirname, '../../../swagger-output.json');
@@ -149,6 +153,7 @@ export function createFastifyAdapter(app: LatticeCore): FastifyHttpAdapter {
       instance.route({
         method: route.method,
         url: route.path,
+        config: route.config as any,
         preHandler: preHandlers.map(wrapPreHandler),
         handler: wrapHandler(route.handler) as any,
       });
