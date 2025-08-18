@@ -2,6 +2,7 @@ import { LatticeCore } from '../../../index';
 import { createJwtUtil } from '../../auth/jwt';
 import { z } from 'zod';
 import { logger } from '../../logger';
+import rateLimit from 'express-rate-limit';
 
 function getJwt(app: LatticeCore) {
   const secret = app.jwtConfig?.secret || process.env.JWT_SECRET || 'dev-secret';
@@ -56,9 +57,28 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
 
   const p = prefix;
 
+  const windowMs = parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || '60000', 10);
+  const loginMax = parseInt(process.env.AUTH_LOGIN_RATE_LIMIT || '5', 10);
+  const refreshMax = parseInt(process.env.AUTH_REFRESH_RATE_LIMIT || '10', 10);
+  const revokeMax = parseInt(process.env.AUTH_REVOKE_RATE_LIMIT || '10', 10);
+
+  const buildExpressLimiter = (max: number) =>
+    rateLimit({ windowMs, max, standardHeaders: true, legacyHeaders: false });
+
+  const buildFastifyConfig = (max: number) => ({
+    rateLimit: { max, timeWindow: windowMs },
+  });
+
+  function rateLimitOpts(max: number) {
+    if (app.express) return { preHandler: buildExpressLimiter(max) };
+    if (app.fastify) return { config: buildFastifyConfig(max) };
+    return {};
+  }
+
   app.route({
     method: 'POST',
     path: `${p}/auth/login`,
+    ...rateLimitOpts(loginMax),
     handler: async ({ body }) => {
       const schema = z.object({
         email: z.string().email(),
@@ -94,9 +114,10 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
   app.route({
     method: 'POST',
     path: `${p}/auth/refresh`,
+    ...rateLimitOpts(refreshMax),
     handler: async ({ body }) => {
-      const schema = z.object({ 
-        refreshToken: z.string().min(1) 
+      const schema = z.object({
+        refreshToken: z.string().min(1)
       });
       
       try {
@@ -138,9 +159,10 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
   app.route({
     method: 'POST',
     path: `${p}/auth/revoke`,
+    ...rateLimitOpts(revokeMax),
     handler: async ({ body }) => {
-      const schema = z.object({ 
-        token: z.string().min(1) 
+      const schema = z.object({
+        token: z.string().min(1)
       });
       
       try {
