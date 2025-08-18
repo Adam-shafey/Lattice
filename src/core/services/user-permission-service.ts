@@ -85,17 +85,11 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before granting permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         // Verify the context exists if a specific context ID is provided
         if (contextId) {
-          const context = await this.db.context.findUnique({ where: { id: contextId } });
-          if (!context) {
-            throw ServiceError.notFound('Context', contextId);
-          }
+          await this.ensureContextExists(contextId);
         }
 
         // Create or find the permission record
@@ -176,10 +170,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before revoking permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         // Find the permission record
         const permission = await this.db.permission.findUnique({ where: { key: permissionKey } });
@@ -256,10 +247,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before querying permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         // Build the where clause based on the provided context parameters
         const where: any = { userId };
@@ -410,10 +398,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before calculating permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         // Get direct user permissions
         const userPermissions = await this.getUserPermissions({
@@ -607,6 +592,20 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return true;
   }
 
+  private async ensureUserExists(userId: string, client: any = this.db): Promise<void> {
+    const user = await client.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw ServiceError.notFound('User', userId);
+    }
+  }
+
+  private async ensureContextExists(contextId: string, client: any = this.db): Promise<void> {
+    const context = await client.context.findUnique({ where: { id: contextId } });
+    if (!context) {
+      throw ServiceError.notFound('Context', contextId);
+    }
+  }
+
   /**
    * Grants multiple permissions to a user in a single operation
    * 
@@ -651,10 +650,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before granting permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         const results: UserPermission[] = [];
 
@@ -666,10 +662,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
 
             // Verify context exists if provided
             if (perm.contextId) {
-              const context = await tx.context.findUnique({ where: { id: perm.contextId } });
-              if (!context) {
-                throw ServiceError.notFound('Context', perm.contextId);
-              }
+              await this.ensureContextExists(perm.contextId, tx);
             }
 
             // Create or find the permission
