@@ -1,5 +1,5 @@
 import { isAllowedByWildcard } from './wildcard-utils';
-import { db } from '../db/db-client';
+import type { PrismaClient } from '../db/db-client';
 import { logger } from '../logger';
 
 export interface RegisteredPermission {
@@ -18,6 +18,11 @@ export interface RegisteredPermission {
 export class PermissionRegistry {
   private readonly registry: Map<string, RegisteredPermission> = new Map();
   private initialized = false;
+  private readonly db: PrismaClient;
+
+  constructor(db: PrismaClient) {
+    this.db = db;
+  }
 
   /**
    * Registers a new permission in the registry
@@ -83,7 +88,7 @@ export class PermissionRegistry {
     }
     
     try {
-      const rows = await db.permission.findMany();
+      const rows = await this.db.permission.findMany();
       for (const row of rows) {
         this.registry.set(row.key, { 
           key: row.key, 
@@ -107,14 +112,14 @@ export class PermissionRegistry {
     try {
       // Get all permission keys currently in the database
       const inDb = new Set(
-        (await db.permission.findMany({ select: { key: true } }))
+        (await this.db.permission.findMany({ select: { key: true } }))
           .map((r: { key: string }) => r.key)
       );
       
       // Create any permissions that exist in memory but not in database
       for (const p of this.registry.values()) {
         if (!inDb.has(p.key)) {
-          await db.permission.create({ 
+          await this.db.permission.create({
             data: { 
               key: p.key, 
               label: p.label, 

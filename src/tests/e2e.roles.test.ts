@@ -6,7 +6,7 @@ import { logger } from '../core/logger';
 
 import { createJwtUtil } from '../core/auth/jwt';
 
-const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
+const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' }, db);
 function authHeaders(userId: string) {
   const token = jwt.signAccess({ sub: userId });
   return { authorization: `Bearer ${token}`, 'x-user-id': userId };
