@@ -46,4 +46,82 @@ describe('ABAC policy evaluation', () => {
     });
     expect(denied).toBe(false);
   });
+
+  test('allows access when no policies exist', async () => {
+    await db.abacPolicy.deleteMany();
+    invalidatePolicyCache();
+    const allowed = await evaluateAbac(service, provider, {
+      action: 'any:action',
+      resource: 'anyResource',
+      resourceId: null,
+      userId: 'user1'
+    });
+    expect(allowed).toBe(true);
+  });
+
+  test('deny policy overrides permit policy', async () => {
+    await db.abacPolicy.deleteMany();
+    await service.createPolicy({
+      action: 'documents:write',
+      resource: 'teamDocument',
+      condition: 'true',
+      effect: 'permit'
+    });
+    await service.createPolicy({
+      action: 'documents:write',
+      resource: 'teamDocument',
+      condition: 'true',
+      effect: 'deny'
+    });
+    invalidatePolicyCache();
+    const allowed = await evaluateAbac(service, provider, {
+      action: 'documents:write',
+      resource: 'teamDocument',
+      resourceId: 'doc1',
+      userId: 'user1'
+    });
+    expect(allowed).toBe(false);
+  });
+
+  test('evaluates environment attributes', async () => {
+    class EnvProvider extends TestProvider {
+      async getEnvironmentAttributes() {
+        return { ip: '127.0.0.1' };
+      }
+    }
+    const envProvider = new EnvProvider();
+    await db.abacPolicy.deleteMany();
+    await service.createPolicy({
+      action: 'server:access',
+      resource: 'server',
+      condition: "environment.ip == '127.0.0.1'",
+      effect: 'permit'
+    });
+    invalidatePolicyCache();
+    const allowed = await evaluateAbac(service, envProvider, {
+      action: 'server:access',
+      resource: 'server',
+      resourceId: null,
+      userId: 'user1'
+    });
+    expect(allowed).toBe(true);
+  });
+
+  test('handles evaluation errors gracefully', async () => {
+    await db.abacPolicy.deleteMany();
+    await service.createPolicy({
+      action: 'documents:read',
+      resource: 'teamDocument',
+      condition: 'user.id ==', // invalid condition
+      effect: 'permit'
+    });
+    invalidatePolicyCache();
+    const allowed = await evaluateAbac(service, provider, {
+      action: 'documents:read',
+      resource: 'teamDocument',
+      resourceId: 'doc1',
+      userId: 'user1'
+    });
+    expect(allowed).toBe(false);
+  });
 });

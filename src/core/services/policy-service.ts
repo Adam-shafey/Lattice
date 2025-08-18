@@ -1,6 +1,6 @@
 import { BaseService, type ServiceContext } from './base-service';
 import { IPolicyService } from './interfaces';
-import type { AbacPolicy } from '../db/db-client';
+import type { AbacPolicy, PrismaClient } from '../db/db-client';
 import { invalidatePolicyCache } from '../abac/abac';
 
 /**
@@ -10,7 +10,7 @@ import { invalidatePolicyCache } from '../abac/abac';
  * This service is intentionally lightweight and focuses on persistence.
  */
 export class PolicyService extends BaseService implements IPolicyService {
-  constructor(db: any) {
+  constructor(db: PrismaClient) {
     super(db);
   }
 

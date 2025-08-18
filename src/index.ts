@@ -33,12 +33,18 @@ export interface CoreConfig {
   authz?: boolean;
   policy?: RoutePermissionPolicy;
   apiPrefix?: string;
+  /**
+   * Automatically register built-in API routes when listening
+   * Defaults to false
+   */
+  exposeAPI?: boolean;
 }
 
 export interface RouteDefinition<Body = unknown> {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   path: string;
   preHandler?: Array<unknown> | unknown;
+  config?: unknown;
   handler: (args: {
     user: { id: string } | null;
     context: { id: string } | null;
@@ -306,16 +312,18 @@ export class LatticeCore {
   public async listen(port: number, host: string = '0.0.0.0'): Promise<void> {
     await this.permissionRegistry.initFromDatabase();
     await this.permissionRegistry.syncToDatabase();
-    
-    // Global request context middleware (only for adapters that support preHandler arrays at route-level)
-    // Developers should add it before their own routes if using adapter directly.
-    createAuthRoutes(this, this.apiPrefix);
-    registerUserRoutes(this, this.apiPrefix);
-    registerPermissionRoutes(this, this.apiPrefix);
-    registerContextRoutes(this, this.apiPrefix);
-    registerRoleRoutes(this, this.apiPrefix);
-    registerPolicyRoutes(this, this.apiPrefix);
-    
+
+    if (this.config.exposeAPI) {
+      // Global request context middleware (only for adapters that support preHandler arrays at route-level)
+      // Developers should add it before their own routes if using adapter directly.
+      createAuthRoutes(this, this.apiPrefix);
+      registerUserRoutes(this, this.apiPrefix);
+      registerPermissionRoutes(this, this.apiPrefix);
+      registerContextRoutes(this, this.apiPrefix);
+      registerRoleRoutes(this, this.apiPrefix);
+      registerPolicyRoutes(this, this.apiPrefix);
+    }
+
     await this.httpAdapter.listen(port, host);
   }
 
@@ -327,8 +335,21 @@ export class LatticeCore {
   }
 }
 
-export function Lattice(config: CoreConfig): LatticeCore {
-  return new LatticeCore(config);
+const defaultConfig: CoreConfig = {
+  db: { provider: 'sqlite' },
+  adapter: 'fastify',
+  jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'dev-secret' },
+  exposeAPI: false,
+};
+
+export function Lattice(config: Partial<CoreConfig> = {}): LatticeCore {
+  const finalConfig: CoreConfig = {
+    ...defaultConfig,
+    ...config,
+    db: { ...defaultConfig.db, ...(config.db ?? {}) },
+    jwt: { ...defaultConfig.jwt, ...(config.jwt ?? {}) },
+  };
+  return new LatticeCore(finalConfig);
 }
 
 export type { PermissionRegistry };

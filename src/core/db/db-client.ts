@@ -1,10 +1,12 @@
 import { PrismaClient } from '../../../prisma/generated/client';
 import { logger } from '../logger';
 
-// Set the database URL if not already set - this must happen before PrismaClient instantiation
-import path from 'path';
-const dbPath = path.resolve(process.cwd(), 'prisma', 'dev.db');
-process.env.DATABASE_URL = process.env.DATABASE_URL || `file:${dbPath}`;
+// Ensure database URL is explicitly provided
+if (!process.env.DATABASE_URL) {
+  const msg = 'DATABASE_URL environment variable is required but was not provided';
+  logger.error(msg);
+  throw new Error(msg);
+}
 
 /**
  * Singleton instance of PrismaClient for application use.

@@ -1,15 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach } from 'vitest';
 import { createJwtUtil } from '../core/auth/jwt';
 import { Lattice } from '../index';
 import { db } from '../core/db/db-client';
 
 describe('Auth Service', () => {
   let app: ReturnType<typeof Lattice>;
-
-  beforeAll(async () => {
-    process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
-  });
-
   beforeEach(async () => {
     // Create fresh app instance for each test
     app = Lattice({ 

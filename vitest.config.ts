@@ -13,5 +13,6 @@ export default defineConfig({
     testTimeout: 10000,
     // Disable parallel execution
     threads: false,
+    setupFiles: ['src/tests/setup.ts'],
   },
 });
