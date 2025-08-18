@@ -9,9 +9,9 @@
     "lattice": "dist/core/cli/index.js"
   },
   "license": "MIT",
-  "repository": "github:yourorg/lattice",
-  "author": "Your Name <you@example.com>",
-  "homepage": "https://github.com/yourorg/lattice#readme",
+  "repository": "github:Adam-shafey/lattice",
+  "author": "Adam Elshafei <abdoshafey1@gmail.com>",
+  "homepage": "https://github.com/Adam-shafey/Lattice#readme",
   "bugs": "https://github.com/yourorg/lattice/issues",
   "scripts": {
     "swagger:gen": "ts-node src/scripts/swagger.ts",
