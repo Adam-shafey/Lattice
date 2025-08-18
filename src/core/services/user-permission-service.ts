@@ -29,8 +29,7 @@
 
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IPermissionService } from './interfaces';
-import type { Permission } from '../db/db-client';
-import type { Prisma } from '../db/db-client';
+import type { Permission, UserPermission } from '../db/db-client';
 
 /**
  * UserPermissionService Class
@@ -76,7 +75,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     contextId?: string | null;
     contextType?: string | null;
     context?: ServiceContext;
-  }): Promise<Prisma.UserPermissionGetPayload<{}>> {
+  }): Promise<UserPermission> {
     const { userId, permissionKey, contextId, contextType, context: serviceContext } = params;
 
     // Validate required inputs
@@ -640,7 +639,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
       contextType?: string | null;
     }>;
     context?: ServiceContext;
-  }): Promise<Prisma.UserPermissionGetPayload<{}>[]> {
+  }): Promise<UserPermission[]> {
     const { userId, permissions, context: serviceContext } = params;
 
     // Validate required inputs
@@ -657,7 +656,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
           throw ServiceError.notFound('User', userId);
         }
 
-        const results: Prisma.UserPermissionGetPayload<{}>[] = [];
+        const results: UserPermission[] = [];
 
         // Use transaction for bulk operations to ensure atomicity
         await this.withTransaction(async (tx) => {
