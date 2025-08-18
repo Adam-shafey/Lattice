@@ -1,6 +1,6 @@
-import { PrismaClient } from './prisma/generated/client';
+import { PrismaClient } from '../../prisma/generated/client';
 import bcrypt from 'bcryptjs';
-import { logger } from './src/core/logger';
+import { logger } from '../core/logger';
 
 // Set the database URL if not already set
 import path from 'path';

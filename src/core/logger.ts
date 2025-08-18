@@ -24,16 +24,16 @@ class Logger {
     return this.logger.level !== 'silent';
   }
 
-  log(...args: any[]) {
-    this.logger.info(...args);
+  log(...args: unknown[]) {
+    this.logger.info(args);
   }
 
-  warn(...args: any[]) {
-    this.logger.warn(...args);
+  warn(...args: unknown[]) {
+    this.logger.warn(args);
   }
 
-  error(...args: any[]) {
-    this.logger.error(...args);
+  error(...args: unknown[]) {
+    this.logger.error(args);
   }
 }
 

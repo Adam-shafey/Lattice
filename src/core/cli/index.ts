@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import minimist from 'minimist';
 import { CoreSaaS } from '../../index';
-import { logger } from '../logger';
+import { logger } from '../../core/logger';
 
 function createApp() {
   return CoreSaaS({
