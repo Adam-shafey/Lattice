@@ -287,17 +287,76 @@ async function main() {
       const permissionService = app.permissionService;
       const userId = await resolveUserIdFromArgs();
       const contextId = argv.contextId ? String(argv.contextId) : undefined;
-      
+
       const permissions = await permissionService.getUserEffectivePermissions({
         userId,
         contextId,
         context: { actorId: 'system' }
       });
-      
+
       logger.log('Effective permissions:');
       permissions.forEach(permission => {
         logger.log(`- ${permission.key}: ${permission.label}`);
       });
+      break;
+    }
+    case 'policies:create': {
+      const policyService = app.policyService;
+      const action = String(argv.action || argv.a);
+      const resource = String(argv.resource || argv.r);
+      const condition = String(argv.condition || argv.c);
+      const effect = String(argv.effect || argv.e);
+      if (!action || !resource || !condition || !effect) {
+        throw new Error('Usage: policies:create --action <action> --resource <resource> --condition <expr> --effect <permit|deny>');
+      }
+      const policy = await policyService.createPolicy({ action, resource, condition, effect });
+      logger.log(policy);
+      break;
+    }
+    case 'policies:list': {
+      const policyService = app.policyService;
+      const policies = await policyService.listPolicies();
+      policies.forEach(p => {
+        logger.log(`${p.id}: ${p.effect} ${p.action} on ${p.resource} when ${p.condition}`);
+      });
+      break;
+    }
+    case 'policies:get': {
+      const policyService = app.policyService;
+      const id = String(argv.id || argv.i);
+      if (!id) throw new Error('Usage: policies:get --id <id>');
+      const policy = await policyService.getPolicy(id);
+      if (!policy) {
+        logger.log('Policy not found');
+      } else {
+        logger.log(policy);
+      }
+      break;
+    }
+    case 'policies:update': {
+      const policyService = app.policyService;
+      const id = String(argv.id || argv.i);
+      if (!id) {
+        throw new Error('Usage: policies:update --id <id> [--action <action>] [--resource <resource>] [--condition <expr>] [--effect <permit|deny>]');
+      }
+      const data: Record<string, string> = {};
+      if (argv.action || argv.a) data.action = String(argv.action || argv.a);
+      if (argv.resource || argv.r) data.resource = String(argv.resource || argv.r);
+      if (argv.condition || argv.c) data.condition = String(argv.condition || argv.c);
+      if (argv.effect || argv.e) data.effect = String(argv.effect || argv.e);
+      if (Object.keys(data).length === 0) {
+        throw new Error('Provide at least one field to update');
+      }
+      const policy = await policyService.updatePolicy(id, data);
+      logger.log(policy);
+      break;
+    }
+    case 'policies:delete': {
+      const policyService = app.policyService;
+      const id = String(argv.id || argv.i);
+      if (!id) throw new Error('Usage: policies:delete --id <id>');
+      await policyService.deletePolicy(id);
+      logger.log('Policy deleted successfully');
       break;
     }
     case 'contexts:create': {
@@ -358,6 +417,11 @@ async function main() {
       logger.log('  permissions:revoke --permission <key> (--userId <id> | --email <email>) [--contextId <ctx>]');
       logger.log('  permissions:user (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
       logger.log('  permissions:effective (--userId <id> | --email <email>) [--contextId <ctx>]');
+      logger.log('  policies:create --action <action> --resource <resource> --condition <expr> --effect <permit|deny>');
+      logger.log('  policies:list');
+      logger.log('  policies:get --id <id>');
+      logger.log('  policies:update --id <id> [--action <action>] [--resource <resource>] [--condition <expr>] [--effect <permit|deny>]');
+      logger.log('  policies:delete --id <id>');
       logger.log('  contexts:create --id <id> --type <type> --name <name>');
       logger.log('  contexts:list [--type <type>] [--limit <n>] [--offset <n>]');
   }
