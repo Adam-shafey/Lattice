@@ -29,7 +29,7 @@
 
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IPermissionService } from './interfaces';
-import type { Permission, UserPermission, Prisma } from '../db/db-client';
+import type { PrismaClient, Prisma, Permission, UserPermission } from '../db/db-client';
 import { PermissionRegistry } from '../permissions/permission-registry';
 
 /**
@@ -42,7 +42,7 @@ import { PermissionRegistry } from '../permissions/permission-registry';
 export class UserPermissionService extends BaseService implements IPermissionService {
   private readonly permissionRegistry: PermissionRegistry;
 
-  constructor(db: any, permissionRegistry: PermissionRegistry) {
+  constructor(db: PrismaClient, permissionRegistry: PermissionRegistry) {
     super(db);
     this.permissionRegistry = permissionRegistry;
   }
@@ -253,7 +253,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         await this.ensureUserExists(userId);
 
         // Build the where clause based on the provided context parameters
-        const where: any = { userId };
+        const where: Prisma.UserPermissionWhereInput = { userId };
         if (contextId) {
           // Context-specific permissions
           where.contextId = contextId;
@@ -268,13 +268,14 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         }
 
         // Query user permissions with included permission details
-        const userPermissions = await this.db.userPermission.findMany({
-          where,
-          include: { permission: true },
-        });
+        const userPermissions: Prisma.UserPermissionGetPayload<{ include: { permission: true } }>[] =
+          await this.db.userPermission.findMany({
+            where,
+            include: { permission: true },
+          });
 
         // Extract and return just the permission objects
-        return userPermissions.map((up: any) => up.permission);
+        return userPermissions.map((up) => up.permission);
       },
       {
         action: 'permission.user.list',
@@ -329,7 +330,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         }
 
         // Build the where clause based on the provided context parameters
-        const where: any = { roleId };
+        const where: Prisma.RolePermissionWhereInput = { roleId };
         if (contextId) {
           // Context-specific permissions
           where.contextId = contextId;
@@ -344,13 +345,14 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         }
 
         // Query role permissions with included permission details
-        const rolePermissions = await this.db.rolePermission.findMany({
-          where,
-          include: { permission: true },
-        });
+        const rolePermissions: Prisma.RolePermissionGetPayload<{ include: { permission: true } }>[] =
+          await this.db.rolePermission.findMany({
+            where,
+            include: { permission: true },
+          });
 
         // Extract and return just the permission objects
-        return rolePermissions.map((rp: any) => rp.permission);
+        return rolePermissions.map((rp) => rp.permission);
       },
       {
         action: 'permission.role.list',

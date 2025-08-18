@@ -27,6 +27,7 @@ export * from './context-service';
 export * from './role-service';
 export * from './user-permission-service';
 export * from './user-service';
+export * from './policy-service';
 
 // Service factory
 // Exports the factory pattern implementation for creating and managing services
@@ -46,5 +47,6 @@ export type {
   UserContext,
   RevokedToken,
   PasswordResetToken,
+  AbacPolicy,
   Prisma,
 } from '../db/db-client';
