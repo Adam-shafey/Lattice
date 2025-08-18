@@ -138,6 +138,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-prisma/prisma/test.db
+prisma/test.db
 *.db
-prisma/dev.db
