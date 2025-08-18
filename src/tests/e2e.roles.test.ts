@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { CoreSaaS } from '../index';
+import { Lattice } from '../index';
 import { registerRoleRoutes } from '../core/http/api/roles';
 import { defaultRoutePermissionPolicy } from '../core/policy/policy';
 import { db } from '../core/db/db-client';
 import { logger } from '../core/logger';
 
 describe('E2E: Role Management', () => {
-  let app: ReturnType<typeof CoreSaaS>;
+  let app: ReturnType<typeof Lattice>;
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
@@ -14,9 +14,9 @@ describe('E2E: Role Management', () => {
 
   beforeEach(async () => {
     // Create fresh app instance for each test
-    app = CoreSaaS({ 
+    app = Lattice({ 
       db: { provider: 'sqlite' }, 
-      adapter: 'fastify',
+      adapter: 'fastify', 
       jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
     });
     registerRoleRoutes(app, defaultRoutePermissionPolicy);

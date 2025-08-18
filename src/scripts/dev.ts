@@ -1,8 +1,8 @@
-import { CoreSaaS } from './index';
-import { logger } from './core/logger';
+import { Lattice } from '../index';
+import { logger } from '../core/logger';
 
 async function bootstrap() {
-  const app = CoreSaaS({
+  const app = Lattice({
     db: { provider: 'sqlite' },
     adapter: (process.env.ADAPTER as 'fastify' | 'express') || 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' },

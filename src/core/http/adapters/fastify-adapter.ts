@@ -2,7 +2,7 @@ import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import fastifyCors from '@fastify/cors';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
-import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
+import type { LatticeCore, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
 import fs from 'fs';
 import path from 'path';
@@ -13,9 +13,9 @@ export interface FastifyHttpAdapter extends HttpAdapter {
 }
 
 /**
- * Creates a Fastify HTTP adapter for the CoreSaaS application
+ * Creates a Fastify HTTP adapter for the LatticeCore application
  */
-export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
+export function createFastifyAdapter(app: LatticeCore): FastifyHttpAdapter {
   const instance: FastifyInstance = fastify({
     logger: true,
     trustProxy: true

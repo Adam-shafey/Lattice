@@ -53,7 +53,7 @@ export interface RoutePermissionPolicy {
  * Default Route Permission Policy
  * 
  * Provides sensible defaults for route permissions. This policy can be
- * overridden when creating the CoreSaaS application to customize
+ * overridden when creating the LatticeCore application to customize
  * permission requirements for different routes.
  * 
  * Permission patterns:

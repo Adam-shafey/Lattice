@@ -1,18 +1,18 @@
-import { CoreSaaSApp } from '../../../index';
+import { LatticeCore } from '../../../index';
 import { createJwtUtil } from '../../auth/jwt';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { db } from '../../db/db-client';
 import { logger } from '../../logger';
 
-function getJwt(app: CoreSaaSApp) {
+function getJwt(app: LatticeCore) {
   const secret = app.jwtConfig?.secret || process.env.JWT_SECRET || 'dev-secret';
   const accessTTL = app.jwtConfig?.accessTTL || '15m';
   const refreshTTL = app.jwtConfig?.refreshTTL || '7d';
   return createJwtUtil({ secret, accessTTL, refreshTTL });
 }
 
-export function requireAuthMiddleware(app: CoreSaaSApp) {
+export function requireAuthMiddleware(app: LatticeCore) {
   return async function (req: any, res: any, next?: (err?: any) => void) {
     logger.log('🔑 [REQUIRE_AUTH] ===== REQUIRE AUTH MIDDLEWARE CALLED =====');
     logger.log('🔑 [REQUIRE_AUTH] Request headers:', req?.headers);
@@ -53,7 +53,7 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
   };
 }
 
-export function createAuthRoutes(app: CoreSaaSApp, prefix: string = '') {
+export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
   const jwt = getJwt(app);
 
   const p = prefix;

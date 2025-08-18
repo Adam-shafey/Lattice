@@ -1,6 +1,6 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
+import type { LatticeCore, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
 import { logger } from '../../logger';
 
@@ -9,15 +9,15 @@ export interface ExpressHttpAdapter extends HttpAdapter {
 }
 
 /**
- * Creates an Express HTTP adapter for the CoreSaaS application
+ * Creates an Express HTTP adapter for the LatticeCore application
  * 
  * This adapter wraps Express.js functionality to provide a consistent
  * interface for route registration and server management.
  * 
- * @param app - The CoreSaaS application instance
+ * @param app - The LatticeCore application instance
  * @returns ExpressHttpAdapter instance
  */
-export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
+export function createExpressAdapter(app: LatticeCore): ExpressHttpAdapter {
   const instance: Express = express();
 
   // Configure CORS

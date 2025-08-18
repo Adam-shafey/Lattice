@@ -265,9 +265,9 @@ const roleService = services.getRoleService();
 The main application has been refactored to use the new service patterns:
 
 ```typescript
-import { CoreSaaS } from './src/index';
+import { Lattice } from './src/index';
 
-const app = CoreSaaS({
+const app = Lattice({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },

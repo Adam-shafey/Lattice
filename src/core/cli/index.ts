@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 import minimist from 'minimist';
-import { CoreSaaS } from '../../index';
+import { Lattice } from '../../index';
 import { logger } from '../../core/logger';
 
 function createApp() {
-  return CoreSaaS({
+  return Lattice({
     db: { provider: 'sqlite' },
     adapter: 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' }
   });
 }
 
-async function listPermissions(app: ReturnType<typeof CoreSaaS>) {
+async function listPermissions(app: ReturnType<typeof Lattice>) {
   await app.permissionRegistry.initFromDatabase();
   const list = app.permissionRegistry.list();
   for (const p of list) {
@@ -20,7 +20,7 @@ async function listPermissions(app: ReturnType<typeof CoreSaaS>) {
   }
 }
 
-async function checkAccess(app: ReturnType<typeof CoreSaaS>, argv: minimist.ParsedArgs) {
+async function checkAccess(app: ReturnType<typeof Lattice>, argv: minimist.ParsedArgs) {
   const userId = String(argv.userId || argv.u || 'user_123');
   const contextId = (argv.contextId || argv.c) ? String(argv.contextId || argv.c) : undefined;
   const permission = String(argv.permission || argv.p || 'example:read');

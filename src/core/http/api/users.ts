@@ -1,9 +1,9 @@
-import { CoreSaaSApp } from '../../../index';
+import { LatticeCore } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 import { logger } from '../../logger';
 
-export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
+export function registerUserRoutes(app: LatticeCore, policy: RoutePermissionPolicy, prefix: string = '') {
   const p = prefix;
   app.route({
     method: 'POST',

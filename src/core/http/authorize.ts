@@ -1,4 +1,4 @@
-import { CoreSaaSApp } from '../../index';
+import { LatticeCore } from '../../index';
 import { logger } from '../logger';
 
 type AuthorizeScope = 'exact' | 'global' | 'type-wide';
@@ -24,7 +24,7 @@ function respond(res: any, next: ((err?: any) => void) | undefined, status: numb
   if (typeof next === 'function') return next(body);
 }
 
-export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, options: AuthorizeOptions = {}) {
+export function createAuthorize(app: LatticeCore, requiredPermission: string, options: AuthorizeOptions = {}) {
   return async function authorize(req: any, res: any, next?: (err?: any) => void) {
     logger.log('🚨 [AUTHORIZE] ===== AUTHORIZE MIDDLEWARE CALLED =====');
     logger.log('🚨 [AUTHORIZE] Starting authorization check');

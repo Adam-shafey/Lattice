@@ -48,7 +48,7 @@ export interface PluginPermission {
 export interface LatticePlugin {
   name: string;
   permissions?: PluginPermission[];
-  register?: (app: CoreSaaSApp) => void | Promise<void>;
+  register?: (app: LatticeCore) => void | Promise<void>;
 }
 
 export interface CheckAccessInput {
@@ -65,7 +65,7 @@ export interface HttpAdapter {
   getUnderlying: () => unknown;
 }
 
-export class CoreSaaSApp {
+export class LatticeCore {
   public readonly permissionRegistry: PermissionRegistry;
   public readonly PermissionRegistry: PermissionRegistry;
   private readonly adapterKind: SupportedAdapter;
@@ -245,8 +245,8 @@ export class CoreSaaSApp {
   }
 }
 
-export function CoreSaaS(config: CoreConfig): CoreSaaSApp {
-  return new CoreSaaSApp(config);
+export function Lattice(config: CoreConfig): LatticeCore {
+  return new LatticeCore(config);
 }
 
 export type { PermissionRegistry };

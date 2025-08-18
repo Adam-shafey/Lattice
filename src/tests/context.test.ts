@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { CoreSaaS } from '../index';
+import { Lattice } from '../index';
 import { db } from '../core/db/db-client';
 
 describe('Context Service', () => {
-  let app: ReturnType<typeof CoreSaaS>;
+  let app: ReturnType<typeof Lattice>;
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
@@ -11,7 +11,7 @@ describe('Context Service', () => {
 
     beforeEach(async () => {
     // Create fresh app instance for each test
-    app = CoreSaaS({ 
+    app = Lattice({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify',
       jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }

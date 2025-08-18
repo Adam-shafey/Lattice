@@ -99,9 +99,9 @@ const roleService = globalFactory.getRoleService();
 The main application has been refactored to use the new service patterns:
 
 ```typescript
-import { CoreSaaS } from './src/index';
+import { LatticeCore } from './src/index';
 
-const app = CoreSaaS({
+const app = LatticeCore({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
@@ -1183,7 +1183,7 @@ async function createUserWithRoles(email: string, password: string, roles: strin
 
 ```typescript
 // Initialize application with services
-const app = CoreSaaS({
+const app = LatticeCore({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },

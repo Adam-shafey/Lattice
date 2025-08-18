@@ -1,9 +1,9 @@
 ## **1️⃣ Spinning up the core**
 
 ```ts
-import { CoreSaaS } from '@yourorg/lattice-core'
+import { Lattice } from '@yourorg/lattice-core'
 
-const app = CoreSaaS({
+const app = Lattice({
   db: { provider: 'postgres', url: process.env.DATABASE_URL },
   adapter: 'fastify', // can also be 'express'
   jwt: { accessTTL: '15m', refreshTTL: '7d' },

@@ -153,7 +153,7 @@ const contextService = factory.getContextService();
 The main application provides convenient access to all services:
 
 ```typescript
-const app = CoreSaaS({
+const app = Lattice({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' }
@@ -507,9 +507,9 @@ lattice check-access --userId user_123 --contextId org_123 --permission users:re
 Programmatic:
 
 ```ts
-import { CoreSaaS } from './src/index'
+import { Lattice } from './src/index'
 
-const app = CoreSaaS({
+const app = Lattice({
   db: { provider: 'postgres' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
@@ -530,7 +530,7 @@ await app.roleService.addPermissionToRole({ roleName: 'admin', permissionKey: 'e
 
 ### Route-level Permissions & Scoping
 
-Core exposes a modifiable route permission policy used by built-in routes. You can override defaults via `policy` in `CoreSaaS` config.
+Core exposes a modifiable route permission policy used by built-in routes. You can override defaults via `policy` in `Lattice` config.
 
 Each route is configured with both a permission key and a scope requirement:
 - `exact`: Requires permission in the exact context (e.g., role assignments)
@@ -582,7 +582,7 @@ policy: {
 Override example:
 
 ```ts
-const app = CoreSaaS({
+const app = Lattice({
   // ...
   policy: {
     users: { create: 'admin:users:create' },

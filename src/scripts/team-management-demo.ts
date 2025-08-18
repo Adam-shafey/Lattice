@@ -1,4 +1,4 @@
-import { CoreSaaS } from '../index';
+import { Lattice } from '../index';
 import { logger } from '../core/logger';
 
 /**
@@ -10,7 +10,7 @@ import { logger } from '../core/logger';
 async function main() {
   // 1. Create an application instance. In this demo we use the
   // Fastify adapter with an in-memory SQLite database.
-  const app = CoreSaaS({
+  const app = Lattice({
     db: { provider: 'sqlite' },
     adapter: 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'demo-secret' }
