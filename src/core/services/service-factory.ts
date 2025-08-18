@@ -179,8 +179,8 @@ export class ServiceFactory implements IServiceFactory {
    * @returns Promise that resolves when all services are shut down
    */
   async shutdown(): Promise<void> {
-    // Add service shutdown logic here as needed
-    await Promise.resolve();
+    // Disconnect the database client
+    await this.db.$disconnect();
   }
 
   /**
