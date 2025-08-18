@@ -7,6 +7,7 @@ async function main() {
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'dev-secret' },
     authn: false,
     authz: false,
+    exposeAPI: true,
   });
 
   const port = parseInt(process.env.PORT || '3001', 10);

@@ -7,6 +7,7 @@ async function bootstrap() {
     adapter: (process.env.ADAPTER as 'fastify' | 'express') || 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' },
     apiPrefix: '/api',
+    exposeAPI: true,
   });
 
   app.route({
