@@ -95,14 +95,6 @@ export interface IUserService {
   changePassword(userId: string, oldPassword: string, newPassword: string, context?: ServiceContext): Promise<void>;
 
   /**
-   * Initiates a password reset for a user by email
-   * @param email - User's email address
-   * @param context - Optional service context
-   * @returns Promise that resolves when reset email is sent
-   */
-  resetPassword(email: string, context?: ServiceContext): Promise<void>;
-
-  /**
    * Verifies a user's password
    * @param userId - User's unique identifier
    * @param password - Password to verify
@@ -392,7 +384,6 @@ export interface IPermissionService {
  * - Context resolution from requests
  * - Context creation and management
  * - User membership in contexts
- * - Context hierarchy management
  */
 export interface IContextService {
   /**

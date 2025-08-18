@@ -10,7 +10,6 @@ import { registerContextRoutes } from './core/http/api/contexts';
 import { registerRoleRoutes } from './core/http/api/roles';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
 import { ServiceFactory, setServiceFactory } from './core/services';
-import type { EmailAdapter } from './core/services';
 import { db } from './core/db/db-client';
 import { logger } from './core/logger';
 
@@ -32,7 +31,6 @@ export interface CoreConfig {
   authz?: boolean;
   policy?: RoutePermissionPolicy;
   apiPrefix?: string;
-  emailAdapter?: EmailAdapter;
 }
 
 export interface RouteDefinition<Body = unknown> {
@@ -96,6 +94,7 @@ export class LatticeCore {
         ? createFastifyAdapter(this)
         : createExpressAdapter(this);
     this.policy = {
+      roles: { ...defaultRoutePermissionPolicy.roles, ...(config.policy?.roles ?? {}) },
       users: { ...defaultRoutePermissionPolicy.users, ...(config.policy?.users ?? {}) },
       permissions: { ...defaultRoutePermissionPolicy.permissions, ...(config.policy?.permissions ?? {}) },
       contexts: { ...defaultRoutePermissionPolicy.contexts, ...(config.policy?.contexts ?? {}) },
@@ -107,7 +106,6 @@ export class LatticeCore {
     // Initialize service factory with configuration
     this.serviceFactory = new ServiceFactory({
       db,
-      emailAdapter: config.emailAdapter,
     });
 
     // Set global service factory for application-wide access
@@ -297,12 +295,5 @@ export function Lattice(config: CoreConfig): LatticeCore {
 }
 
 export type { PermissionRegistry };
-
-export {
-  ResendEmailAdapter,
-  ConsoleEmailAdapter,
-  type EmailAdapter,
-  type EmailMessage,
-} from './core/services';
 
 

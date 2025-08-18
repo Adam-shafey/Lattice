@@ -1,6 +1,5 @@
 import { LatticeCore } from '../../../index';
 import { createJwtUtil } from '../../auth/jwt';
-import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { db } from '../../db/db-client';
 import { logger } from '../../logger';
@@ -199,78 +198,6 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
     },
   });
 
-  // Password reset request (by email)
-  app.route({
-    method: 'POST',
-    path: `${p}/auth/password/reset/request`,
-    handler: async ({ body }) => {
-      const schema = z.object({ 
-        email: z.string().email() 
-      });
-      
-      try {
-        const parsed = schema.safeParse(body);
-        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
-        const { email } = parsed.data;
-        
-        // Check if user exists
-        const user = await app.userService.getUserByEmail(email);
-        if (!user) return { ok: true }; // Don't reveal if user exists
-        
-        // Generate reset token
-        const token = randomUUID();
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-        
-        await db.passwordResetToken.create({ 
-          data: { token, userId: user.id, expiresAt } 
-        });
-        
-        // In real implementation, email the token. Here we return it for testability.
-        return { ok: true, token };
-      } catch (error: any) {
-        return { error: error.message || 'Password reset request failed' };
-      }
-    },
-  });
-
-  // Password reset confirm
-  app.route({
-    method: 'POST',
-    path: `${p}/auth/password/reset/confirm`,
-    handler: async ({ body }) => {
-      const schema = z.object({ 
-        token: z.string().min(1), 
-        newPassword: z.string().min(6) 
-      });
-      
-      try {
-        const parsed = schema.safeParse(body);
-        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
-        const { token, newPassword } = parsed.data;
-        
-        // Find reset token
-        const row = await db.passwordResetToken.findUnique({ where: { token } });
-        
-        if (!row || row.expiresAt < new Date()) {
-          return { error: 'Invalid or expired token' };
-        }
-        
-        // Update password
-        await app.userService.updateUser(row.userId, { password: newPassword }, {
-          actorId: 'system'
-        });
-        
-        // Delete used token
-        await db.passwordResetToken.delete({ where: { token } });
-        
-        return { ok: true };
-      } catch (error: any) {
-        return { error: error.message || 'Password reset confirmation failed' };
-      }
-    },
-  });
 }
 
 

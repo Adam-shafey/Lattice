@@ -164,29 +164,6 @@ export function registerUserRoutes(app: LatticeCore, prefix: string = '') {
     },
   });
 
-  app.route({
-    method: 'POST',
-    path: '/users/password/reset/request',
-    handler: async ({ body }) => {
-      const schema = z.object({ 
-        email: z.string().email() 
-      });
-      
-      try {
-        const parsed = schema.safeParse(body);
-        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
-        const { email } = parsed.data;
-        await app.userService.resetPassword(email, {
-          actorId: 'system'
-        });
-        
-        return { ok: true };
-      } catch (error: any) {
-        return { error: error.message || 'Failed to request password reset' };
-      }
-    },
-  });
 }
 
 

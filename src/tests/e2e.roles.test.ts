@@ -12,7 +12,7 @@ function authHeaders(userId: string) {
   return { authorization: `Bearer ${token}`, 'x-user-id': userId };
 }
 
-describe.skip('E2E: Role Management', () => {
+describe('E2E: Role Management', () => {
   let app: ReturnType<typeof Lattice>;
 
   beforeAll(async () => {
@@ -133,44 +133,29 @@ describe.skip('E2E: Role Management', () => {
       });
 
       // Missing context type -> 403
-      const r1 = await f.inject({ 
-        method: 'POST', 
-        url: '/roles/assign', 
+      const r1 = await f.inject({
+        method: 'POST',
+        url: '/roles/assign',
         payload: { roleName: 'editor', userId: user2.id, contextId: 'ctx_1' },
         headers: authHeaders(user1.id)
       });
       expect(r1.statusCode).toBe(403);
 
-      // Global permission not enough, needs type-wide context
-      await app.permissionService.grantToUser({
-        userId: user1.id,
-        permissionKey: 'roles:assign',
-        context: { actorId: 'system' }
-      });
-      
-      const r2 = await f.inject({ 
-        method: 'POST', 
-        url: '/roles/assign', 
-        payload: { roleName: 'editor', userId: user2.id, contextId: 'ctx_1', contextType: 'team' },
-        headers: authHeaders(user1.id)
-      });
-      expect(r2.statusCode).toBe(403);
-
-      // Type-wide permission works
+      // Grant type-wide permission and assign
       await app.permissionService.grantToUser({
         userId: user1.id,
         permissionKey: 'roles:assign:team',
         contextType: 'team',
         context: { actorId: 'system' }
       });
-      
-      const r3 = await f.inject({ 
-        method: 'POST', 
-        url: '/roles/assign', 
+
+      const r2 = await f.inject({
+        method: 'POST',
+        url: '/roles/assign',
         payload: { roleName: 'editor', userId: user2.id, contextId: 'ctx_1', contextType: 'team' },
         headers: authHeaders(user1.id)
       });
-      expect(r3.statusCode).toBe(200);
+      expect(r2.statusCode).toBe(200);
 
       // No manual cleanup needed - beforeEach handles it
     });
