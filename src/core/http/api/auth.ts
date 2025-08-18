@@ -35,9 +35,8 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
       logger.log('🔑 [REQUIRE_AUTH] Token extracted:', token.substring(0, 20) + '...');
       
       const jwt = getJwt(app);
-      const payload = await jwt.verify(token) as any;
+      const payload = await jwt.verify(token);
       logger.log('🔑 [REQUIRE_AUTH] JWT payload:', payload);
-      
       (req as any).user = { id: payload.sub };
       logger.log('🔑 [REQUIRE_AUTH] ✅ Set req.user to:', req.user);
       
@@ -107,9 +106,9 @@ export function createAuthRoutes(app: CoreSaaSApp, prefix: string = '') {
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
         
         const { refreshToken } = parsed.data;
-        const payload = jwt.verifyWithoutRevocationCheck(refreshToken) as any;
-        const userId = payload?.sub as string | undefined;
-        const jti = payload?.jti as string | undefined;
+        const payload = jwt.verifyWithoutRevocationCheck(refreshToken);
+        const userId = payload.sub;
+        const jti = payload.jti;
         
         if (!userId) return { error: 'Invalid token' };
         
@@ -151,8 +150,8 @@ export function createAuthRoutes(app: CoreSaaSApp, prefix: string = '') {
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
         
         const { token } = parsed.data;
-        const payload = jwt.verifyWithoutRevocationCheck(token) as any;
-        const jti = payload?.jti as string | undefined;
+        const payload = jwt.verifyWithoutRevocationCheck(token);
+        const jti = payload.jti;
         
         if (!jti) return { ok: true };
         
