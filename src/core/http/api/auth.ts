@@ -12,12 +12,10 @@ function getJwt(app: LatticeCore) {
 
 export function requireAuthMiddleware(app: LatticeCore) {
   return async function (req: any, res: any, next?: (err?: any) => void) {
-    logger.log('🔑 [REQUIRE_AUTH] ===== REQUIRE AUTH MIDDLEWARE CALLED =====');
-    logger.log('🔑 [REQUIRE_AUTH] Request headers:', req?.headers);
-    
+    logger.log('🔑 [REQUIRE_AUTH] Middleware invoked');
+
     try {
       const auth = req?.headers?.authorization as string | undefined;
-      logger.log('🔑 [REQUIRE_AUTH] Authorization header:', auth);
       
       if (!auth || !auth.startsWith('Bearer ')) {
         logger.log('🔑 [REQUIRE_AUTH] ❌ No Bearer token found');
@@ -30,13 +28,11 @@ export function requireAuthMiddleware(app: LatticeCore) {
       }
       
       const token = auth.substring('Bearer '.length);
-      logger.log('🔑 [REQUIRE_AUTH] Token extracted:', token.substring(0, 20) + '...');
-      
+
       const jwt = getJwt(app);
       const payload = await jwt.verify(token);
-      logger.log('🔑 [REQUIRE_AUTH] JWT payload:', payload);
       (req as any).user = { id: payload.sub };
-      logger.log('🔑 [REQUIRE_AUTH] ✅ Set req.user to:', req.user);
+      logger.log('🔑 [REQUIRE_AUTH] ✅ Authenticated user', { userId: payload.sub });
       
       if (next) return next();
     } catch (e) {

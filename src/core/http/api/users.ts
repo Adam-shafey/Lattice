@@ -40,14 +40,11 @@ export function registerUserRoutes(app: LatticeCore, prefix: string = '') {
     path: `${p}/users`,
     ...(listPre && { preHandler: listPre }),
     handler: async ({ query, req }) => {
-      logger.log('👥 [USERS_ROUTE] ===== GET /users ROUTE HANDLER CALLED =====');
-      logger.log('👥 [USERS_ROUTE] Query params:', query);
-      logger.log('👥 [USERS_ROUTE] Request user:', req?.user);
-      
+      const limit = query.limit ? parseInt(query.limit as string) : undefined;
+      const offset = query.offset ? parseInt(query.offset as string) : undefined;
+      logger.log('👥 [USERS_ROUTE] Listing users', { userId: req?.user?.id, limit, offset });
+
       try {
-        const limit = query.limit ? parseInt(query.limit as string) : undefined;
-        const offset = query.offset ? parseInt(query.offset as string) : undefined;
-        
         const result = await app.userService.listUsers({
           limit,
           offset,
