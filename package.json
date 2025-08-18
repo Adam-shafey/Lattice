@@ -8,6 +8,11 @@
   "bin": {
     "lattice": "dist/core/cli/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "swagger:gen": "ts-node src/scripts/swagger.ts",
     "build": "npm run swagger:gen && tsc -p tsconfig.json",
