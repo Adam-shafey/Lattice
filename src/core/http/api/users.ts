@@ -1,12 +1,14 @@
 import { CoreSaaSApp } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
+import { logger } from '../../logger';
 
-export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
+  const p = prefix;
   app.route({
     method: 'POST',
-    path: '/users',
-    preHandler: app.authorize(policy.users!.create),
+    path: `${p}/users`,
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.create, { scope: 'global' })],
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         email: z.string().email(), 
@@ -33,9 +35,13 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'GET',
-    path: '/users',
-    preHandler: app.authorize(policy.users!.list),
+    path: `${p}/users`,
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.list, { scope: 'global' })],
     handler: async ({ query, req }) => {
+      logger.log('👥 [USERS_ROUTE] ===== GET /users ROUTE HANDLER CALLED =====');
+      logger.log('👥 [USERS_ROUTE] Query params:', query);
+      logger.log('👥 [USERS_ROUTE] Request user:', req?.user);
+      
       try {
         const limit = query.limit ? parseInt(query.limit as string) : undefined;
         const offset = query.offset ? parseInt(query.offset as string) : undefined;
@@ -59,8 +65,8 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'GET',
-    path: '/users/:id',
-    preHandler: app.authorize(policy.users!.get),
+    path: `${p}/users/:id`,
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.get, { scope: 'global' })],
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
@@ -83,8 +89,8 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'PUT',
-    path: '/users/:id',
-    preHandler: app.authorize(policy.users!.update),
+    path: `${p}/users/:id`,
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.update, { scope: 'global' })],
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
         email: z.string().email().optional(),
@@ -110,8 +116,8 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'DELETE',
-    path: '/users/:id',
-    preHandler: app.authorize(policy.users!.delete),
+    path: `${p}/users/:id`,
+    preHandler: [app.requireAuth(), app.authorize(policy.users!.delete, { scope: 'global' })],
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);

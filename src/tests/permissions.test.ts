@@ -422,6 +422,18 @@ describe('Permission System', () => {
       expect(app.permissionRegistry.isAllowed('admin:users:read', new Set([wildcardPermission]))).toBe(false);
     });
 
+    it('handles the global wildcard permission (*)', () => {
+      const globalWildcard = '*';
+      
+      // Test that '*' matches everything
+      expect(app.permissionRegistry.isAllowed('users:read', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('users:write', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('roles:create', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('permissions:grant', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('contexts:delete', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('any:permission:here', new Set([globalWildcard]))).toBe(true);
+    });
+
     it('handles nested wildcards', () => {
       const nestedWildcard = 'org:123:*';
       

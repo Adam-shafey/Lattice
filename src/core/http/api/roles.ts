@@ -1,11 +1,13 @@
 import { CoreSaaSApp } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
+import { logger } from '../../logger';
 
-export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
+  const p = prefix;
   app.route({
     method: 'POST',
-    path: '/roles',
+    path: `${p}/roles`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.body;
       return app.authorize(policy.roles!.create.replace('{type}', contextType), { 
@@ -39,7 +41,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'GET',
-    path: '/roles',
+    path: `${p}/roles`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.query;
       return app.authorize(policy.roles!.list.replace('{type}', contextType || 'team'), { 
@@ -63,7 +65,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'GET',
-    path: '/roles/:name',
+    path: `${p}/roles/:name`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.query;
       return app.authorize(policy.roles!.get.replace('{type}', contextType || 'team'), { 
@@ -87,7 +89,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'DELETE',
-    path: '/roles/:name',
+    path: `${p}/roles/:name`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.query;
       return app.authorize(policy.roles!.delete.replace('{type}', contextType || 'team'), { 
@@ -110,7 +112,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'POST',
-    path: '/roles/assign',
+    path: `${p}/roles/assign`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.body;
       if (!contextType) {
@@ -153,7 +155,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'POST',
-    path: '/roles/remove',
+    path: `${p}/roles/remove`,
     preHandler: (req: any, res: any, next: () => void) => {
       const { contextType } = req.body;
       if (!contextType) {
@@ -196,7 +198,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'POST',
-    path: '/roles/:name/permissions/add',
+    path: `${p}/roles/:name/permissions/add`,
     preHandler: [
       // Must have role management permission for this type
       (req: any, res: any, next: () => void) => {
@@ -205,7 +207,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
         // For type-wide (contextType only), use the provided contextType
         const effectiveContextType = contextType || (contextId ? 'team' : null);
         
-        console.log('PreHandler 1:', { contextType, contextId, effectiveContextType });
+        logger.log('PreHandler 1:', { contextType, contextId, effectiveContextType });
         
         if (!effectiveContextType) {
           res.status(403).send({ error: 'Missing contextType or contextId' });
@@ -213,7 +215,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
         }
         
         const permissionKey = policy.roles!.addPerm.roleManage.replace('{type}', effectiveContextType);
-        console.log('Checking permission:', permissionKey);
+        logger.log('Checking permission:', permissionKey);
         
         return app.authorize(permissionKey, {
           scope: 'type-wide',
@@ -227,11 +229,11 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
         // For type-wide (contextType only), use the provided contextType
         const effectiveContextType = contextType || (contextId ? 'team' : null);
         
-        console.log('PreHandler 2 - Starting check for permission grant ability');
-        console.log('PreHandler 2:', { permissionKey, contextType, contextId, effectiveContextType });
+        logger.log('PreHandler 2 - Starting check for permission grant ability');
+        logger.log('PreHandler 2:', { permissionKey, contextType, contextId, effectiveContextType });
         
         if (!effectiveContextType) {
-          console.log('PreHandler 2 - Missing contextType or contextId, denying');
+          logger.log('PreHandler 2 - Missing contextType or contextId, denying');
           res.status(403).send({ error: 'Missing contextType or contextId' });
           return;
         }
@@ -240,10 +242,10 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
           .replace('{perm}', permissionKey)
           .replace('{type}', effectiveContextType);
         
-        console.log('PreHandler 2 - Required permission:', requiredPermission);
-        console.log('PreHandler 2 - User ID:', req.user?.id || req.headers['x-user-id']);
-        
-        console.log('PreHandler 2 - About to call authorize middleware');
+        logger.log('PreHandler 2 - Required permission:', requiredPermission);
+        logger.log('PreHandler 2 - User ID:', req.user?.id || req.headers['x-user-id']);
+
+        logger.log('PreHandler 2 - About to call authorize middleware');
         return app.authorize(requiredPermission, {
           scope: 'type-wide',
           contextType: 'required'
@@ -261,7 +263,7 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
       });
       
       const parsed = schema.safeParse(body);
-      console.log('Validation result:', { success: parsed.success, body, issues: parsed.error?.issues });
+      logger.log('Validation result:', { success: parsed.success, body, issues: parsed.error?.issues });
       if (!parsed.success) {
         const error = new Error('Validation failed');
         (error as any).statusCode = 400;
@@ -287,47 +289,44 @@ export function registerRoleRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
 
   app.route({
     method: 'POST',
-    path: '/roles/:name/permissions/remove',
+    path: `${p}/roles/:name/permissions/remove`,
     preHandler: [
-      // Must have role management permission for this type
+      // 1) Must have role management permission for this type
       (req: any, res: any, next: () => void) => {
         const { contextType } = req.body;
-        return app.authorize(policy.roles!.removePerm.roleManage.replace('{type}', contextType), {
+        return app.authorize(
+          policy.roles!.removePerm.roleManage.replace('{type}', contextType),
+          { scope: 'type-wide', contextType: 'required' }
+        )(req, res, next);
+      },
+      // 2) Must have permission revoke ability for this permission in this context type
+      (req: any, res: any, next: () => void) => {
+        const { permissionKey, contextType } = req.body;
+  
+        const requiredPermission = policy.roles!.removePerm.permissionRevoke
+          .replace('{perm}', permissionKey)
+          .replace('{type}', contextType);
+  
+        return app.authorize(requiredPermission, {
           scope: 'type-wide',
           contextType: 'required'
         })(req, res, next);
-      },
-      // Must have permission revoke ability for this permission in this context
-      async (req: any, res: any, next: () => void) => {
-        const { permissionKey, contextType } = req.body;
-        const allowed = await app.checkAccess({
-          userId: req.user.id,
-          permission: policy.roles!.removePerm.permissionRevoke
-            .replace('{perm}', permissionKey)
-            .replace('{type}', contextType),
-          scope: 'type-wide',
-          contextType
-        });
-        if (!allowed) {
-          return res.status(403).send({ error: 'Cannot revoke permissions you do not have' });
-        }
-        next();
       }
     ],
     handler: async ({ params, body, req }) => {
       try {
         const { name } = z.object({ name: z.string().min(1) }).parse(params);
-        const schema = z.object({ 
-          permissionKey: z.string().min(1), 
-          contextId: z.string().min(1).optional(), 
-          contextType: z.string().min(1).optional() 
-        }).refine((d) => !(d.contextId && d.contextType), { 
-          message: 'Provide either contextId for exact, or contextType for type-wide, not both' 
+        const schema = z.object({
+          permissionKey: z.string().min(1),
+          contextId: z.string().min(1).optional(),
+          contextType: z.string().min(1).optional()
+        }).refine((d) => !(d.contextId && d.contextType), {
+          message: 'Provide either contextId for exact, or contextType for type-wide, not both'
         });
-        
+  
         const parsed = schema.safeParse(body);
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
+  
         const { permissionKey, contextId, contextType } = parsed.data;
         await app.roleService.removePermissionFromRole({
           roleName: name,

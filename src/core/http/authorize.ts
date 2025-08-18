@@ -1,4 +1,5 @@
 import { CoreSaaSApp } from '../../index';
+import { logger } from '../logger';
 
 type AuthorizeScope = 'exact' | 'global' | 'type-wide';
 
@@ -25,6 +26,13 @@ function respond(res: any, next: ((err?: any) => void) | undefined, status: numb
 
 export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, options: AuthorizeOptions = {}) {
   return async function authorize(req: any, res: any, next?: (err?: any) => void) {
+    logger.log('🚨 [AUTHORIZE] ===== AUTHORIZE MIDDLEWARE CALLED =====');
+    logger.log('🚨 [AUTHORIZE] Starting authorization check');
+    logger.log('🚨 [AUTHORIZE] Required permission:', requiredPermission);
+    logger.log('🚨 [AUTHORIZE] Options:', options);
+    logger.log('🚨 [AUTHORIZE] Request headers:', req?.headers);
+    logger.log('🚨 [AUTHORIZE] Request user:', req?.user);
+    
     try {
       const userId =
         getValue(req, [r => r?.headers?.['x-user-id'], r => r?.user?.id]);
@@ -42,15 +50,24 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
       ]);
       const contextType = requestContextType ?? options.contextType;
 
+      logger.log('🔐 [AUTHORIZE] Extracted values:');
+      logger.log('🔐 [AUTHORIZE] - userId:', userId);
+      logger.log('🔐 [AUTHORIZE] - contextId:', contextId);
+      logger.log('🔐 [AUTHORIZE] - requestContextType:', requestContextType);
+      logger.log('🔐 [AUTHORIZE] - final contextType:', contextType);
+
       if (!userId) {
+        logger.log('🔐 [AUTHORIZE] ❌ No userId found - returning 401');
         return respond(res, next, 401, { statusCode: 401, message: 'Unauthorized' });
       }
 
       if (options.contextRequired && !contextId) {
+        logger.log('🔐 [AUTHORIZE] ❌ Context required but not provided - returning 400');
         return respond(res, next, 400, { statusCode: 400, message: 'Context required' });
       }
 
       if (options.scope === 'global' && (contextId || contextType)) {
+        logger.log('🔐 [AUTHORIZE] ❌ Global scope but context provided - returning 403');
         return respond(res, next, 403, {
           statusCode: 403,
           message: 'This operation requires global scope'
@@ -58,6 +75,7 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
       }
 
       if (options.scope === 'type-wide' && !contextType) {
+        logger.log('🔐 [AUTHORIZE] ❌ Type-wide scope but no contextType - returning 400');
         return respond(res, next, 400, {
           statusCode: 400,
           message: 'Context type required for type-wide operation'
@@ -65,11 +83,21 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
       }
 
       if (options.scope === 'exact' && !contextId) {
+        logger.log('🔐 [AUTHORIZE] ❌ Exact scope but no contextId - returning 400');
         return respond(res, next, 400, {
           statusCode: 400,
           message: 'Context ID required for exact scope operation'
         });
       }
+
+      logger.log('🔐 [AUTHORIZE] ✅ All validation passed, calling checkAccess');
+      logger.log('🔐 [AUTHORIZE] checkAccess params:', {
+        userId,
+        context: contextId ? { id: contextId, type: requestContextType ?? 'unknown' } : null,
+        permission: requiredPermission,
+        scope: options.scope,
+        contextType: contextType ?? undefined
+      });
 
       const allowed = await app.checkAccess({
         userId,
@@ -79,12 +107,17 @@ export function createAuthorize(app: CoreSaaSApp, requiredPermission: string, op
         contextType: contextType ?? undefined
       });
 
+      logger.log('🔐 [AUTHORIZE] checkAccess result:', allowed);
+
       if (!allowed) {
+        logger.log('🔐 [AUTHORIZE] ❌ Access denied - returning 403');
         return respond(res, next, 403, { statusCode: 403, message: 'Forbidden' });
       }
 
+      logger.log('🔐 [AUTHORIZE] ✅ Access granted - calling next()');
       return next?.();
     } catch (error) {
+      logger.error('🔐 [AUTHORIZE] ❌ Error during authorization:', error);
       if (res?.sent) return;
       if (typeof res?.status === 'function') return res.status(500).send({ message: 'Internal Server Error' });
       if (typeof res?.code === 'function') return res.code(500).send({ message: 'Internal Server Error' });

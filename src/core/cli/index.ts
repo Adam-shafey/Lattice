@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import minimist from 'minimist';
 import { CoreSaaS } from '../../index';
+import { logger } from '../logger';
 
 function createApp() {
   return CoreSaaS({
@@ -15,7 +16,7 @@ async function listPermissions(app: ReturnType<typeof CoreSaaS>) {
   const list = app.permissionRegistry.list();
   for (const p of list) {
     // eslint-disable-next-line no-console
-    console.log(`${p.key}${p.plugin ? ` [${p.plugin}]` : ''} - ${p.label}`);
+    logger.log(`${p.key}${p.plugin ? ` [${p.plugin}]` : ''} - ${p.label}`);
   }
 }
 
@@ -32,7 +33,7 @@ async function checkAccess(app: ReturnType<typeof CoreSaaS>, argv: minimist.Pars
   });
   const ok = await app.checkAccess({ userId, context: contextId ? { id: contextId, type: 'unknown' } : null, permission });
   // eslint-disable-next-line no-console
-  console.log(ok ? 'ALLOWED' : 'DENIED');
+  logger.log(ok ? 'ALLOWED' : 'DENIED');
 }
 
 async function main() {
@@ -73,7 +74,7 @@ async function main() {
         password,
         context: { actorId: 'system' }
       });
-      console.log(user);
+      logger.log(user);
       break;
     }
     case 'users:list': {
@@ -87,9 +88,9 @@ async function main() {
         context: { actorId: 'system' }
       });
       
-      console.log(`Found ${result.total} users:`);
+      logger.log(`Found ${result.total} users:`);
       result.users.forEach(user => {
-        console.log(`- ${user.id}: ${user.email} (created: ${user.createdAt})`);
+        logger.log(`- ${user.id}: ${user.email} (created: ${user.createdAt})`);
       });
       break;
     }
@@ -110,9 +111,9 @@ async function main() {
       }
       
       if (!user) {
-        console.log('User not found');
+        logger.log('User not found');
       } else {
-        console.log(user);
+        logger.log(user);
       }
       break;
     }
@@ -121,7 +122,7 @@ async function main() {
       const userId = await resolveUserIdFromArgs();
       
       await userService.deleteUser(userId, { actorId: 'system' });
-      console.log('User deleted successfully');
+      logger.log('User deleted successfully');
       break;
     }
     case 'roles:create': {
@@ -136,7 +137,7 @@ async function main() {
         key,
         context: { actorId: 'system' }
       });
-      console.log(role);
+      logger.log(role);
       break;
     }
     case 'roles:list': {
@@ -144,9 +145,9 @@ async function main() {
       const contextType = argv.contextType ? String(argv.contextType) : undefined;
       
       const roles = await roleService.listRoles({ contextType });
-      console.log('Roles:');
+      logger.log('Roles:');
       roles.forEach(role => {
-        console.log(`- ${role.name} (${role.key}) - ${role.contextType || 'global'}`);
+        logger.log(`- ${role.name} (${role.key}) - ${role.contextType || 'global'}`);
       });
       break;
     }
@@ -164,7 +165,7 @@ async function main() {
         contextType,
         context: { actorId: 'system' }
       });
-      console.log('Role assigned successfully');
+      logger.log('Role assigned successfully');
       break;
     }
     case 'roles:remove': {
@@ -179,7 +180,7 @@ async function main() {
         contextId,
         context: { actorId: 'system' }
       });
-      console.log('Role removed successfully');
+      logger.log('Role removed successfully');
       break;
     }
     case 'roles:add-perm': {
@@ -196,7 +197,7 @@ async function main() {
         contextType,
         context: { actorId: 'system' }
       });
-      console.log('Permission added to role successfully');
+      logger.log('Permission added to role successfully');
       break;
     }
     case 'roles:remove-perm': {
@@ -211,7 +212,7 @@ async function main() {
         contextId,
         context: { actorId: 'system' }
       });
-      console.log('Permission removed from role successfully');
+      logger.log('Permission removed from role successfully');
       break;
     }
     case 'roles:user-roles': {
@@ -225,9 +226,9 @@ async function main() {
         context: { actorId: 'system' }
       });
       
-      console.log('User roles:');
+      logger.log('User roles:');
       roles.forEach(role => {
-        console.log(`- ${role.name}${role.contextId ? ` (context: ${role.contextId})` : ' (global)'}`);
+        logger.log(`- ${role.name}${role.contextId ? ` (context: ${role.contextId})` : ' (global)'}`);
       });
       break;
     }
@@ -245,7 +246,7 @@ async function main() {
         contextType,
         context: { actorId: 'system' }
       });
-      console.log('Permission granted successfully');
+      logger.log('Permission granted successfully');
       break;
     }
     case 'permissions:revoke': {
@@ -260,7 +261,7 @@ async function main() {
         contextId,
         context: { actorId: 'system' }
       });
-      console.log('Permission revoked successfully');
+      logger.log('Permission revoked successfully');
       break;
     }
     case 'permissions:user': {
@@ -276,9 +277,9 @@ async function main() {
         context: { actorId: 'system' }
       });
       
-      console.log('User permissions:');
+      logger.log('User permissions:');
       permissions.forEach(permission => {
-        console.log(`- ${permission.key}: ${permission.label}`);
+        logger.log(`- ${permission.key}: ${permission.label}`);
       });
       break;
     }
@@ -293,9 +294,9 @@ async function main() {
         context: { actorId: 'system' }
       });
       
-      console.log('Effective permissions:');
+      logger.log('Effective permissions:');
       permissions.forEach(permission => {
-        console.log(`- ${permission.key}: ${permission.label}`);
+        logger.log(`- ${permission.key}: ${permission.label}`);
       });
       break;
     }
@@ -311,7 +312,7 @@ async function main() {
         name,
         context: { actorId: 'system' }
       });
-      console.log(context);
+      logger.log(context);
       break;
     }
     case 'contexts:list': {
@@ -326,39 +327,39 @@ async function main() {
         offset
       });
       
-      console.log(`Found ${result.total} contexts:`);
+      logger.log(`Found ${result.total} contexts:`);
       result.contexts.forEach(context => {
-        console.log(`- ${context.id}: ${context.name} (${context.type})`);
+        logger.log(`- ${context.id}: ${context.name} (${context.type})`);
       });
       break;
     }
     case 'help':
     default:
       // eslint-disable-next-line no-console
-      console.log('Usage: lattice <command>');
+      logger.log('Usage: lattice <command>');
       // eslint-disable-next-line no-console
-      console.log('Commands:');
+      logger.log('Commands:');
       // eslint-disable-next-line no-console
-      console.log('  list-permissions');
+      logger.log('  list-permissions');
       // eslint-disable-next-line no-console
-      console.log('  check-access --userId <id> --contextId <ctx?> --permission <perm>');
-      console.log('  users:create --email <email> --password <pw>');
-      console.log('  users:list [--limit <n>] [--offset <n>]');
-      console.log('  users:get (--email <email> | --userId <id>)');
-      console.log('  users:delete (--userId <id> | --email <email>)');
-      console.log('  roles:create --name <name> [--contextType <type>] [--key <key>]');
-      console.log('  roles:list [--contextType <type>]');
-      console.log('  roles:assign --role <name> (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
-      console.log('  roles:remove --role <name> (--userId <id> | --email <email>) [--contextId <ctx>]');
-      console.log('  roles:add-perm --role <name> --permission <key> [--contextId <ctx>] [--contextType <type>]');
-      console.log('  roles:remove-perm --role <name> --permission <key> [--contextId <ctx>]');
-      console.log('  roles:user-roles (--userId <id> | --email <email>) [--contextId <ctx>]');
-      console.log('  permissions:grant --permission <key> (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
-      console.log('  permissions:revoke --permission <key> (--userId <id> | --email <email>) [--contextId <ctx>]');
-      console.log('  permissions:user (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
-      console.log('  permissions:effective (--userId <id> | --email <email>) [--contextId <ctx>]');
-      console.log('  contexts:create --id <id> --type <type> --name <name>');
-      console.log('  contexts:list [--type <type>] [--limit <n>] [--offset <n>]');
+      logger.log('  check-access --userId <id> --contextId <ctx?> --permission <perm>');
+      logger.log('  users:create --email <email> --password <pw>');
+      logger.log('  users:list [--limit <n>] [--offset <n>]');
+      logger.log('  users:get (--email <email> | --userId <id>)');
+      logger.log('  users:delete (--userId <id> | --email <email>)');
+      logger.log('  roles:create --name <name> [--contextType <type>] [--key <key>]');
+      logger.log('  roles:list [--contextType <type>]');
+      logger.log('  roles:assign --role <name> (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
+      logger.log('  roles:remove --role <name> (--userId <id> | --email <email>) [--contextId <ctx>]');
+      logger.log('  roles:add-perm --role <name> --permission <key> [--contextId <ctx>] [--contextType <type>]');
+      logger.log('  roles:remove-perm --role <name> --permission <key> [--contextId <ctx>]');
+      logger.log('  roles:user-roles (--userId <id> | --email <email>) [--contextId <ctx>]');
+      logger.log('  permissions:grant --permission <key> (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
+      logger.log('  permissions:revoke --permission <key> (--userId <id> | --email <email>) [--contextId <ctx>]');
+      logger.log('  permissions:user (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
+      logger.log('  permissions:effective (--userId <id> | --email <email>) [--contextId <ctx>]');
+      logger.log('  contexts:create --id <id> --type <type> --name <name>');
+      logger.log('  contexts:list [--type <type>] [--limit <n>] [--offset <n>]');
   }
   } finally {
     await app.shutdown();
@@ -367,7 +368,7 @@ async function main() {
 
 main().catch((err) => {
   // eslint-disable-next-line no-console
-  console.error(err);
+  logger.error(err);
   process.exit(1);
 });
 

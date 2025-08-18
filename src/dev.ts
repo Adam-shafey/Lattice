@@ -1,10 +1,24 @@
 import { CoreSaaS } from './index';
+import { logger } from './core/logger';
 
 async function bootstrap() {
   const app = CoreSaaS({
     db: { provider: 'sqlite' },
     adapter: (process.env.ADAPTER as 'fastify' | 'express') || 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' },
+    apiPrefix: '/api',
+  });
+
+  app.route({
+    method: 'GET',
+    path: '/',
+    handler: async () => ({ 
+      message: 'Lattice Access Control System',
+      admin: '/admin',
+      api: app.apiBase || '/api',
+      docs: '/docs',
+      health: '/ping'
+    }),
   });
 
   app.route({
@@ -13,26 +27,17 @@ async function bootstrap() {
     handler: async () => ({ pong: true }),
   });
 
-  app.route({
-    method: 'GET',
-    path: '/secure/:contextId/info',
-    preHandler: [app.requireAuth(), app.authorize('example:read', { contextRequired: true })],
-    handler: async ({ user, context }) => ({ user, context, ok: true }),
-  });
-
-  await app.permissionService.grantToUser({
-    userId: 'user_123',
-    permissionKey: 'example:*',
-    contextId: 'ctx_1',
-    context: { actorId: 'system' }
-  });
-
-  await app.listen(Number(process.env.PORT) || 3000);
+  const port = Number(process.env.PORT) || 3000;
+  await app.listen(port);
+  
+  logger.log(`🚀 Lattice server running on http://localhost:${port}`);
+  logger.log(`📊 Admin UI available at http://localhost:${port}/admin`);
+  logger.log(`🔌 API available at http://localhost:${port}/api`);
+  logger.log(`📚 API Documentation available at http://localhost:${port}/docs`);
 }
 
 bootstrap().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error(err);
+  logger.error(err);
   process.exit(1);
 });
 

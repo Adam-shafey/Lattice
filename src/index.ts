@@ -10,7 +10,9 @@ import { registerContextRoutes } from './core/http/api/contexts';
 import { registerRoleRoutes } from './core/http/api/roles';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
 import { ServiceFactory, getServiceFactory, setServiceFactory } from './core/services';
+import type { EmailAdapter } from './core/services';
 import { db } from './core/db/db-client';
+import { logger } from './core/logger';
 
 export type SupportedAdapter = 'fastify' | 'express';
 
@@ -19,6 +21,8 @@ export interface CoreConfig {
   adapter: SupportedAdapter;
   jwt: { accessTTL: string; refreshTTL: string; secret?: string };
   policy?: RoutePermissionPolicy;
+  apiPrefix?: string;
+  emailAdapter?: EmailAdapter;
 }
 
 export interface RouteDefinition<Body = unknown> {
@@ -69,9 +73,11 @@ export class CoreSaaSApp {
   private readonly policy: RoutePermissionPolicy;
   private readonly serviceFactory: ServiceFactory;
   private readonly config: CoreConfig;
+  private readonly apiPrefix: string;
 
   constructor(config: CoreConfig) {
     this.config = config;
+    this.apiPrefix = config.apiPrefix ?? '';
     this.permissionRegistry = new PermissionRegistry();
     this.PermissionRegistry = this.permissionRegistry;
     this.adapterKind = config.adapter;
@@ -87,7 +93,8 @@ export class CoreSaaSApp {
 
     // Initialize service factory with configuration
     this.serviceFactory = new ServiceFactory({
-      db
+      db,
+      emailAdapter: config.emailAdapter,
     });
 
     // Set global service factory for application-wide access
@@ -106,6 +113,10 @@ export class CoreSaaSApp {
    */
   public get services(): ServiceFactory {
     return this.serviceFactory;
+  }
+
+  public get apiBase() {
+    return this.apiPrefix;
   }
 
   /**
@@ -161,20 +172,38 @@ export class CoreSaaSApp {
   }
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
+      logger.log('🔍 [CHECK_ACCESS] Starting checkAccess');
+      logger.log('🔍 [CHECK_ACCESS] Input:', input);
+    
     const { userId, context, permission, scope, contextType } = input;
 
     let lookupContext: { type: string; id: string | null } | null = context ?? null;
     if (scope === 'global') {
       lookupContext = null;
+        logger.log('🔍 [CHECK_ACCESS] Global scope - setting lookupContext to null');
     } else if (scope === 'type-wide') {
       lookupContext = contextType ? { type: contextType, id: null } : (context ?? null);
+        logger.log('🔍 [CHECK_ACCESS] Type-wide scope - setting lookupContext to:', lookupContext);
+    } else {
+        logger.log('🔍 [CHECK_ACCESS] Exact scope or undefined - using provided context:', lookupContext);
     }
 
+      logger.log('🔍 [CHECK_ACCESS] Final lookupContext:', lookupContext);
+
     try {
+      logger.log('🔍 [CHECK_ACCESS] Calling fetchEffectivePermissions');
       const effective = await fetchEffectivePermissions({ userId, context: lookupContext });
-      return this.permissionRegistry.isAllowed(permission, effective);
+      logger.log('🔍 [CHECK_ACCESS] fetchEffectivePermissions result - permissions count:', effective.size);
+      logger.log('🔍 [CHECK_ACCESS] Effective permissions:', Array.from(effective));
+      
+      logger.log('🔍 [CHECK_ACCESS] Calling permissionRegistry.isAllowed');
+      const result = this.permissionRegistry.isAllowed(permission, effective);
+      logger.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', result);
+      
+      return result;
     } catch (error) {
-      console.error('Failed to fetch effective permissions:', error);
+      logger.error('🔍 [CHECK_ACCESS] ❌ Error during checkAccess:', error);
+      logger.error('Failed to fetch effective permissions:', error);
       return false;
     }
   }
@@ -199,11 +228,11 @@ export class CoreSaaSApp {
     
     // Global request context middleware (only for adapters that support preHandler arrays at route-level)
     // Developers should add it before their own routes if using adapter directly.
-    createAuthRoutes(this);
-    registerUserRoutes(this, this.policy);
-    registerPermissionRoutes(this, this.policy);
-    registerContextRoutes(this, this.policy);
-    registerRoleRoutes(this, this.policy);
+    createAuthRoutes(this, this.apiPrefix);
+    registerUserRoutes(this, this.policy, this.apiPrefix);
+    registerPermissionRoutes(this, this.policy, this.apiPrefix);
+    registerContextRoutes(this, this.policy, this.apiPrefix);
+    registerRoleRoutes(this, this.policy, this.apiPrefix);
     
     await this.httpAdapter.listen(port, host);
   }
@@ -221,5 +250,12 @@ export function CoreSaaS(config: CoreConfig): CoreSaaSApp {
 }
 
 export type { PermissionRegistry };
+
+export {
+  ResendEmailAdapter,
+  ConsoleEmailAdapter,
+  type EmailAdapter,
+  type EmailMessage,
+} from './core/services';
 
 

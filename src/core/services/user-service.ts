@@ -16,6 +16,8 @@ import { IUserService } from './interfaces';
 import type { User } from '../db/db-client';
 import { hash, compare } from 'bcryptjs';
 import { randomUUID } from 'crypto';
+import { logger } from '../logger';
+import type { EmailAdapter } from './email-adapter';
 
 /**
  * UserService Class
@@ -24,9 +26,11 @@ import { randomUUID } from 'crypto';
  * operations. Extends BaseService to inherit common functionality.
  */
 export class UserService extends BaseService implements IUserService {
+  private readonly emailAdapter?: EmailAdapter;
 
-  constructor(db: any) {
+  constructor(db: any, emailAdapter?: EmailAdapter) {
     super(db);
+    this.emailAdapter = emailAdapter;
   }
   
   /**
@@ -421,9 +425,18 @@ export class UserService extends BaseService implements IUserService {
           },
         });
 
-        // TODO: Send email with reset link
-        // This would typically integrate with an email service
-        console.log(`Password reset token for ${email}: ${resetToken}`);
+        // Send email with reset link
+        if (this.emailAdapter) {
+          const resetLink = `${process.env.APP_BASE_URL ?? ''}/reset-password?token=${resetToken}`;
+          await this.emailAdapter.send({
+            to: email,
+            subject: 'Password Reset',
+            html: `<p>Click <a href="${resetLink}">here</a> to reset your password.</p>`,
+            text: `Reset your password: ${resetLink}`,
+          });
+        } else {
+          logger.log(`Password reset token for ${email}: ${resetToken}`);
+        }
       },
       {
         action: 'user.password_reset_initiated',

@@ -2,11 +2,12 @@ import { CoreSaaSApp } from '../../../index';
 import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 
-export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy, prefix: string = '') {
+  const p = prefix;
   app.route({
     method: 'POST',
-    path: '/permissions/user/grant',
-    preHandler: app.authorize(policy.permissions!.grantUser),
+    path: `${p}/permissions/user/grant`,
+    preHandler: [app.requireAuth(), app.authorize(policy.permissions!.grantUser, { scope: 'global' })],
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         userId: z.string().min(1), 
@@ -38,8 +39,8 @@ export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissi
 
   app.route({
     method: 'POST',
-    path: '/permissions/user/revoke',
-    preHandler: app.authorize(policy.permissions!.revokeUser),
+    path: `${p}/permissions/user/revoke`,
+    preHandler: [app.requireAuth(), app.authorize(policy.permissions!.revokeUser, { scope: 'global' })],
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         userId: z.string().min(1), 
@@ -71,8 +72,8 @@ export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissi
 
   app.route({
     method: 'GET',
-    path: '/permissions/user/:userId',
-    preHandler: app.authorize(policy.permissions!.grantUser),
+    path: `${p}/permissions/user/:userId`,
+    preHandler: [app.requireAuth(), app.authorize(policy.permissions!.grantUser, { scope: 'global' })],
     handler: async ({ params, query, req }) => {
       try {
         const { userId } = z.object({ userId: z.string().min(1) }).parse(params);
@@ -94,8 +95,8 @@ export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissi
 
   app.route({
     method: 'GET',
-    path: '/permissions/user/:userId/effective',
-    preHandler: app.authorize(policy.permissions!.grantUser),
+    path: `${p}/permissions/user/:userId/effective`,
+    preHandler: [app.requireAuth(), app.authorize(policy.permissions!.grantUser, { scope: 'global' })],
     handler: async ({ params, query, req }) => {
       try {
         const { userId } = z.object({ userId: z.string().min(1) }).parse(params);

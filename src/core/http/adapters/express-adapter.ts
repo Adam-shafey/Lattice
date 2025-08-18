@@ -1,6 +1,8 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
+import { logger } from '../../logger';
 
 export interface ExpressHttpAdapter extends HttpAdapter {
   getUnderlying: () => Express;
@@ -17,7 +19,22 @@ export interface ExpressHttpAdapter extends HttpAdapter {
  */
 export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
   const instance: Express = express();
-  
+
+  // Configure CORS
+  instance.use(cors({
+    origin: [
+      'http://localhost:5173', // Vite dev server
+      'http://localhost:3000', // Production admin UI
+      'http://localhost:8080', // Swagger UI
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  }));
+
   // Configure Express middleware
   instance.use(express.json());
   instance.use(express.urlencoded({ extended: true }));
@@ -53,7 +70,7 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
         res.send(result);
       } catch (error) {
         // Handle errors gracefully
-        console.error('Express handler error:', error);
+        logger.error('Express handler error:', error);
         res.status(500).send({ 
           error: 'Internal server error',
           message: error instanceof Error ? error.message : 'Unknown error'
@@ -67,12 +84,12 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
      * Adds a route to the Express application
      */
     addRoute(route: RouteDefinition) {
-      const preHandlers = Array.isArray(route.preHandler) 
-        ? route.preHandler 
-        : route.preHandler 
-          ? [route.preHandler] 
+      const preHandlers = Array.isArray(route.preHandler)
+        ? route.preHandler
+        : route.preHandler
+          ? [route.preHandler]
           : [];
-          
+
       const handlers = [...preHandlers.map(wrapPreHandler), wrapHandler(route.handler)];
       
       // Register the route based on HTTP method
@@ -103,7 +120,7 @@ export function createExpressAdapter(app: CoreSaaSApp): ExpressHttpAdapter {
     async listen(port: number, host?: string) {
       return new Promise<void>((resolve) => {
         instance.listen(port, host ?? '0.0.0.0', () => {
-          console.log(`Express server listening on http://${host ?? '0.0.0.0'}:${port}`);
+          logger.log(`Express server listening on http://${host ?? '0.0.0.0'}:${port}`);
           resolve();
         });
       });

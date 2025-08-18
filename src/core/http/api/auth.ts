@@ -3,6 +3,7 @@ import { createJwtUtil } from '../../auth/jwt';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { db } from '../../db/db-client';
+import { logger } from '../../logger';
 
 function getJwt(app: CoreSaaSApp) {
   const secret = app.jwtConfig?.secret || process.env.JWT_SECRET || 'dev-secret';
@@ -13,9 +14,15 @@ function getJwt(app: CoreSaaSApp) {
 
 export function requireAuthMiddleware(app: CoreSaaSApp) {
   return async function (req: any, res: any, next?: (err?: any) => void) {
+    logger.log('🔑 [REQUIRE_AUTH] ===== REQUIRE AUTH MIDDLEWARE CALLED =====');
+    logger.log('🔑 [REQUIRE_AUTH] Request headers:', req?.headers);
+    
     try {
       const auth = req?.headers?.authorization as string | undefined;
+      logger.log('🔑 [REQUIRE_AUTH] Authorization header:', auth);
+      
       if (!auth || !auth.startsWith('Bearer ')) {
+        logger.log('🔑 [REQUIRE_AUTH] ❌ No Bearer token found');
         const err = { statusCode: 401, message: 'Unauthorized' };
         if (res?.sent) return;
         if (res?.status) return res.status(401).send(err);
@@ -23,12 +30,20 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
         if (next) return next(err);
         return;
       }
+      
       const token = auth.substring('Bearer '.length);
+      logger.log('🔑 [REQUIRE_AUTH] Token extracted:', token.substring(0, 20) + '...');
+      
       const jwt = getJwt(app);
       const payload = await jwt.verify(token);
+      const payload = await jwt.verify(token) as any;
+      logger.log('🔑 [REQUIRE_AUTH] JWT payload:', payload);
       (req as any).user = { id: payload.sub };
+      logger.log('🔑 [REQUIRE_AUTH] ✅ Set req.user to:', req.user);
+      
       if (next) return next();
     } catch (e) {
+      logger.error('🔑 [REQUIRE_AUTH] ❌ Error during auth:', e);
       const err = { statusCode: 401, message: 'Unauthorized' };
       if (res?.sent) return;
       if (res?.status) return res.status(401).send(err);
@@ -39,12 +54,14 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
   };
 }
 
-export function createAuthRoutes(app: CoreSaaSApp) {
+export function createAuthRoutes(app: CoreSaaSApp, prefix: string = '') {
   const jwt = getJwt(app);
+
+  const p = prefix;
 
   app.route({
     method: 'POST',
-    path: '/auth/login',
+    path: `${p}/auth/login`,
     handler: async ({ body }) => {
       const schema = z.object({
         email: z.string().email(),
@@ -79,7 +96,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
 
   app.route({
     method: 'POST',
-    path: '/auth/refresh',
+    path: `${p}/auth/refresh`,
     handler: async ({ body }) => {
       const schema = z.object({ 
         refreshToken: z.string().min(1) 
@@ -123,7 +140,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   // Explicit revocation endpoint
   app.route({
     method: 'POST',
-    path: '/auth/revoke',
+    path: `${p}/auth/revoke`,
     handler: async ({ body }) => {
       const schema = z.object({ 
         token: z.string().min(1) 
@@ -156,7 +173,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   // Password change (requires auth)
   app.route({
     method: 'POST',
-    path: '/auth/password/change',
+    path: `${p}/auth/password/change`,
     preHandler: requireAuthMiddleware(app),
     handler: async ({ body, user }) => {
       const schema = z.object({ 
@@ -188,7 +205,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   // Password reset request (by email)
   app.route({
     method: 'POST',
-    path: '/auth/password/reset/request',
+    path: `${p}/auth/password/reset/request`,
     handler: async ({ body }) => {
       const schema = z.object({ 
         email: z.string().email() 
@@ -223,7 +240,7 @@ export function createAuthRoutes(app: CoreSaaSApp) {
   // Password reset confirm
   app.route({
     method: 'POST',
-    path: '/auth/password/reset/confirm',
+    path: `${p}/auth/password/reset/confirm`,
     handler: async ({ body }) => {
       const schema = z.object({ 
         token: z.string().min(1), 
