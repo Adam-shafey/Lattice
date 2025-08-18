@@ -22,7 +22,7 @@ export function getDbClient() {
 }
 
 export { prisma as db };
-export type { Prisma } from '../../../prisma/generated/client';
+export type { Prisma, PrismaClient } from '../../../prisma/generated/client';
 
 // Export types from Prisma schema
 export type {

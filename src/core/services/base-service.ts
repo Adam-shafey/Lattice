@@ -6,8 +6,7 @@
  * transaction management.
  */
 
-import { db as PrismaClient, type Prisma } from '../db/db-client';
-import type { PrismaClient as PrismaClientType } from '../../../prisma/generated/client';
+import type { PrismaClient, Prisma } from '../db/db-client';
 
 /**
  * Service Context Interface
@@ -135,13 +134,13 @@ export class ServiceError extends Error implements IServiceError {
  */
 export abstract class BaseService {
   /** Database client for all database operations */
-  protected readonly db: PrismaClientType;
+  protected readonly db: PrismaClient;
 
   /**
    * Constructor for BaseService
    * @param db - Prisma database client
    */
-  constructor(db: PrismaClientType) {
+  constructor(db: PrismaClient) {
     this.db = db;
   }
 
@@ -162,7 +161,7 @@ export abstract class BaseService {
    * });
    */
   protected async withTransaction<T>(
-    operation: (tx: any) => Promise<T>
+    operation: (tx: Prisma.TransactionClient) => Promise<T>
   ): Promise<T> {
     return this.db.$transaction(operation);
   }
