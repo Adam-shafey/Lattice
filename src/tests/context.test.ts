@@ -265,6 +265,61 @@ describe('Context Service', () => {
 
       // No manual cleanup needed - beforeEach handles it
     });
+
+    it('removal is idempotent and targeted', async () => {
+      const user1 = await app.userService.createUser({
+        email: 'idempotent-user1@example.com',
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
+      const user2 = await app.userService.createUser({
+        email: 'idempotent-user2@example.com',
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
+      const context = await app.contextService.createContext({
+        id: 'idempotent-test',
+        type: 'organization',
+        name: 'Idempotent Test Org',
+        context: { actorId: 'system' }
+      });
+
+      // Add both users
+      await app.contextService.addUserToContext({
+        userId: user1.id,
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+      await app.contextService.addUserToContext({
+        userId: user2.id,
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+
+      // Remove first user twice
+      await app.contextService.removeUserFromContext({
+        userId: user1.id,
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+      await app.contextService.removeUserFromContext({
+        userId: user1.id,
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+
+      const remainingUsers = await app.contextService.getContextUsers({
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+
+      expect(remainingUsers.length).toBe(1);
+      expect(remainingUsers[0].id).toBe(user2.id);
+
+      // No manual cleanup needed - beforeEach handles it
+    });
   });
 
   describe('error handling', () => {

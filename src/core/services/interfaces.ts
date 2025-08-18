@@ -386,7 +386,6 @@ export interface IPermissionService {
  * - Context resolution from requests
  * - Context creation and management
  * - User membership in contexts
- * - Context hierarchy management
  */
 export interface IContextService {
   /**
