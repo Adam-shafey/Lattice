@@ -1,280 +1,329 @@
-# 🏗️ Lattice Core
+# 🏗️ Lattice
 
-> **The Foundation for Permission-First SaaS Applications**
+> **Lego blocks for access control**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-blue.svg)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![Prisma](https://img.shields.io/badge/Prisma-6.14-purple.svg)](https://www.prisma.io/)
+Ever built a SaaS app and got lost in a maze of roles and permissions? Lattice is here to save you from auth spaghetti.
 
-Lattice Core is a production-ready, TypeScript-first authorization framework that provides the foundation for building secure, scalable SaaS applications. Built with modern best practices, it offers context-aware access control, comprehensive role management, and a powerful plugin architecture.
+Lattice is a permission-first backend framework that makes complex authorization feel simple. Think of it as the foundation that handles all your "who can do what where" logic, so you can focus on building features that matter.
 
-## ✨ Key Features
+## Why Lattice?
 
-- 🔐 **Context-Aware Access Control** - Multi-tenant, hierarchical permission system
-- 🎭 **Flexible Role Management** - RBAC with user-level permissions and wildcard support
-- 🔌 **Plugin Architecture** - Extensible system for routes, contexts, and permissions
-- 🛠️ **Developer Experience** - CLI tools, TypeScript types, hot-reloadable permissions
-- 🚀 **Production Ready** - Standardized service layer with error handling and validation
-- 🔄 **Adapter Agnostic** - Works with Fastify or Express via shared interface
-- 📚 **Comprehensive APIs** - Built-in REST APIs with OpenAPI documentation
-- 🧪 **Testing Ready** - Full test suite with end-to-end examples
+Building SaaS apps means dealing with complex permission scenarios:
+- Users who belong to multiple organizations
+- Roles that change based on context (team vs org vs project)
+- Business rules like "only managers can approve expenses during business hours"
+- The inevitable "just one more role" that breaks your entire auth system
+
+Traditional approaches lead to:
+- 🔴 Hard-coded permission checks scattered throughout your codebase
+- 🔴 Complex role hierarchies that become impossible to maintain
+- 🔴 Security vulnerabilities from inconsistent authorization logic
+- 🔴 Hours spent debugging "why can't this user access that?"
+
+Lattice solves this by putting permissions at the center of your architecture, not as an afterthought.
+
+## ✨ What Makes Lattice Great
+
+🔑 **Permission-first design** - Every action flows through a unified permission system
+
+🌐 **Context-aware** - Permissions that adapt to organizations, teams, and projects
+
+⚡️ **Pluggable modules** - Add features without touching core auth logic
+
+🧩 **Works with your stack** - Fastify, Express, PostgreSQL, SQLite - your choice
+
+🔍 **RBAC + ABAC** - Start simple with roles, add complex policies when needed
+
+🚀 **Developer experience** - CLI tools, TypeScript types, hot-reloadable permissions
+
+📚 **Built-in APIs** - Complete REST API with OpenAPI documentation
 
 ## 🚀 Quick Start
 
-### Installation
+Get Lattice running in 3 steps:
+
+### 1. Install & Setup
 
 ```bash
 npm install @yourorg/lattice-core
+
+# Set up your environment
+export DATABASE_URL="postgresql://user:password@localhost:5432/lattice"
+export JWT_SECRET="your-super-secret-key"
+
+# Initialize database
+npx prisma generate
+npx prisma db push
 ```
 
-### Basic Setup
+### 2. Create Your App
 
 ```typescript
 import { Lattice } from '@yourorg/lattice-core';
 
 const app = Lattice({
-  db: { 
-    provider: 'postgres', 
-    url: process.env.DATABASE_URL 
-  },
-  adapter: 'fastify', // or 'express'
-  jwt: { 
-    accessTTL: '15m', 
-    refreshTTL: '7d',
-    secret: process.env.JWT_SECRET 
-  },
-  apiPrefix: '/api/v1'
+  db: { provider: 'postgres', url: process.env.DATABASE_URL },
+  adapter: 'fastify',
+  jwt: { accessTTL: '15m', refreshTTL: '7d' },
+  exposeAPI: true
 });
 
 await app.listen(3000);
-console.log('🚀 Lattice Core running on port 3000');
+console.log('🚀 Lattice running on port 3000');
 ```
 
-### Environment Variables
+### 3. Use Authorization in Your Routes
 
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/lattice"
-JWT_SECRET="your-super-secret-jwt-key-here"
-CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173"
-```
-
-## 🏗️ Architecture
-
-Lattice Core is built around a service-oriented architecture with clear separation of concerns:
-
-```
-/core
-├── 🔐 auth/          # JWT, OAuth2, MFA, Social Login
-├── 🗄️ db/            # Database client and connections
-├── 🌐 http/          # HTTP adapters and API routes
-├── 🔑 permissions/   # Permission registry and evaluation
-├── 📋 policy/        # ABAC policies and conditions
-├── ⚙️ services/      # Production-ready service layer
-└── 🧪 tests/         # Comprehensive test suite
-```
-
-## 🔧 Core Services
-
-### User Management
 ```typescript
-// Create users with secure password hashing
-const user = await app.userService.createUser({
-  email: 'user@example.com',
-  password: 'securepassword123',
-  context: { actorId: 'system' }
+// Simple permission check
+app.route({
+  method: 'GET',
+  path: '/users/:id',
+  preHandler: app.routeAuth('users:read'),
+  handler: async ({ params }) => {
+    return { id: params.id, name: 'John Doe' };
+  }
+});
+
+// Context-aware permission check
+app.route({
+  method: 'POST',
+  path: '/teams/:teamId/users',
+  preHandler: app.routeAuth('users:create', { scope: 'exact' }),
+  handler: async ({ params }) => {
+    // User can only create users in their team
+    return { success: true };
+  }
 });
 ```
 
-### Role Management
-```typescript
-// Create and assign roles
-const role = await app.roleService.createRole({
-  name: 'admin',
-  contextType: 'organization',
-  context: { actorId: 'system' }
-});
+That's it! Your app now has enterprise-grade authorization without the enterprise complexity.
 
-await app.roleService.assignRoleToUser({
-  roleName: 'admin',
-  userId: user.id,
-  contextId: 'org_123',
-  context: { actorId: 'admin_456' }
-});
-```
+## 🧠 Mental Model
 
-### Permission Management
-```typescript
-// Grant direct permissions to users
-await app.permissionService.grantToUser({
-  userId: user.id,
-  permissionKey: 'users:read',
-  contextId: 'org_123',
-  context: { actorId: 'admin_456' }
-});
-```
+Lattice's mental model is simple but powerful:
 
-## 🔌 Plugin System
+- **Users** are people (you, your customers, your team)
+- **Permissions** are verbs (`users:read`, `projects:create`, `expenses:approve`)
+- **Roles** are bundles of permissions (`admin`, `manager`, `viewer`)
+- **Contexts** are where actions happen (`org_123`, `team_456`, `project_789`)
+- **Policies** are business rules ("only managers can approve expenses during business hours")
 
-Extend Lattice Core with plugins for domain-specific functionality:
+Think of it like this: **Permissions are verbs, Roles are bundles, Contexts are where those actions live.**
+
+## 💡 Usage Examples
+
+### Basic Permission Check
 
 ```typescript
-import TeamsPlugin from '@yourorg/lattice-plugin-teams';
-import UploadsPlugin from '@yourorg/lattice-plugin-uploads';
-
-app.registerPlugin(TeamsPlugin);
-app.registerPlugin(UploadsPlugin);
-```
-
-Plugins automatically register:
-- 📋 Permissions in the Permission Registry
-- 🏢 Context types for multi-tenancy
-- 🛣️ Routes with built-in authorization
-
-## 🛡️ Access Control
-
-### Context-Aware Authorization
-```typescript
-// Check access with context awareness
-const hasAccess = await app.checkAccess({
-  userId: 'user_123',
-  context: { type: 'organization', id: 'org_456' },
+// Check if user can read a specific user
+const canRead = await app.checkAccess({
+  userId: 'alice',
+  context: { type: 'organization', id: 'org_123' },
   permission: 'users:read',
   scope: 'exact'
 });
 ```
 
-### ABAC Policies
+### Complex Business Rules
+
 ```typescript
-// Create attribute-based access control policies
+// Create a policy: "Only managers can approve expenses during business hours"
 await app.policyService.createPolicy({
-  action: 'users:read',
-  resource: 'user',
-  condition: 'user.department == resource.department',
-  effect: 'permit',
-  context: { actorId: 'admin' }
+  action: 'expenses:approve',
+  resource: 'expense',
+  condition: 'user.role == "manager" && time.hour >= 9 && time.hour <= 17',
+  effect: 'permit'
+});
+
+// The policy automatically applies to all expense approval requests
+```
+
+### Multi-tenant Contexts
+
+```typescript
+// Grant permissions in different contexts
+await app.permissionService.grantToUser({
+  userId: 'alice',
+  permissionKey: 'users:read',
+  contextId: 'org_123'  // Can read users in org_123
+});
+
+await app.permissionService.grantToUser({
+  userId: 'alice',
+  permissionKey: 'projects:create',
+  contextId: 'team_456'  // Can create projects in team_456
 });
 ```
 
-## 🖥️ CLI Tools
+## 🔧 Core Features
 
-Lattice Core includes a powerful CLI for management tasks:
+### Built-in REST APIs
+
+Lattice comes with complete APIs for user management, roles, permissions, and contexts:
+
+```bash
+# Create a user
+curl -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"email": "alice@company.com", "password": "secure123"}'
+
+# Grant permission
+curl -X POST http://localhost:3000/api/permissions/user/grant \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"userId": "alice", "permissionKey": "users:read", "contextId": "org_123"}'
+```
+
+### CLI Tools
+
+Manage your authorization system from the command line:
 
 ```bash
 # List all permissions
 npx lattice list-permissions
 
-# Create users
-npx lattice users:create --email alice@example.com --password secret
+# Create a user
+npx lattice users:create --email alice@company.com --password secure123
+
+# Grant permission
+npx lattice permissions:grant --userId alice --permission users:read --contextId org_123
 
 # Check access
-npx lattice check-access --userId user_123 --contextId ctx_1 --permission example:read
-
-# Manage roles
-npx lattice roles:create --name admin --contextType organization
-npx lattice roles:assign --roleName admin --userId user_123 --contextId org_456
+npx lattice check-access --userId alice --contextId org_123 --permission users:read
 ```
 
-## 📚 API Documentation
+### Plugin System
 
-Lattice Core provides comprehensive API documentation:
+Extend Lattice with domain-specific functionality:
 
-- **Swagger UI**: `http://localhost:3000/docs`
-- **OpenAPI Spec**: `http://localhost:3000/docs/json`
+```typescript
+const TeamsPlugin = {
+  name: 'teams',
+  permissions: [
+    { key: 'teams:create', label: 'Create teams' },
+    { key: 'teams:join', label: 'Join teams' }
+  ],
+  register: (app) => {
+    // Add your team management logic
+  }
+};
 
-All endpoints include:
-- 🔐 Authentication requirements
-- 📝 Request/response schemas
-- 🧪 Interactive testing
-- ❌ Error documentation
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run specific test suites
-npm run test:auth
-npm run test:e2e
+app.registerPlugin(TeamsPlugin);
 ```
 
-## 🚀 Development
+## 🛡️ Security Features
 
-### Prerequisites
-- Node.js 18+
-- PostgreSQL or SQLite
-- TypeScript 5.5+
+- **JWT-based authentication** with refresh tokens
+- **Password hashing** with bcrypt
+- **Token revocation** for secure logout
+- **Rate limiting** on authentication endpoints
+- **CORS protection** with configurable origins
+- **Input validation** with Zod schemas
+- **Audit logging** for all authorization decisions
 
-### Setup
-```bash
-# Clone the repository
-git clone https://github.com/Adam-shafey/lattice.git
-cd lattice
+## 🚀 Getting Started with Your Project
 
-# Install dependencies
-npm install
+### 1. Choose Your Database
 
-# Set up database
-npx prisma generate
-npx prisma db push
+```typescript
+// PostgreSQL (recommended for production)
+const app = Lattice({
+  db: { provider: 'postgres', url: process.env.DATABASE_URL }
+});
 
-# Start development server
-npm run dev
+// SQLite (great for development)
+const app = Lattice({
+  db: { provider: 'sqlite', url: 'file:./dev.db' }
+});
 ```
 
-### Available Scripts
-```bash
-npm run dev          # Start development server with hot reload
-npm run build        # Build for production
-npm run test         # Run test suite
-npm run swagger:gen  # Generate API documentation
-npm run cli          # Run CLI commands
+### 2. Pick Your HTTP Framework
+
+```typescript
+// Fastify (recommended)
+const app = Lattice({ adapter: 'fastify' });
+
+// Express
+const app = Lattice({ adapter: 'express' });
 ```
 
-## 📖 Documentation
+### 3. Configure Your Environment
 
-- **[Developer Guide](docs/DEV_GUIDE.md)** - Complete development setup and workflow
-- **[Service Usage Guide](docs/SERVICE_USAGE_GUIDE.md)** - Detailed service layer documentation
+```env
+# Required
+DATABASE_URL="postgresql://user:password@localhost:5432/lattice"
+JWT_SECRET="your-super-secret-jwt-key"
+
+# Optional
+CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173"
+PORT="3000"
+```
+
+## 📚 Documentation
+
+- **[Core Concepts](docs/README.md)** - Deep dive into Lattice's mental model
+- **[API Reference](docs/SERVICE_USAGE_GUIDE.md)** - Complete service layer documentation
+- **[Developer Guide](docs/DEV_GUIDE.md)** - Setup, testing, and development workflow
 - **[Sample Usage](docs/SampleUsage.md)** - Real-world examples and patterns
-- **[API Reference](docs/README.md)** - Comprehensive API documentation
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We're building something special here, and we'd love for you to be part of it! 
 
-### Development Workflow
+Lattice is more than just another auth library - it's a new way of thinking about permissions in SaaS applications. Whether you're fixing a bug, adding a feature, or just sharing ideas, your contributions help shape the future of access control.
+
+**How to contribute:**
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
 4. Run tests (`npm test`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+5. Submit a pull request
+
+**We welcome:**
+- 🐛 Bug reports and fixes
+- ✨ New features and improvements
+- 📚 Documentation improvements
+- 💡 Ideas and suggestions
+- 🌟 Star the repo if you find it useful!
+
+## 🗺️ Vision & Roadmap
+
+Lattice is evolving from a solid RBAC foundation to a comprehensive ABAC platform. Here's where we're headed:
+
+**Now (v0.1.x):**
+- ✅ Core RBAC with context awareness
+- ✅ Basic ABAC policy engine
+- ✅ Plugin architecture
+- ✅ Production-ready service layer
+
+**Next (v0.2.x):**
+- 🔄 Advanced ABAC with custom attribute providers
+- 🔄 Policy versioning and rollback
+- 🔄 Performance optimizations and caching
+- 🔄 More built-in plugins (Teams, Billing, Analytics)
+
+**Future (v1.0.x):**
+- 🚀 Visual policy editor
+- 🚀 Machine learning for policy optimization
+- 🚀 Enterprise features (SSO, audit trails, compliance)
+- 🚀 Cloud-hosted Lattice service
+
+**The goal:** From RBAC today to ABAC tomorrow — building a flexible, open framework for access control that developers actually love to use.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
-- Built with [Prisma](https://www.prisma.io/) for type-safe database access
-- Powered by [Fastify](https://www.fastify.io/) and [Express](https://expressjs.com/) adapters
-- Enhanced with [CEL](https://github.com/google/cel-js) for policy evaluation
-- Documented with [OpenAPI](https://swagger.io/specification/) and Swagger UI
-
-## 📞 Support
-
-- 📧 **Email**: abdoshafey1@gmail.com
-- 🐛 **Issues**: [GitHub Issues](https://github.com/Adam-shafey/lattice/issues)
-- 📖 **Documentation**: [docs/](docs/)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/Adam-shafey/lattice/discussions)
+Built with love by the open source community. Special thanks to:
+- [Prisma](https://www.prisma.io/) for type-safe database access
+- [Fastify](https://www.fastify.io/) and [Express](https://expressjs.com/) for HTTP frameworks
+- [CEL](https://github.com/google/cel-js) for policy evaluation
+- [OpenAPI](https://swagger.io/specification/) for API documentation
 
 ---
 
 <div align="center">
-  <strong>Built with ❤️ for the open source community</strong>
+  <strong>Built with ❤️ for developers who deserve better auth</strong>
 </div>
