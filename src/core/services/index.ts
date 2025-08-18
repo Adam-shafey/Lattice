@@ -55,6 +55,7 @@ export type {
   Context,
   UserRole,
   RolePermission,
+  UserPermission,
   UserContext,
   RevokedToken,
   PasswordResetToken,

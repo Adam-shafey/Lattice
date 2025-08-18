@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { Lattice } from '../index';
-import { db } from '../core/db/db-client';
+import { db, type UserPermission } from '../core/db/db-client';
 
 describe('Permission System', () => {
   let app: ReturnType<typeof Lattice>;
@@ -258,13 +258,16 @@ describe('Permission System', () => {
         context: { actorId: 'system' }
       });
 
-      // Grant permission
-      await app.permissionService.grantToUser({
+      // Grant permission and verify returned record
+      const grant: UserPermission = await app.permissionService.grantToUser({
         userId: user.id,
         permissionKey: 'grant:test',
         contextId: context.id,
         context: { actorId: 'system' }
       });
+
+      expect(grant.userId).toBe(user.id);
+      expect(grant.contextId).toBe(context.id);
 
       // Check permission is granted
       const hasPermission = await app.permissionService.checkUserPermission({
@@ -310,7 +313,7 @@ describe('Permission System', () => {
       });
 
       // Grant multiple permissions
-      await app.permissionService.bulkGrantToUser({
+      const results: UserPermission[] = await app.permissionService.bulkGrantToUser({
         userId: user.id,
         permissions: [
           { permissionKey: 'bulk:read', contextId: context.id },
@@ -319,6 +322,8 @@ describe('Permission System', () => {
         ],
         context: { actorId: 'system' }
       });
+
+      expect(results).toHaveLength(3);
 
       // Check all permissions are granted
       const canRead = await app.permissionService.checkUserPermission({
