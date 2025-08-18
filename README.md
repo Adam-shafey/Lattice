@@ -2,6 +2,8 @@
 
 > **Lego blocks for access control**
 
+> ⚠️ **Beta Notice:** Lattice is currently in beta. A production-ready release is planned for the future, and APIs or features may change.
+
 Ever built a SaaS app and got lost in a maze of roles and permissions? Lattice is here to save you from auth spaghetti.
 
 Lattice is a permission-first backend framework that makes complex authorization feel simple. Think of it as the foundation that handles all your "who can do what where" logic, so you can focus on building features that matter.
