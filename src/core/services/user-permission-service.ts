@@ -29,7 +29,7 @@
 
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IPermissionService } from './interfaces';
-import type { PrismaClient, Prisma, Permission } from '../db/db-client';
+import type { PrismaClient, Prisma, Permission, UserPermission } from '../db/db-client';
 
 
 /**
