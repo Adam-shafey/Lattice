@@ -1,15 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach } from 'vitest';
 import { Lattice } from '../index';
 import { db } from '../core/db/db-client';
 
 describe('Authorization Middleware', () => {
   let app: ReturnType<typeof Lattice>;
-
-  beforeAll(async () => {
-    process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
-  });
-
-    beforeEach(async () => {
+  beforeEach(async () => {
     // Create fresh app instance for each test
     app = Lattice({ 
       db: { provider: 'sqlite' }, 
