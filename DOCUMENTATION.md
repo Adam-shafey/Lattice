@@ -2,6 +2,8 @@
 
 > **The Permission-First Backend Framework**
 
+> ⚠️ **Beta Release:** Lattice Core is currently in beta. A production-ready release is planned for the future, and interfaces may change.
+
 ## Introduction
 
 Lattice Core is a modular, permission-first backend framework designed to solve the complex authorization challenges that modern SaaS applications face. Unlike traditional frameworks that bolt on authentication and authorization as an afterthought, Lattice puts permissions at the center of your application architecture.
