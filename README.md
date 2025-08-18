@@ -39,4 +39,3 @@ Generated Swagger documentation is available at [`src/swagger-output.json`](src/
 2. Install dependencies with `npm install`.
 3. Run `npm test` to ensure all tests pass.
 4. Submit a pull request with a clear description of your changes.
-

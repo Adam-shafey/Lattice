@@ -8,6 +8,11 @@
   "bin": {
     "lattice": "dist/core/cli/index.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "license": "MIT",
   "repository": "github:Adam-shafey/lattice",
   "author": "Adam Elshafei <abdoshafey1@gmail.com>",
