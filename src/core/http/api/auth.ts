@@ -169,35 +169,33 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
     },
   });
 
-  // Password change (requires auth)
+  // Password change
+  const changeSchema = z.object({
+        userId: z.string().min(1).optional(),
+        oldPassword: z.string().min(6),
+        newPassword: z.string().min(6),
+      });
+
   app.route({
     method: 'POST',
     path: `${p}/auth/password/change`,
-    preHandler: requireAuthMiddleware(app),
+    ...(app.authnEnabled && { preHandler: app.requireAuth() }),
     handler: async ({ body, user }) => {
-      const schema = z.object({ 
-        oldPassword: z.string().min(6), 
-        newPassword: z.string().min(6) 
-      });
-      
-      try {
-        const parsed = schema.safeParse(body);
-        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
-        const { oldPassword, newPassword } = parsed.data;
-        
-        if (!user) {
-          return { error: 'Unauthorized' };
-        }
-        
-        await app.userService.changePassword(user.id, oldPassword, newPassword, {
-          actorId: user.id
-        });
-        
-        return { ok: true };
-      } catch (error: any) {
-        return { error: error.message || 'Password change failed' };
+      const parsed = changeSchema.safeParse(body);
+      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+
+      const { oldPassword, newPassword } = parsed.data;
+      const userId = app.authnEnabled ? user?.id : parsed.data.userId;
+
+      if (app.authnEnabled && !userId) {
+        return { error: 'Unauthorized' };
       }
+
+      await app.userService.changePassword(userId!, oldPassword, newPassword, {
+        actorId: userId!,
+      });
+
+      return { ok: true };
     },
   });
 
