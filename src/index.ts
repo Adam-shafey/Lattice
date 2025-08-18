@@ -107,9 +107,10 @@ export class LatticeCore {
     this.enableAuthn = config.authn !== false;
     this.enableAuthz = config.authz !== false;
 
-    // Initialize service factory with configuration
+    // Initialize service factory with shared permission registry
     this.serviceFactory = new ServiceFactory({
       db: this.dbClient,
+      permissionRegistry: this.permissionRegistry,
     });
 
     // Set global service factory for application-wide access
