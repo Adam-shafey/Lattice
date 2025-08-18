@@ -29,7 +29,7 @@
 
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IPermissionService } from './interfaces';
-import type { Permission, UserPermission } from '../db/db-client';
+import type { Permission, UserPermission, Prisma } from '../db/db-client';
 
 /**
  * UserPermissionService Class
