@@ -46,7 +46,6 @@ export type {
   RolePermission,
   UserContext,
   RevokedToken,
-  PasswordResetToken,
   AbacPolicy,
   Prisma,
 } from '../db/db-client';
