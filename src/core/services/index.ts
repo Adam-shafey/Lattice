@@ -8,7 +8,7 @@
  * 
  * Usage:
  * import { ServiceFactory, RoleService, ServiceError } from './services';
- * import type { IRoleService, ServiceContext } from './services';
+ * import type { IRoleService, ServiceContext, IServiceError } from './services';
  */
 
 // Base service infrastructure

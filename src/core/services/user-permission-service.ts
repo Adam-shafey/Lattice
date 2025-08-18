@@ -29,7 +29,7 @@
 
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IPermissionService } from './interfaces';
-import type { Permission, UserPermission } from '../db/db-client';
+import type { Permission, UserPermission, Prisma } from '../db/db-client';
 
 /**
  * UserPermissionService Class
@@ -421,14 +421,30 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         });
 
         // Collect all permissions from user's roles
-        const rolePermissions: Permission[] = [];
-        for (const userRole of userRoles) {
-          const permissions = await this.getRolePermissions({
-            roleId: userRole.roleId,
-            contextId,
-            contextType,
+        let rolePermissions: Permission[] = [];
+        const roleIds = userRoles.map((userRole) => userRole.roleId);
+
+        if (roleIds.length > 0) {
+          const where: Prisma.RolePermissionWhereInput = {
+            roleId: { in: roleIds },
+          };
+
+          if (contextId) {
+            where.contextId = contextId;
+          } else if (contextType) {
+            where.contextId = null;
+            where.contextType = contextType;
+          } else {
+            where.contextId = null;
+            where.contextType = null;
+          }
+
+          const rolePermissionRecords = await this.db.rolePermission.findMany({
+            where,
+            include: { permission: true },
           });
-          rolePermissions.push(...permissions);
+
+          rolePermissions = rolePermissionRecords.map((rp: any) => rp.permission);
         }
 
         // Combine and deduplicate permissions
