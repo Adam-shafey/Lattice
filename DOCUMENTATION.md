@@ -137,6 +137,22 @@ await app.policyService.createPolicy({
 - **Condition**: CEL expression that evaluates to true/false
 - **Effect**: `permit` or `deny`
 
+## Authorization Flow
+
+Lattice evaluates every protected request through a layered process:
+
+1. **Route middleware** (`app.routeAuth` or `authorize`): extracts the user ID and context from headers, params, query, or body. It can enforce that a request is global, type-wide, or scoped to an exact context before your handler runs.
+2. **`checkAccess`**: builds the lookup context and loads the user's *effective permissions*—direct grants merged with role‑based permissions. The `PermissionRegistry` checks for the required permission, including wildcard patterns like `users:*`.
+3. **ABAC policies**: if the RBAC check passes, matching Attribute-Based policies are evaluated. Access is granted only when both RBAC and ABAC return `permit`.
+
+Roles are context-aware. Assigning a role in a context whose type doesn't match the role's declared context type results in a validation error, keeping permissions consistent across organizations, teams, and projects.
+
+### Example Scenarios
+
+- **Context-specific role vs. user grant**: A `viewer` role with `example:read` in `ctx_1` allows reads only in that context; a direct grant of `example:write` in `ctx_2` allows writes there.
+- **Context-type validation**: Assigning a role defined for `org` to a `team` context is rejected.
+- **Global and type-wide permissions**: A global permission works across all contexts, while a type-wide permission such as `team:read` applies to every `team` context but not to `org` contexts.
+
 ## Policy Management
 
 ### How Policies Work
