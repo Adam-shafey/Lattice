@@ -275,11 +275,10 @@ export class ContextService extends BaseService implements IContextService {
           throw ServiceError.notFound('Context', contextId);
         }
 
-        // Remove user from context
-        await this.db.userContext.delete({
-          where: { userId_contextId: { userId, contextId } },
-        }).catch(() => {
-          // User wasn't in context, which is fine
+        // Remove user from context. Using deleteMany keeps the operation
+        // idempotent and quietly succeeds if the record doesn't exist.
+        await this.db.userContext.deleteMany({
+          where: { userId, contextId },
         });
       },
       {
