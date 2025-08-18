@@ -19,6 +19,7 @@ import { RoleService } from './role-service';
 import { UserPermissionService } from './user-permission-service';
 import { UserService } from './user-service';
 import { IServiceFactory, type IUserService, type IRoleService, type IPermissionService, type IContextService } from './interfaces';
+import type { EmailAdapter } from './email-adapter';
 
 /**
  * Configuration interface for ServiceFactory
@@ -29,6 +30,8 @@ import { IServiceFactory, type IUserService, type IRoleService, type IPermission
 export interface ServiceFactoryConfig {
   /** Database client instance for all services */
   db: PrismaClientType;
+  /** Optional email adapter for services that send emails */
+  emailAdapter?: EmailAdapter;
 }
 
 /**
@@ -45,6 +48,9 @@ export interface ServiceFactoryConfig {
 export class ServiceFactory implements IServiceFactory {
   /** Database client shared across all services */
   private readonly db: PrismaClientType;
+
+  /** Optional email adapter */
+  private readonly emailAdapter?: EmailAdapter;
   
   /** Lazy-loaded context service instance */
   private _contextService?: ContextService;
@@ -64,6 +70,7 @@ export class ServiceFactory implements IServiceFactory {
    */
   constructor(config: ServiceFactoryConfig) {
     this.db = config.db;
+    this.emailAdapter = config.emailAdapter;
   }
 
   /**
@@ -125,7 +132,7 @@ export class ServiceFactory implements IServiceFactory {
    */
   getUserService(): IUserService {
     if (!this._userService) {
-      this._userService = new UserService(this.db);
+      this._userService = new UserService(this.db, this.emailAdapter);
     }
     return this._userService;
   }
