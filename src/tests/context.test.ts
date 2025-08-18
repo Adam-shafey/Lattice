@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { CoreSaaS } from '../index';
+import { Lattice } from '../index';
 import { db } from '../core/db/db-client';
 
 describe('Context Service', () => {
-  let app: ReturnType<typeof CoreSaaS>;
+  let app: ReturnType<typeof Lattice>;
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
@@ -11,7 +11,7 @@ describe('Context Service', () => {
 
     beforeEach(async () => {
     // Create fresh app instance for each test
-    app = CoreSaaS({ 
+    app = Lattice({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify',
       jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
@@ -262,6 +262,61 @@ describe('Context Service', () => {
 
       expect(users.length).toBe(2);
       expect(users.map(u => u.id).sort()).toEqual([user1.id, user2.id].sort());
+
+      // No manual cleanup needed - beforeEach handles it
+    });
+
+    it('removal is idempotent and targeted', async () => {
+      const user1 = await app.userService.createUser({
+        email: 'idempotent-user1@example.com',
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
+      const user2 = await app.userService.createUser({
+        email: 'idempotent-user2@example.com',
+        password: 'password123',
+        context: { actorId: 'system' }
+      });
+
+      const context = await app.contextService.createContext({
+        id: 'idempotent-test',
+        type: 'organization',
+        name: 'Idempotent Test Org',
+        context: { actorId: 'system' }
+      });
+
+      // Add both users
+      await app.contextService.addUserToContext({
+        userId: user1.id,
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+      await app.contextService.addUserToContext({
+        userId: user2.id,
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+
+      // Remove first user twice
+      await app.contextService.removeUserFromContext({
+        userId: user1.id,
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+      await app.contextService.removeUserFromContext({
+        userId: user1.id,
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+
+      const remainingUsers = await app.contextService.getContextUsers({
+        contextId: context.id,
+        context: { actorId: 'system' }
+      });
+
+      expect(remainingUsers.length).toBe(1);
+      expect(remainingUsers[0].id).toBe(user2.id);
 
       // No manual cleanup needed - beforeEach handles it
     });

@@ -1,12 +1,15 @@
-import { CoreSaaSApp } from '../../../index';
-import { type RoutePermissionPolicy } from '../../policy/policy';
+import { LatticeCore } from '../../../index';
 import { z } from 'zod';
+import { logger } from '../../logger';
 
-export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerUserRoutes(app: LatticeCore, prefix: string = '') {
+  const p = prefix;
+  const policy = app.routePolicy;
+  const createPre = app.routeAuth(policy.users.create, { scope: 'global' });
   app.route({
     method: 'POST',
-    path: '/users',
-    preHandler: app.authorize(policy.users!.create),
+    path: `${p}/users`,
+    ...(createPre && { preHandler: createPre }),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         email: z.string().email(), 
@@ -31,11 +34,16 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     },
   });
 
+  const listPre = app.routeAuth(policy.users.list, { scope: 'global' });
   app.route({
     method: 'GET',
-    path: '/users',
-    preHandler: app.authorize(policy.users!.list),
+    path: `${p}/users`,
+    ...(listPre && { preHandler: listPre }),
     handler: async ({ query, req }) => {
+      logger.log('👥 [USERS_ROUTE] ===== GET /users ROUTE HANDLER CALLED =====');
+      logger.log('👥 [USERS_ROUTE] Query params:', query);
+      logger.log('👥 [USERS_ROUTE] Request user:', req?.user);
+      
       try {
         const limit = query.limit ? parseInt(query.limit as string) : undefined;
         const offset = query.offset ? parseInt(query.offset as string) : undefined;
@@ -57,10 +65,11 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     },
   });
 
+  const getPre = app.routeAuth(policy.users.get, { scope: 'global' });
   app.route({
     method: 'GET',
-    path: '/users/:id',
-    preHandler: app.authorize(policy.users!.get),
+    path: `${p}/users/:id`,
+    ...(getPre && { preHandler: getPre }),
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
@@ -81,10 +90,11 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     },
   });
 
+  const updatePre = app.routeAuth(policy.users.update, { scope: 'global' });
   app.route({
     method: 'PUT',
-    path: '/users/:id',
-    preHandler: app.authorize(policy.users!.update),
+    path: `${p}/users/:id`,
+    ...(updatePre && { preHandler: updatePre }),
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
         email: z.string().email().optional(),
@@ -108,10 +118,11 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     },
   });
 
+  const deletePre = app.routeAuth(policy.users.delete, { scope: 'global' });
   app.route({
     method: 'DELETE',
-    path: '/users/:id',
-    preHandler: app.authorize(policy.users!.delete),
+    path: `${p}/users/:id`,
+    ...(deletePre && { preHandler: deletePre }),
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
@@ -125,26 +136,27 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     },
   });
 
+  const changePre = app.routeAuth(policy.users.update);
   app.route({
     method: 'POST',
     path: '/users/:id/password/change',
-    preHandler: app.authorize(policy.users!.update),
+    ...(changePre && { preHandler: changePre }),
     handler: async ({ params, body, req }) => {
-      const schema = z.object({ 
-        oldPassword: z.string().min(6), 
-        newPassword: z.string().min(6) 
+      const schema = z.object({
+        oldPassword: z.string().min(6),
+        newPassword: z.string().min(6)
       });
-      
+
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
         const parsed = schema.safeParse(body);
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
+
         const { oldPassword, newPassword } = parsed.data;
         await app.userService.changePassword(id, oldPassword, newPassword, {
           actorId: req?.user?.id || 'system'
         });
-        
+
         return { ok: true };
       } catch (error: any) {
         return { error: error.message || 'Failed to change password' };
@@ -152,29 +164,6 @@ export function registerUserRoutes(app: CoreSaaSApp, policy: RoutePermissionPoli
     },
   });
 
-  app.route({
-    method: 'POST',
-    path: '/users/password/reset/request',
-    handler: async ({ body }) => {
-      const schema = z.object({ 
-        email: z.string().email() 
-      });
-      
-      try {
-        const parsed = schema.safeParse(body);
-        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
-        const { email } = parsed.data;
-        await app.userService.resetPassword(email, {
-          actorId: 'system'
-        });
-        
-        return { ok: true };
-      } catch (error: any) {
-        return { error: error.message || 'Failed to request password reset' };
-      }
-    },
-  });
 }
 
 

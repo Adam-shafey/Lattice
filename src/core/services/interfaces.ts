@@ -12,6 +12,8 @@
 import type { User, Role, Permission, Context, UserRole, RolePermission, UserPermission } from '../db/db-client';
 import type { ServiceContext } from './base-service';
 
+export type SafeUser = Omit<User, 'passwordHash'>;
+
 /**
  * User Service Interface
  * 
@@ -41,7 +43,7 @@ export interface IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  getUserById(id: string, context?: ServiceContext): Promise<User | null>;
+  getUserById(id: string, context?: ServiceContext): Promise<SafeUser | null>;
 
   /**
    * Retrieves a user by their email address
@@ -49,7 +51,7 @@ export interface IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  getUserByEmail(email: string, context?: ServiceContext): Promise<User | null>;
+  getUserByEmail(email: string, context?: ServiceContext): Promise<SafeUser | null>;
 
   /**
    * Updates a user's profile information
@@ -61,7 +63,7 @@ export interface IUserService {
   updateUser(id: string, updates: {
     email?: string;
     password?: string;
-  }, context?: ServiceContext): Promise<User>;
+  }, context?: ServiceContext): Promise<SafeUser>;
 
   /**
    * Permanently deletes a user and all associated data
@@ -82,7 +84,7 @@ export interface IUserService {
     limit?: number;
     offset?: number;
     context?: ServiceContext;
-  }): Promise<{ users: User[]; total: number }>;
+  }): Promise<{ users: SafeUser[]; total: number }>;
 
   /**
    * Changes a user's password with old password verification
@@ -93,14 +95,6 @@ export interface IUserService {
    * @returns Promise that resolves when password is changed
    */
   changePassword(userId: string, oldPassword: string, newPassword: string, context?: ServiceContext): Promise<void>;
-
-  /**
-   * Initiates a password reset for a user by email
-   * @param email - User's email address
-   * @param context - Optional service context
-   * @returns Promise that resolves when reset email is sent
-   */
-  resetPassword(email: string, context?: ServiceContext): Promise<void>;
 
   /**
    * Verifies a user's password
@@ -392,7 +386,6 @@ export interface IPermissionService {
  * - Context resolution from requests
  * - Context creation and management
  * - User membership in contexts
- * - Context hierarchy management
  */
 export interface IContextService {
   /**

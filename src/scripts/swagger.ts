@@ -1,0 +1,1577 @@
+// scripts/swagger.ts
+import fs from 'fs';
+import path from 'path';
+import { logger } from '../core/logger';
+
+const swaggerSpec = {
+  openapi: "3.0.0",
+  info: {
+    title: "Lattice API",
+    description: "Lattice Access Control System API Documentation",
+    version: "1.0.0",
+    contact: {
+      name: "API Support",
+      email: "support@yourorg.com"
+    }
+  },
+  servers: [
+    {
+      url: "http://localhost:3000/api",
+      description: "Development server"
+    }
+  ],
+  paths: {
+    "/auth/login": {
+      post: {
+        tags: ["Authentication"],
+        summary: "User login",
+        description: "Authenticate a user with email and password",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["email", "password"],
+                properties: {
+                  email: {
+                    type: "string",
+                    format: "email",
+                    description: "User's email address"
+                  },
+                  password: {
+                    type: "string",
+                    minLength: 8,
+                    description: "User's password (minimum 8 characters)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Login successful",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Invalid input",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            description: "Invalid credentials",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Refresh access token",
+        description: "Get a new access token using a refresh token",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["refreshToken"],
+                properties: {
+                  refreshToken: {
+                    type: "string",
+                    description: "The refresh token"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Token refresh successful",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Invalid input",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            description: "Invalid token",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/revoke": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Revoke token",
+        description: "Revoke a JWT token (logout)",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["token"],
+                properties: {
+                  token: {
+                    type: "string",
+                    description: "The token to revoke"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Token revoked successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/password/change": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Change password",
+        description: "Change user password (requires authentication)",
+        security: [{ Bearer: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["oldPassword", "newPassword"],
+                properties: {
+                  oldPassword: {
+                    type: "string",
+                    minLength: 6,
+                    description: "Current password"
+                  },
+                  newPassword: {
+                    type: "string",
+                    minLength: 6,
+                    description: "New password"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Password changed successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            description: "Unauthorized",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users": {
+      post: {
+        tags: ["Users"],
+        summary: "Create user",
+        description: "Create a new user account",
+        security: [{ Bearer: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["email", "password"],
+                properties: {
+                  email: {
+                    type: "string",
+                    format: "email",
+                    description: "User's email address"
+                  },
+                  password: {
+                    type: "string",
+                    minLength: 6,
+                    description: "User's password"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "User created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Invalid input",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      get: {
+        tags: ["Users"],
+        summary: "List users",
+        description: "Get a list of users with pagination",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "limit",
+            schema: {
+              type: "integer",
+              minimum: 1,
+              maximum: 100
+            },
+            description: "Number of users to return"
+          },
+          {
+            in: "query",
+            name: "offset",
+            schema: {
+              type: "integer",
+              minimum: 0
+            },
+            description: "Number of users to skip"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "List of users",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    $ref: "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            description: "Unauthorized",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}": {
+      get: {
+        tags: ["Users"],
+        summary: "Get user by ID",
+        description: "Retrieve a specific user by their ID",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "User ID"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "User details",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "404": {
+            description: "User not found",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      put: {
+        tags: ["Users"],
+        summary: "Update user",
+        description: "Update user information",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "User ID"
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  email: {
+                    type: "string",
+                    format: "email",
+                    description: "New email address"
+                  },
+                  password: {
+                    type: "string",
+                    minLength: 6,
+                    description: "New password"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "User updated successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "400": {
+            description: "Invalid input",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      delete: {
+        tags: ["Users"],
+        summary: "Delete user",
+        description: "Delete a user account",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "User ID"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "User deleted successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contexts": {
+      post: {
+        tags: ["Contexts"],
+        summary: "Create context",
+        description: "Create a new context",
+        security: [{ Bearer: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["id", "type"],
+                properties: {
+                  id: {
+                    type: "string",
+                    description: "Context ID"
+                  },
+                  type: {
+                    type: "string",
+                    description: "Context type"
+                  },
+                  name: {
+                    type: "string",
+                    description: "Context name"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Context created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Context"
+                }
+              }
+            }
+          }
+        }
+      },
+      get: {
+        tags: ["Contexts"],
+        summary: "List contexts",
+        description: "Get a list of contexts with optional filtering",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "type",
+            schema: {
+              type: "string"
+            },
+            description: "Filter by context type"
+          },
+          {
+            in: "query",
+            name: "limit",
+            schema: {
+              type: "integer",
+              minimum: 1,
+              maximum: 100
+            },
+            description: "Number of contexts to return"
+          },
+          {
+            in: "query",
+            name: "offset",
+            schema: {
+              type: "integer",
+              minimum: 0
+            },
+            description: "Number of contexts to skip"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "List of contexts",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    $ref: "#/components/schemas/Context"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contexts/{id}": {
+      get: {
+        tags: ["Contexts"],
+        summary: "Get context by ID",
+        description: "Retrieve a specific context by its ID",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Context ID"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "Context details",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Context"
+                }
+              }
+            }
+          },
+          "404": {
+            description: "Context not found",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      put: {
+        tags: ["Contexts"],
+        summary: "Update context",
+        description: "Update context information",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Context ID"
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: {
+                    type: "string",
+                    description: "New context name"
+                  },
+                  type: {
+                    type: "string",
+                    description: "New context type"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Context updated successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Context"
+                }
+              }
+            }
+          }
+        }
+      },
+      delete: {
+        tags: ["Contexts"],
+        summary: "Delete context",
+        description: "Delete a context",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Context ID"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "Context deleted successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contexts/{id}/users": {
+      get: {
+        tags: ["Contexts"],
+        summary: "Get context users",
+        description: "Get all users in a specific context",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Context ID"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "List of users in context",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    $ref: "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contexts/{id}/users/add": {
+      post: {
+        tags: ["Contexts"],
+        summary: "Add user to context",
+        description: "Add a user to a specific context",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Context ID"
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId"],
+                properties: {
+                  userId: {
+                    type: "string",
+                    description: "User ID to add"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "User added to context successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contexts/{id}/users/remove": {
+      post: {
+        tags: ["Contexts"],
+        summary: "Remove user from context",
+        description: "Remove a user from a specific context",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Context ID"
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId"],
+                properties: {
+                  userId: {
+                    type: "string",
+                    description: "User ID to remove"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "User removed from context successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roles": {
+      post: {
+        tags: ["Roles"],
+        summary: "Create role",
+        description: "Create a new role",
+        security: [{ Bearer: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name", "contextType"],
+                properties: {
+                  name: {
+                    type: "string",
+                    description: "Role name"
+                  },
+                  contextType: {
+                    type: "string",
+                    description: "Context type for this role"
+                  },
+                  key: {
+                    type: "string",
+                    description: "Role key (optional)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Role created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Role"
+                }
+              }
+            }
+          }
+        }
+      },
+      get: {
+        tags: ["Roles"],
+        summary: "List roles",
+        description: "Get a list of roles with optional filtering",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "query",
+            name: "contextType",
+            schema: {
+              type: "string"
+            },
+            description: "Filter by context type"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "List of roles",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    $ref: "#/components/schemas/Role"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roles/{name}": {
+      get: {
+        tags: ["Roles"],
+        summary: "Get role by name",
+        description: "Retrieve a specific role by its name",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "name",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Role name"
+          },
+          {
+            in: "query",
+            name: "contextType",
+            schema: {
+              type: "string"
+            },
+            description: "Context type"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "Role details",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Role"
+                }
+              }
+            }
+          },
+          "404": {
+            description: "Role not found",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      delete: {
+        tags: ["Roles"],
+        summary: "Delete role",
+        description: "Delete a role",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "name",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Role name"
+          },
+          {
+            in: "query",
+            name: "contextType",
+            schema: {
+              type: "string"
+            },
+            description: "Context type"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "Role deleted successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roles/assign": {
+      post: {
+        tags: ["Roles"],
+        summary: "Assign role to user",
+        description: "Assign a role to a user in a specific context",
+        security: [{ Bearer: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId", "contextId", "contextType"],
+                properties: {
+                  roleName: {
+                    type: "string",
+                    description: "Role name (either roleName or roleKey required)"
+                  },
+                  roleKey: {
+                    type: "string",
+                    description: "Role key (either roleName or roleKey required)"
+                  },
+                  userId: {
+                    type: "string",
+                    description: "User ID"
+                  },
+                  contextId: {
+                    type: "string",
+                    description: "Context ID"
+                  },
+                  contextType: {
+                    type: "string",
+                    description: "Context type"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Role assigned successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roles/remove": {
+      post: {
+        tags: ["Roles"],
+        summary: "Remove role from user",
+        description: "Remove a role from a user in a specific context",
+        security: [{ Bearer: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId", "contextId", "contextType"],
+                properties: {
+                  roleName: {
+                    type: "string",
+                    description: "Role name (either roleName or roleKey required)"
+                  },
+                  roleKey: {
+                    type: "string",
+                    description: "Role key (either roleName or roleKey required)"
+                  },
+                  userId: {
+                    type: "string",
+                    description: "User ID"
+                  },
+                  contextId: {
+                    type: "string",
+                    description: "Context ID"
+                  },
+                  contextType: {
+                    type: "string",
+                    description: "Context type"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Role removed successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roles/{name}/permissions/add": {
+      post: {
+        tags: ["Roles"],
+        summary: "Add permission to role",
+        description: "Add a permission to a role",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "name",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Role name"
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["permissionKey"],
+                properties: {
+                  permissionKey: {
+                    type: "string",
+                    description: "Permission key to add"
+                  },
+                  contextId: {
+                    type: "string",
+                    description: "Context ID (for exact context)"
+                  },
+                  contextType: {
+                    type: "string",
+                    description: "Context type (for type-wide)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Permission added to role successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/roles/{name}/permissions/remove": {
+      post: {
+        tags: ["Roles"],
+        summary: "Remove permission from role",
+        description: "Remove a permission from a role",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "name",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "Role name"
+          }
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["permissionKey"],
+                properties: {
+                  permissionKey: {
+                    type: "string",
+                    description: "Permission key to remove"
+                  },
+                  contextId: {
+                    type: "string",
+                    description: "Context ID (for exact context)"
+                  },
+                  contextType: {
+                    type: "string",
+                    description: "Context type (for type-wide)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Permission removed from role successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/permissions/user/grant": {
+      post: {
+        tags: ["Permissions"],
+        summary: "Grant permission to user",
+        description: "Grant a permission directly to a user",
+        security: [{ Bearer: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId", "permissionKey"],
+                properties: {
+                  userId: {
+                    type: "string",
+                    description: "User ID"
+                  },
+                  permissionKey: {
+                    type: "string",
+                    description: "Permission key to grant"
+                  },
+                  contextType: {
+                    type: "string",
+                    description: "Context type (for type-wide permissions)"
+                  },
+                  contextId: {
+                    type: "string",
+                    description: "Context ID (for exact context permissions)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Permission granted successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/permissions/user/revoke": {
+      post: {
+        tags: ["Permissions"],
+        summary: "Revoke permission from user",
+        description: "Revoke a permission directly from a user",
+        security: [{ Bearer: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["userId", "permissionKey"],
+                properties: {
+                  userId: {
+                    type: "string",
+                    description: "User ID"
+                  },
+                  permissionKey: {
+                    type: "string",
+                    description: "Permission key to revoke"
+                  },
+                  contextType: {
+                    type: "string",
+                    description: "Context type (for type-wide permissions)"
+                  },
+                  contextId: {
+                    type: "string",
+                    description: "Context ID (for exact context permissions)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Permission revoked successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: {
+                      type: "boolean",
+                      example: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/permissions/user/{userId}": {
+      get: {
+        tags: ["Permissions"],
+        summary: "Get user permissions",
+        description: "Get all permissions for a specific user",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "User ID"
+          },
+          {
+            in: "query",
+            name: "contextId",
+            schema: {
+              type: "string"
+            },
+            description: "Filter by context ID"
+          },
+          {
+            in: "query",
+            name: "contextType",
+            schema: {
+              type: "string"
+            },
+            description: "Filter by context type"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "User permissions",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    $ref: "#/components/schemas/Permission"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/permissions/user/{userId}/effective": {
+      get: {
+        tags: ["Permissions"],
+        summary: "Get user effective permissions",
+        description: "Get effective permissions for a user (including role-based permissions)",
+        security: [{ Bearer: [] }],
+        parameters: [
+          {
+            in: "path",
+            name: "userId",
+            required: true,
+            schema: {
+              type: "string"
+            },
+            description: "User ID"
+          },
+          {
+            in: "query",
+            name: "contextId",
+            schema: {
+              type: "string"
+            },
+            description: "Filter by context ID"
+          }
+        ],
+        responses: {
+          "200": {
+            description: "Effective user permissions",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    $ref: "#/components/schemas/Permission"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  components: {
+    schemas: {
+      User: {
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+            description: "User ID"
+          },
+          email: {
+            type: "string",
+            format: "email",
+            description: "User's email address"
+          },
+          createdAt: {
+            type: "string",
+            format: "date-time",
+            description: "User creation timestamp"
+          }
+        }
+      },
+      Context: {
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+            description: "Context ID"
+          },
+          type: {
+            type: "string",
+            description: "Context type"
+          },
+          name: {
+            type: "string",
+            description: "Context name"
+          }
+        }
+      },
+      Role: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Role name"
+          },
+          contextType: {
+            type: "string",
+            description: "Context type for this role"
+          },
+          key: {
+            type: "string",
+            description: "Role key"
+          }
+        }
+      },
+      Permission: {
+        type: "object",
+        properties: {
+          key: {
+            type: "string",
+            description: "Permission key"
+          },
+          contextType: {
+            type: "string",
+            description: "Context type"
+          },
+          contextId: {
+            type: "string",
+            description: "Context ID"
+          }
+        }
+      },
+      AuthResponse: {
+        type: "object",
+        properties: {
+          accessToken: {
+            type: "string",
+            description: "JWT access token"
+          },
+          refreshToken: {
+            type: "string",
+            description: "JWT refresh token"
+          }
+        }
+      },
+      Error: {
+        type: "object",
+        properties: {
+          error: {
+            type: "string",
+            description: "Error message"
+          },
+          issues: {
+            type: "array",
+            items: {
+              type: "object"
+            },
+            description: "Validation issues"
+          }
+        }
+      }
+    },
+    securitySchemes: {
+      Bearer: {
+        type: "apiKey",
+        name: "Authorization",
+        in: "header",
+        description: "JWT Bearer token for authentication"
+      }
+    }
+  }
+};
+
+// Write the swagger spec to file
+const outputFile = './src/swagger-output.json';
+fs.writeFileSync(outputFile, JSON.stringify(swaggerSpec, null, 2));
+
+logger.log(`✅ Swagger documentation generated successfully at ${outputFile}`);

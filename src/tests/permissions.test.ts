@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { CoreSaaS } from '../index';
+import { Lattice } from '../index';
 import { db } from '../core/db/db-client';
 
 describe('Permission System', () => {
-  let app: ReturnType<typeof CoreSaaS>;
+  let app: ReturnType<typeof Lattice>;
 
   beforeAll(async () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
@@ -11,7 +11,7 @@ describe('Permission System', () => {
 
   beforeEach(async () => {
     // Create fresh app instance for each test
-    app = CoreSaaS({ 
+    app = Lattice({ 
       db: { provider: 'sqlite' }, 
       adapter: 'fastify',
       jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'test' }
@@ -420,6 +420,18 @@ describe('Permission System', () => {
       // Test non-matches
       expect(app.permissionRegistry.isAllowed('projects:read', new Set([wildcardPermission]))).toBe(false);
       expect(app.permissionRegistry.isAllowed('admin:users:read', new Set([wildcardPermission]))).toBe(false);
+    });
+
+    it('handles the global wildcard permission (*)', () => {
+      const globalWildcard = '*';
+      
+      // Test that '*' matches everything
+      expect(app.permissionRegistry.isAllowed('users:read', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('users:write', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('roles:create', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('permissions:grant', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('contexts:delete', new Set([globalWildcard]))).toBe(true);
+      expect(app.permissionRegistry.isAllowed('any:permission:here', new Set([globalWildcard]))).toBe(true);
     });
 
     it('handles nested wildcards', () => {

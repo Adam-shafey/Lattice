@@ -9,8 +9,9 @@ import { registerPermissionRoutes } from './core/http/api/permissions';
 import { registerContextRoutes } from './core/http/api/contexts';
 import { registerRoleRoutes } from './core/http/api/roles';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
-import { ServiceFactory, getServiceFactory, setServiceFactory } from './core/services';
+import { ServiceFactory, setServiceFactory } from './core/services';
 import { db } from './core/db/db-client';
+import { logger } from './core/logger';
 
 export type SupportedAdapter = 'fastify' | 'express';
 
@@ -18,7 +19,18 @@ export interface CoreConfig {
   db: { provider: 'postgres' | 'sqlite'; url?: string };
   adapter: SupportedAdapter;
   jwt: { accessTTL: string; refreshTTL: string; secret?: string };
+  /**
+   * Enable route-level authentication (JWT verification)
+   * Defaults to true
+   */
+  authn?: boolean;
+  /**
+   * Enable route-level authorization checks
+   * Defaults to true
+   */
+  authz?: boolean;
   policy?: RoutePermissionPolicy;
+  apiPrefix?: string;
 }
 
 export interface RouteDefinition<Body = unknown> {
@@ -44,7 +56,7 @@ export interface PluginPermission {
 export interface LatticePlugin {
   name: string;
   permissions?: PluginPermission[];
-  register?: (app: CoreSaaSApp) => void | Promise<void>;
+  register?: (app: LatticeCore) => void | Promise<void>;
 }
 
 export interface CheckAccessInput {
@@ -61,33 +73,39 @@ export interface HttpAdapter {
   getUnderlying: () => unknown;
 }
 
-export class CoreSaaSApp {
+export class LatticeCore {
   public readonly permissionRegistry: PermissionRegistry;
-  public readonly PermissionRegistry: PermissionRegistry;
   private readonly adapterKind: SupportedAdapter;
   private readonly httpAdapter: HttpAdapter;
   private readonly policy: RoutePermissionPolicy;
   private readonly serviceFactory: ServiceFactory;
   private readonly config: CoreConfig;
+  private readonly apiPrefix: string;
+  private readonly enableAuthn: boolean;
+  private readonly enableAuthz: boolean;
 
   constructor(config: CoreConfig) {
     this.config = config;
+    this.apiPrefix = config.apiPrefix ?? '';
     this.permissionRegistry = new PermissionRegistry();
-    this.PermissionRegistry = this.permissionRegistry;
     this.adapterKind = config.adapter;
     this.httpAdapter =
       config.adapter === 'fastify'
         ? createFastifyAdapter(this)
         : createExpressAdapter(this);
     this.policy = {
+      roles: { ...defaultRoutePermissionPolicy.roles, ...(config.policy?.roles ?? {}) },
       users: { ...defaultRoutePermissionPolicy.users, ...(config.policy?.users ?? {}) },
       permissions: { ...defaultRoutePermissionPolicy.permissions, ...(config.policy?.permissions ?? {}) },
       contexts: { ...defaultRoutePermissionPolicy.contexts, ...(config.policy?.contexts ?? {}) },
     } as Required<RoutePermissionPolicy>;
 
+    this.enableAuthn = config.authn !== false;
+    this.enableAuthz = config.authz !== false;
+
     // Initialize service factory with configuration
     this.serviceFactory = new ServiceFactory({
-      db
+      db,
     });
 
     // Set global service factory for application-wide access
@@ -102,10 +120,49 @@ export class CoreSaaSApp {
   }
 
   /**
+   * Whether route authentication (JWT verification) is enabled
+   */
+  public get authnEnabled(): boolean {
+    return this.enableAuthn;
+  }
+
+  /**
+   * Whether route authorization is enabled
+   */
+  public get authzEnabled(): boolean {
+    return this.enableAuthz;
+  }
+
+  /**
+   * Get the route permission policy
+   */
+  public get routePolicy(): Required<RoutePermissionPolicy> {
+    return this.policy as Required<RoutePermissionPolicy>;
+  }
+
+  /**
+   * Build pre-handlers for authentication and authorization based on config
+   */
+  public routeAuth(permission?: string, options?: AuthorizeOptions) {
+    const handlers: any[] = [];
+    if (this.enableAuthn) {
+      handlers.push(this.requireAuth());
+    }
+    if (permission && this.enableAuthz) {
+      handlers.push(this.authorize(permission, options));
+    }
+    return handlers.length > 0 ? handlers : undefined;
+  }
+
+  /**
    * Get the service factory instance
    */
   public get services(): ServiceFactory {
     return this.serviceFactory;
+  }
+
+  public get apiBase(): string {
+    return this.apiPrefix;
   }
 
   /**
@@ -161,26 +218,43 @@ export class CoreSaaSApp {
   }
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
+    logger.log('🔍 [CHECK_ACCESS] Starting checkAccess');
+    logger.log('🔍 [CHECK_ACCESS] Input:', input);
+    
     const { userId, context, permission, scope, contextType } = input;
 
     let lookupContext: { type: string; id: string | null } | null = context ?? null;
     if (scope === 'global') {
       lookupContext = null;
+      logger.log('🔍 [CHECK_ACCESS] Global scope - setting lookupContext to null');
     } else if (scope === 'type-wide') {
       lookupContext = contextType ? { type: contextType, id: null } : (context ?? null);
+      logger.log('🔍 [CHECK_ACCESS] Type-wide scope - setting lookupContext to:', lookupContext);
+    } else {
+      logger.log('🔍 [CHECK_ACCESS] Exact scope or undefined - using provided context:', lookupContext);
     }
 
+    logger.log('🔍 [CHECK_ACCESS] Final lookupContext:', lookupContext);
+
     try {
+      logger.log('🔍 [CHECK_ACCESS] Calling fetchEffectivePermissions');
       const effective = await fetchEffectivePermissions({ userId, context: lookupContext });
-      return this.permissionRegistry.isAllowed(permission, effective);
+      logger.log('🔍 [CHECK_ACCESS] fetchEffectivePermissions result - permissions count:', effective.size);
+      logger.log('🔍 [CHECK_ACCESS] Effective permissions:', Array.from(effective));
+      
+      logger.log('🔍 [CHECK_ACCESS] Calling permissionRegistry.isAllowed');
+      const result = this.permissionRegistry.isAllowed(permission, effective);
+      logger.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', result);
+      
+      return result;
     } catch (error) {
-      console.error('Failed to fetch effective permissions:', error);
+      logger.error('🔍 [CHECK_ACCESS] ❌ Error during checkAccess:', error);
+      logger.error('Failed to fetch effective permissions:', error);
       return false;
     }
   }
 
-  // Remove the in-memory grantUserPermission function - everything should be DB-driven
-  // public grantUserPermission(userId: string, permission: string, contextId?: string): void { ... }
+  // Note: All permission management is now DB-driven through the permission service
 
   public registerPlugin(plugin: LatticePlugin): void {
     if (plugin.permissions) {
@@ -199,11 +273,11 @@ export class CoreSaaSApp {
     
     // Global request context middleware (only for adapters that support preHandler arrays at route-level)
     // Developers should add it before their own routes if using adapter directly.
-    createAuthRoutes(this);
-    registerUserRoutes(this, this.policy);
-    registerPermissionRoutes(this, this.policy);
-    registerContextRoutes(this, this.policy);
-    registerRoleRoutes(this, this.policy);
+    createAuthRoutes(this, this.apiPrefix);
+    registerUserRoutes(this, this.apiPrefix);
+    registerPermissionRoutes(this, this.apiPrefix);
+    registerContextRoutes(this, this.apiPrefix);
+    registerRoleRoutes(this, this.apiPrefix);
     
     await this.httpAdapter.listen(port, host);
   }
@@ -216,8 +290,8 @@ export class CoreSaaSApp {
   }
 }
 
-export function CoreSaaS(config: CoreConfig): CoreSaaSApp {
-  return new CoreSaaSApp(config);
+export function Lattice(config: CoreConfig): LatticeCore {
+  return new LatticeCore(config);
 }
 
 export type { PermissionRegistry };

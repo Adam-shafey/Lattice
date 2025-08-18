@@ -16,6 +16,14 @@ import { IUserService } from './interfaces';
 import type { PrismaClient, Prisma, User } from '../db/db-client';
 import { hash, compare } from 'bcryptjs';
 import { randomUUID } from 'crypto';
+type SafeUser = Omit<User, 'passwordHash'>;
+
+const safeUserSelect = {
+  id: true,
+  email: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
 /**
  * UserService Class
@@ -24,7 +32,6 @@ import { randomUUID } from 'crypto';
  * operations. Extends BaseService to inherit common functionality.
  */
 export class UserService extends BaseService implements IUserService {
-
   constructor(db: PrismaClient) {
     super(db);
   }
@@ -95,12 +102,12 @@ export class UserService extends BaseService implements IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  async getUserById(id: string, context?: ServiceContext): Promise<User | null> {
+  async getUserById(id: string, context?: ServiceContext): Promise<SafeUser | null> {
     this.validateString(id, 'user id');
 
     return this.execute(
       async () => {
-        return this.db.user.findUnique({ where: { id } });
+        return this.db.user.findUnique({ where: { id }, select: safeUserSelect });
       },
       {
         action: 'user.read',
@@ -119,12 +126,12 @@ export class UserService extends BaseService implements IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  async getUserByEmail(email: string, context?: ServiceContext): Promise<User | null> {
+  async getUserByEmail(email: string, context?: ServiceContext): Promise<SafeUser | null> {
     this.validateEmail(email);
 
     return this.execute(
       async () => {
-        return this.db.user.findUnique({ where: { email } });
+        return this.db.user.findUnique({ where: { email }, select: safeUserSelect });
       },
       {
         action: 'user.read',
@@ -151,7 +158,7 @@ export class UserService extends BaseService implements IUserService {
   async updateUser(id: string, updates: {
     email?: string;
     password?: string;
-  }, context?: ServiceContext): Promise<User> {
+  }, context?: ServiceContext): Promise<SafeUser> {
     this.validateString(id, 'user id');
     
     if (updates.email !== undefined) {
@@ -191,6 +198,7 @@ export class UserService extends BaseService implements IUserService {
         const user = await this.db.user.update({
           where: { id },
           data: updateData,
+          select: safeUserSelect,
         });
 
         return user;
@@ -270,7 +278,7 @@ export class UserService extends BaseService implements IUserService {
     limit?: number;
     offset?: number;
     context?: ServiceContext;
-  }): Promise<{ users: User[]; total: number }> {
+  }): Promise<{ users: SafeUser[]; total: number }> {
     const { limit = 100, offset = 0, context: serviceContext } = params || {};
 
     // Validate pagination parameters
@@ -288,13 +296,7 @@ export class UserService extends BaseService implements IUserService {
             take: limit,
             skip: offset,
             orderBy: { createdAt: 'desc' },
-            select: {
-              id: true,
-              email: true,
-              passwordHash: true,
-              createdAt: true,
-              updatedAt: true,
-            },
+            select: safeUserSelect,
           }),
           this.db.user.count(),
         ]);
@@ -388,51 +390,4 @@ export class UserService extends BaseService implements IUserService {
     );
   }
 
-  /**
-   * Initiates a password reset for a user by email
-   * 
-   * @param email - The user's email address
-   * @param context - Optional service context
-   * @returns Promise that resolves when reset email is sent
-   * 
-   * @throws ServiceError.notFound if user doesn't exist
-   */
-  async resetPassword(email: string, context?: ServiceContext): Promise<void> {
-    this.validateEmail(email);
-
-    return this.execute(
-      async () => {
-        // Check if user exists
-        const user = await this.db.user.findUnique({ where: { email } });
-        if (!user) {
-          throw ServiceError.notFound('User', email);
-        }
-
-        // Generate reset token
-        const resetToken = randomUUID();
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-        // Store reset token
-        await this.db.passwordResetToken.create({
-          data: {
-            token: resetToken,
-            userId: user.id,
-            expiresAt,
-          },
-        });
-
-        // TODO: Send email with reset link
-        // This would typically integrate with an email service
-        console.log(`Password reset token for ${email}: ${resetToken}`);
-      },
-      {
-        action: 'user.password_reset_initiated',
-        success: true,
-        resourceType: 'user',
-        resourceId: email,
-        targetUserId: email,
-      },
-      context
-    );
-  }
 }

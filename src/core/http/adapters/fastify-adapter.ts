@@ -1,31 +1,74 @@
 import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { CoreSaaSApp, HttpAdapter, RouteDefinition } from '../../../index';
+import fastifyCors from '@fastify/cors';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
+import type { LatticeCore, HttpAdapter, RouteDefinition } from '../../../index';
 import { extractRequestContext } from '../utils/extract-request-context';
+import fs from 'fs';
+import path from 'path';
+import { logger } from '../../logger';
 
 export interface FastifyHttpAdapter extends HttpAdapter {
   getUnderlying: () => FastifyInstance;
 }
 
 /**
- * Creates a Fastify HTTP adapter for the CoreSaaS application
- * 
- * This adapter wraps Fastify functionality to provide a consistent
- * interface for route registration and server management.
- * 
- * @param app - The CoreSaaS application instance
- * @returns FastifyHttpAdapter instance
+ * Creates a Fastify HTTP adapter for the LatticeCore application
  */
-export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
-  const instance: FastifyInstance = fastify({ 
+export function createFastifyAdapter(app: LatticeCore): FastifyHttpAdapter {
+  const instance: FastifyInstance = fastify({
     logger: true,
     trustProxy: true
   });
 
+  // CORS (from main)
+  instance.register(fastifyCors, {
+    origin: [
+      'http://localhost:5173', // Vite dev server
+      'http://localhost:3000', // Production admin UI
+      'http://localhost:8080', // Swagger UI
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  });
+
+  // Read the generated swagger spec
+  const swaggerSpecPath = path.join(__dirname, '../../../swagger-output.json');
+  let swaggerSpec: any = {};
+  
+  try {
+    if (fs.existsSync(swaggerSpecPath)) {
+      swaggerSpec = JSON.parse(fs.readFileSync(swaggerSpecPath, 'utf8'));
+    }
+  } catch (error) {
+    logger.warn('Could not load swagger spec, using minimal configuration');
+  }
+
+  // Swagger configuration using our generated spec
+  instance.register(swagger, {
+    mode: 'static',
+    specification: {
+      document: swaggerSpec
+    }
+  });
+
+  // Swagger UI configuration
+  instance.register(swaggerUi, {
+    routePrefix: '/docs',
+    uiConfig: {
+      docExpansion: 'list',
+      deepLinking: true
+    },
+    staticCSP: true,
+    transformStaticCSP: (header) => header
+  });
+
   /**
    * Wraps a route handler to work with Fastify
-   * 
-   * Extracts user and context information from the request and
-   * passes it to the handler in a standardized format.
    */
   function wrapHandler(handler: RouteDefinition['handler']) {
     return async function (request: FastifyRequest, reply: FastifyReply) {
@@ -40,36 +83,27 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
           query: query as Record<string, string | string[]>,
           req: request,
         });
-        
-        // Send the response
+
         if (!reply.sent) {
           reply.send(result);
         }
       } catch (error) {
-        // Handle errors gracefully
-        console.error('Fastify handler error:', error);
-        
-        // Check if response was already sent
-        if (reply.sent) {
-          return;
-        }
-        
-        // Check for custom error with status code
+        logger.error('Fastify handler error:', error);
+
+        if (reply.sent) return;
+
         if (error && typeof error === 'object' && 'statusCode' in error) {
           const statusCode = (error as any).statusCode;
-          const response: any = { 
+          const response: any = {
             error: 'Invalid input',
             message: error instanceof Error ? error.message : 'Unknown error'
           };
-          
-          // Add issues if present
           if ('issues' in error) {
             response.issues = (error as any).issues;
           }
-          
           reply.status(statusCode).send(response);
         } else {
-          reply.status(500).send({ 
+          reply.status(500).send({
             error: 'Internal server error',
             message: error instanceof Error ? error.message : 'Unknown error'
           });
@@ -80,78 +114,38 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
 
   /**
    * Wraps a pre-handler function to work with Fastify middleware
-   * 
-   * Normalizes middleware signatures to be Fastify-compatible.
    */
   function wrapPreHandler(pre: unknown) {
     return function (request: FastifyRequest, reply: FastifyReply, done: (err?: any) => void) {
       try {
-        // Create a next function that the middleware can call
-        const next = (err?: any) => {
-          if (err) {
-            // If there's an error, pass it to done
-            done(err);
-          } else {
-            // If no error, continue
-            done();
-          }
-        };
-        
+        const next = (err?: any) => (err ? done(err) : done());
         const maybePromise = (pre as any)(request, reply, next);
-        
+
         if (maybePromise && typeof (maybePromise as Promise<unknown>).then === 'function') {
-          // Handle async middleware
           (maybePromise as Promise<unknown>)
             .then(() => {
-              // Check if reply was sent by middleware
-              if (reply.sent) {
-                // Middleware already sent a response, don't call done
-                return;
-              }
-              // No response sent, continue
-              done();
+              if (!reply.sent) done();
             })
             .catch((err) => {
-              // Check if reply was sent by middleware
-              if (reply.sent) {
-                // Middleware already sent a response, don't call done
-                return;
-              }
-              // No response sent, pass error to done
-              done(err);
+              if (!reply.sent) done(err);
             });
         } else {
-          // Check if reply was sent by middleware
-          if (reply.sent) {
-            // Middleware already sent a response, don't call done
-            return;
-          }
-          // No response sent, continue
-          done();
+          if (!reply.sent) done();
         }
       } catch (err) {
-        // Check if reply was sent by middleware
-        if (reply.sent) {
-          // Middleware already sent a response, don't call done
-          return;
-        }
-        // No response sent, pass error to done
-        done(err);
+        if (!reply.sent) done(err);
       }
     };
   }
 
   const adapter: FastifyHttpAdapter = {
-    /**
-     * Adds a route to the Fastify application
-     */
     addRoute(route: RouteDefinition) {
-      const preHandlers = Array.isArray(route.preHandler) 
-        ? route.preHandler 
-        : route.preHandler 
-          ? [route.preHandler] 
+      const preHandlers = Array.isArray(route.preHandler)
+        ? route.preHandler
+        : route.preHandler
+          ? [route.preHandler]
           : [];
-          
+
       instance.route({
         method: route.method,
         url: route.path,
@@ -160,16 +154,10 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
       });
     },
 
-    /**
-     * Starts the Fastify server
-     */
     async listen(port: number, host?: string) {
       await instance.listen({ port, host });
     },
 
-    /**
-     * Returns the underlying Fastify instance
-     */
     getUnderlying() {
       return instance;
     },
@@ -177,5 +165,3 @@ export function createFastifyAdapter(app: CoreSaaSApp): FastifyHttpAdapter {
 
   return adapter;
 }
-
-

@@ -2,6 +2,12 @@ import jwt, { type SignOptions, type Secret } from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 import { db } from '../db/db-client';
 
+export interface TokenPayload {
+  sub: string;
+  type: 'access' | 'refresh';
+  jti: string;
+}
+
 export interface JwtConfig {
   secret: string;
   accessTTL: string;
@@ -9,23 +15,31 @@ export interface JwtConfig {
 }
 
 export function createJwtUtil(config: JwtConfig) {
+  const algorithm: SignOptions['algorithm'] = 'HS256';
+
   return {
-    signAccess(payload: object): string {
+    signAccess(payload: Pick<TokenPayload, 'sub'>): string {
+      const jti = randomUUID();
       const options: SignOptions = {
-        expiresIn: config.accessTTL as unknown as SignOptions['expiresIn'],
-        jwtid: randomUUID(),
+        expiresIn: config.accessTTL as SignOptions['expiresIn'],
+        jwtid: jti,
+        algorithm,
       };
-      return jwt.sign({ ...payload, type: 'access' } as any, config.secret as Secret, options);
+      const tokenPayload: Omit<TokenPayload, 'jti'> = { ...payload, type: 'access' };
+      return jwt.sign(tokenPayload, config.secret as Secret, options);
     },
-    signRefresh(payload: object): string {
+    signRefresh(payload: Pick<TokenPayload, 'sub'>): string {
+      const jti = randomUUID();
       const options: SignOptions = {
-        expiresIn: config.refreshTTL as unknown as SignOptions['expiresIn'],
-        jwtid: randomUUID(),
+        expiresIn: config.refreshTTL as SignOptions['expiresIn'],
+        jwtid: jti,
+        algorithm,
       };
-      return jwt.sign({ ...payload, type: 'refresh' } as any, config.secret as Secret, options);
+      const tokenPayload: Omit<TokenPayload, 'jti'> = { ...payload, type: 'refresh' };
+      return jwt.sign(tokenPayload, config.secret as Secret, options);
     },
-    async verify(token: string): Promise<unknown> {
-      const payload = jwt.verify(token, config.secret as Secret) as any;
+    async verify(token: string): Promise<TokenPayload> {
+      const payload = jwt.verify(token, config.secret as Secret, { algorithms: [algorithm] }) as TokenPayload;
       
       // Check if token is revoked by JTI
       const jti = payload?.jti as string | undefined;
@@ -38,8 +52,8 @@ export function createJwtUtil(config: JwtConfig) {
       
       return payload;
     },
-    verifyWithoutRevocationCheck(token: string): unknown {
-      return jwt.verify(token, config.secret as Secret);
+    verifyWithoutRevocationCheck(token: string): TokenPayload {
+      return jwt.verify(token, config.secret as Secret, { algorithms: [algorithm] }) as TokenPayload;
     },
   };
 }

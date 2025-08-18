@@ -1,12 +1,14 @@
-import { CoreSaaSApp } from '../../../index';
-import { type RoutePermissionPolicy } from '../../policy/policy';
+import { LatticeCore } from '../../../index';
 import { z } from 'zod';
 
-export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerPermissionRoutes(app: LatticeCore, prefix: string = '') {
+  const p = prefix;
+  const policy = app.routePolicy;
+  const grantPre = app.routeAuth(policy.permissions.grantUser, { scope: 'global' });
   app.route({
     method: 'POST',
-    path: '/permissions/user/grant',
-    preHandler: app.authorize(policy.permissions!.grantUser),
+    path: `${p}/permissions/user/grant`,
+    ...(grantPre && { preHandler: grantPre }),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         userId: z.string().min(1), 
@@ -36,10 +38,11 @@ export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissi
     },
   });
 
+  const revokePre = app.routeAuth(policy.permissions.revokeUser, { scope: 'global' });
   app.route({
     method: 'POST',
-    path: '/permissions/user/revoke',
-    preHandler: app.authorize(policy.permissions!.revokeUser),
+    path: `${p}/permissions/user/revoke`,
+    ...(revokePre && { preHandler: revokePre }),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         userId: z.string().min(1), 
@@ -69,10 +72,11 @@ export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissi
     },
   });
 
+  const userPermsPre = app.routeAuth(policy.permissions.grantUser, { scope: 'global' });
   app.route({
     method: 'GET',
-    path: '/permissions/user/:userId',
-    preHandler: app.authorize(policy.permissions!.grantUser),
+    path: `${p}/permissions/user/:userId`,
+    ...(userPermsPre && { preHandler: userPermsPre }),
     handler: async ({ params, query, req }) => {
       try {
         const { userId } = z.object({ userId: z.string().min(1) }).parse(params);
@@ -92,10 +96,11 @@ export function registerPermissionRoutes(app: CoreSaaSApp, policy: RoutePermissi
     },
   });
 
+  const effectivePre = app.routeAuth(policy.permissions.grantUser, { scope: 'global' });
   app.route({
     method: 'GET',
-    path: '/permissions/user/:userId/effective',
-    preHandler: app.authorize(policy.permissions!.grantUser),
+    path: `${p}/permissions/user/:userId/effective`,
+    ...(effectivePre && { preHandler: effectivePre }),
     handler: async ({ params, query, req }) => {
       try {
         const { userId } = z.object({ userId: z.string().min(1) }).parse(params);

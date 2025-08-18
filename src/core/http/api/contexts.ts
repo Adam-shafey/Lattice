@@ -1,12 +1,14 @@
-import { CoreSaaSApp } from '../../../index';
-import { type RoutePermissionPolicy } from '../../policy/policy';
+import { LatticeCore } from '../../../index';
 import { z } from 'zod';
 
-export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionPolicy) {
+export function registerContextRoutes(app: LatticeCore, prefix: string = '') {
+  const p = prefix;
+  const policy = app.routePolicy;
+  const createPre = app.routeAuth(policy.contexts.create);
   app.route({
     method: 'POST',
-    path: '/contexts',
-    preHandler: app.authorize(policy.contexts!.create),
+    path: `${p}/contexts`,
+    ...(createPre && { preHandler: createPre }),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         id: z.string().min(1), 
@@ -33,10 +35,11 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     },
   });
 
+  const getPre = app.routeAuth(policy.contexts.get);
   app.route({
     method: 'GET',
-    path: '/contexts/:id',
-    preHandler: app.authorize(policy.contexts!.get),
+    path: `${p}/contexts/:id`,
+    ...(getPre && { preHandler: getPre }),
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
@@ -52,10 +55,11 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     },
   });
 
+  const updatePre = app.routeAuth(policy.contexts.update);
   app.route({
     method: 'PUT',
-    path: '/contexts/:id',
-    preHandler: app.authorize(policy.contexts!.update),
+    path: `${p}/contexts/:id`,
+    ...(updatePre && { preHandler: updatePre }),
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
         name: z.string().optional(), 
@@ -79,10 +83,11 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     },
   });
 
+  const deletePre = app.routeAuth(policy.contexts.delete);
   app.route({
     method: 'DELETE',
-    path: '/contexts/:id',
-    preHandler: app.authorize(policy.contexts!.delete),
+    path: `${p}/contexts/:id`,
+    ...(deletePre && { preHandler: deletePre }),
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
@@ -96,10 +101,11 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     },
   });
 
+  const addUserPre = app.routeAuth(policy.contexts.addUser);
   app.route({
     method: 'POST',
-    path: '/contexts/:id/users/add',
-    preHandler: app.authorize(policy.contexts!.addUser),
+    path: `${p}/contexts/:id/users/add`,
+    ...(addUserPre && { preHandler: addUserPre }),
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
         userId: z.string().min(1) 
@@ -124,10 +130,11 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     },
   });
 
+  const removeUserPre = app.routeAuth(policy.contexts.removeUser);
   app.route({
     method: 'POST',
-    path: '/contexts/:id/users/remove',
-    preHandler: app.authorize(policy.contexts!.removeUser),
+    path: `${p}/contexts/:id/users/remove`,
+    ...(removeUserPre && { preHandler: removeUserPre }),
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
         userId: z.string().min(1) 
@@ -152,10 +159,11 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     },
   });
 
+  const listPre = app.routeAuth(policy.contexts.get);
   app.route({
     method: 'GET',
-    path: '/contexts',
-    preHandler: app.authorize(policy.contexts!.get),
+    path: `${p}/contexts`,
+    ...(listPre && { preHandler: listPre }),
     handler: async ({ query, req }) => {
       try {
         const type = query.type as string | undefined;
@@ -176,10 +184,11 @@ export function registerContextRoutes(app: CoreSaaSApp, policy: RoutePermissionP
     },
   });
 
+  const listUsersPre = app.routeAuth(policy.contexts.get);
   app.route({
     method: 'GET',
-    path: '/contexts/:id/users',
-    preHandler: app.authorize(policy.contexts!.get),
+    path: `${p}/contexts/:id/users`,
+    ...(listUsersPre && { preHandler: listUsersPre }),
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);

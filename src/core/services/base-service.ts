@@ -29,12 +29,12 @@ export interface ServiceContext {
 }
 
 /**
- * Service Error Interface
- * 
+ * IServiceError Interface
+ *
  * Extends the standard Error interface with additional properties for
  * consistent error handling across all services.
  */
-export interface ServiceError extends Error {
+export interface IServiceError extends Error {
   code: string;           // Machine-readable error code
   statusCode: number;     // HTTP status code
   details?: Record<string, unknown>; // Additional error details
@@ -51,7 +51,7 @@ export interface ServiceError extends Error {
  * - ServiceError.validationError('Email is required')
  * - ServiceError.conflict('User already exists')
  */
-export class ServiceError extends Error {
+export class ServiceError extends Error implements IServiceError {
   constructor(
     message: string,
     public code: string,

@@ -43,9 +43,10 @@ export interface ServiceFactoryConfig {
  * const roleService = factory.getRoleService();
  */
 export class ServiceFactory implements IServiceFactory {
+  
   /** Database client shared across all services */
   private readonly db: PrismaClient;
-  
+
   /** Lazy-loaded context service instance */
   private _contextService?: ContextService;
   
