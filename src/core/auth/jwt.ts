@@ -39,7 +39,7 @@ export function createJwtUtil(config: JwtConfig) {
       return jwt.sign(tokenPayload, config.secret as Secret, options);
     },
     async verify(token: string): Promise<TokenPayload> {
-      const payload = jwt.verify<TokenPayload>(token, config.secret as Secret, { algorithms: [algorithm] });
+      const payload = jwt.verify(token, config.secret as Secret, { algorithms: [algorithm] }) as TokenPayload;
       
       // Check if token is revoked by JTI
       const jti = payload?.jti as string | undefined;
@@ -53,7 +53,7 @@ export function createJwtUtil(config: JwtConfig) {
       return payload;
     },
     verifyWithoutRevocationCheck(token: string): TokenPayload {
-      return jwt.verify<TokenPayload>(token, config.secret as Secret, { algorithms: [algorithm] });
+      return jwt.verify(token, config.secret as Secret, { algorithms: [algorithm] }) as TokenPayload;
     },
   };
 }

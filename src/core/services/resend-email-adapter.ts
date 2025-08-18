@@ -16,12 +16,20 @@ export class ResendEmailAdapter implements EmailAdapter {
   }
 
   async send(message: EmailMessage): Promise<void> {
-    await this.resend.emails.send({
+    const emailData: any = {
       from: this.from,
       to: message.to,
       subject: message.subject,
-      html: message.html,
-      text: message.text,
-    });
+    };
+
+    if (message.html) {
+      emailData.html = message.html;
+    }
+
+    if (message.text) {
+      emailData.text = message.text;
+    }
+
+    await this.resend.emails.send(emailData);
   }
 }
