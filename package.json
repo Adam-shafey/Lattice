@@ -1,6 +1,6 @@
 {
   "name": "@yourorg/lattice-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "type": "commonjs",
   "main": "dist/index.js",
@@ -8,6 +8,11 @@
   "bin": {
     "lattice": "dist/core/cli/index.js"
   },
+  "license": "MIT",
+  "repository": "github:yourorg/lattice",
+  "author": "Your Name <you@example.com>",
+  "homepage": "https://github.com/yourorg/lattice#readme",
+  "bugs": "https://github.com/yourorg/lattice/issues",
   "scripts": {
     "swagger:gen": "ts-node src/scripts/swagger.ts",
     "build": "npm run swagger:gen && tsc -p tsconfig.json",
@@ -23,7 +28,9 @@
     "test": "vitest run",
     "test:minimal": "vitest run --reporter=basic --silent",
     "swagger": "ts-node swagger.ts",
-    "policymanager": "ts-node src/scripts/policymanager.ts"
+    "policymanager": "ts-node src/scripts/policymanager.ts",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm test"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",
