@@ -9,7 +9,7 @@ import { registerPermissionRoutes } from './core/http/api/permissions';
 import { registerContextRoutes } from './core/http/api/contexts';
 import { registerRoleRoutes } from './core/http/api/roles';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
-import { ServiceFactory, getServiceFactory, setServiceFactory } from './core/services';
+import { ServiceFactory, setServiceFactory } from './core/services';
 import type { EmailAdapter } from './core/services';
 import { db } from './core/db/db-client';
 import { logger } from './core/logger';
@@ -67,7 +67,6 @@ export interface HttpAdapter {
 
 export class LatticeCore {
   public readonly permissionRegistry: PermissionRegistry;
-  public readonly PermissionRegistry: PermissionRegistry;
   private readonly adapterKind: SupportedAdapter;
   private readonly httpAdapter: HttpAdapter;
   private readonly policy: RoutePermissionPolicy;
@@ -79,7 +78,6 @@ export class LatticeCore {
     this.config = config;
     this.apiPrefix = config.apiPrefix ?? '';
     this.permissionRegistry = new PermissionRegistry();
-    this.PermissionRegistry = this.permissionRegistry;
     this.adapterKind = config.adapter;
     this.httpAdapter =
       config.adapter === 'fastify'
@@ -115,7 +113,7 @@ export class LatticeCore {
     return this.serviceFactory;
   }
 
-  public get apiBase() {
+  public get apiBase(): string {
     return this.apiPrefix;
   }
 
@@ -172,23 +170,23 @@ export class LatticeCore {
   }
 
   public async checkAccess(input: CheckAccessInput): Promise<boolean> {
-      logger.log('🔍 [CHECK_ACCESS] Starting checkAccess');
-      logger.log('🔍 [CHECK_ACCESS] Input:', input);
+    logger.log('🔍 [CHECK_ACCESS] Starting checkAccess');
+    logger.log('🔍 [CHECK_ACCESS] Input:', input);
     
     const { userId, context, permission, scope, contextType } = input;
 
     let lookupContext: { type: string; id: string | null } | null = context ?? null;
     if (scope === 'global') {
       lookupContext = null;
-        logger.log('🔍 [CHECK_ACCESS] Global scope - setting lookupContext to null');
+      logger.log('🔍 [CHECK_ACCESS] Global scope - setting lookupContext to null');
     } else if (scope === 'type-wide') {
       lookupContext = contextType ? { type: contextType, id: null } : (context ?? null);
-        logger.log('🔍 [CHECK_ACCESS] Type-wide scope - setting lookupContext to:', lookupContext);
+      logger.log('🔍 [CHECK_ACCESS] Type-wide scope - setting lookupContext to:', lookupContext);
     } else {
-        logger.log('🔍 [CHECK_ACCESS] Exact scope or undefined - using provided context:', lookupContext);
+      logger.log('🔍 [CHECK_ACCESS] Exact scope or undefined - using provided context:', lookupContext);
     }
 
-      logger.log('🔍 [CHECK_ACCESS] Final lookupContext:', lookupContext);
+    logger.log('🔍 [CHECK_ACCESS] Final lookupContext:', lookupContext);
 
     try {
       logger.log('🔍 [CHECK_ACCESS] Calling fetchEffectivePermissions');
@@ -208,8 +206,7 @@ export class LatticeCore {
     }
   }
 
-  // Remove the in-memory grantUserPermission function - everything should be DB-driven
-  // public grantUserPermission(userId: string, permission: string, contextId?: string): void { ... }
+  // Note: All permission management is now DB-driven through the permission service
 
   public registerPlugin(plugin: LatticePlugin): void {
     if (plugin.permissions) {
