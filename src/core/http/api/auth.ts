@@ -36,7 +36,6 @@ export function requireAuthMiddleware(app: CoreSaaSApp) {
       
       const jwt = getJwt(app);
       const payload = await jwt.verify(token);
-      const payload = await jwt.verify(token) as any;
       logger.log('🔑 [REQUIRE_AUTH] JWT payload:', payload);
       (req as any).user = { id: payload.sub };
       logger.log('🔑 [REQUIRE_AUTH] ✅ Set req.user to:', req.user);
