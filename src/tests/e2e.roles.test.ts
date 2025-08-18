@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach } from 'vitest';
 import { Lattice } from '../index';
 import { registerRoleRoutes } from '../core/http/api/roles';
 import { db } from '../core/db/db-client';
@@ -14,11 +14,6 @@ function authHeaders(userId: string) {
 
 describe('E2E: Role Management', () => {
   let app: ReturnType<typeof Lattice>;
-
-  beforeAll(async () => {
-    process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
-  });
-
   beforeEach(async () => {
     // Create fresh app instance for each test
     app = Lattice({
