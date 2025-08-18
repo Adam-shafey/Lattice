@@ -1,14 +1,13 @@
 import { LatticeCore } from '../../../index';
 import { createJwtUtil } from '../../auth/jwt';
 import { z } from 'zod';
-import { db } from '../../db/db-client';
 import { logger } from '../../logger';
 
 function getJwt(app: LatticeCore) {
   const secret = app.jwtConfig?.secret || process.env.JWT_SECRET || 'dev-secret';
   const accessTTL = app.jwtConfig?.accessTTL || '15m';
   const refreshTTL = app.jwtConfig?.refreshTTL || '7d';
-  return createJwtUtil({ secret, accessTTL, refreshTTL });
+  return createJwtUtil({ secret, accessTTL, refreshTTL }, app.db);
 }
 
 export function requireAuthMiddleware(app: LatticeCore) {
@@ -117,7 +116,7 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
         
         // Revoke old refresh token if JTI present
         if (jti) {
-          await db.revokedToken.upsert({
+          await app.db.revokedToken.upsert({
             where: { jti },
             update: {},
             create: { jti, userId }
@@ -155,7 +154,7 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
         if (!jti) return { ok: true };
         
         // Revoke token
-        const revokedToken = await db.revokedToken.upsert({ 
+        const revokedToken = await app.db.revokedToken.upsert({
           where: { jti }, 
           update: {}, 
           create: { jti, userId: payload?.sub ?? null } 
@@ -168,35 +167,33 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
     },
   });
 
-  // Password change (requires auth)
+  // Password change
+  const changeSchema = z.object({
+        userId: z.string().min(1).optional(),
+        oldPassword: z.string().min(6),
+        newPassword: z.string().min(6),
+      });
+
   app.route({
     method: 'POST',
     path: `${p}/auth/password/change`,
-    preHandler: requireAuthMiddleware(app),
+    ...(app.authnEnabled && { preHandler: app.requireAuth() }),
     handler: async ({ body, user }) => {
-      const schema = z.object({ 
-        oldPassword: z.string().min(6), 
-        newPassword: z.string().min(6) 
-      });
-      
-      try {
-        const parsed = schema.safeParse(body);
-        if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
-        const { oldPassword, newPassword } = parsed.data;
-        
-        if (!user) {
-          return { error: 'Unauthorized' };
-        }
-        
-        await app.userService.changePassword(user.id, oldPassword, newPassword, {
-          actorId: user.id
-        });
-        
-        return { ok: true };
-      } catch (error: any) {
-        return { error: error.message || 'Password change failed' };
+      const parsed = changeSchema.safeParse(body);
+      if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
+
+      const { oldPassword, newPassword } = parsed.data;
+      const userId = app.authnEnabled ? user?.id : parsed.data.userId;
+
+      if (app.authnEnabled && !userId) {
+        return { error: 'Unauthorized' };
       }
+
+      await app.userService.changePassword(userId!, oldPassword, newPassword, {
+        actorId: userId!,
+      });
+
+      return { ok: true };
     },
   });
 

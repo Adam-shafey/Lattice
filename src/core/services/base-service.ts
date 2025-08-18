@@ -6,8 +6,7 @@
  * transaction management.
  */
 
-import { db as PrismaClient, type Prisma } from '../db/db-client';
-import type { PrismaClient as PrismaClientType } from '../../../prisma/generated/client';
+import type { PrismaClient, Prisma } from '../db/db-client';
 
 /**
  * Service Context Interface
@@ -30,12 +29,12 @@ export interface ServiceContext {
 }
 
 /**
- * Service Error Interface
- * 
+ * IServiceError Interface
+ *
  * Extends the standard Error interface with additional properties for
  * consistent error handling across all services.
  */
-export interface ServiceError extends Error {
+export interface IServiceError extends Error {
   code: string;           // Machine-readable error code
   statusCode: number;     // HTTP status code
   details?: Record<string, unknown>; // Additional error details
@@ -52,7 +51,7 @@ export interface ServiceError extends Error {
  * - ServiceError.validationError('Email is required')
  * - ServiceError.conflict('User already exists')
  */
-export class ServiceError extends Error {
+export class ServiceError extends Error implements IServiceError {
   constructor(
     message: string,
     public code: string,
@@ -135,13 +134,13 @@ export class ServiceError extends Error {
  */
 export abstract class BaseService {
   /** Database client for all database operations */
-  protected readonly db: PrismaClientType;
+  protected readonly db: PrismaClient;
 
   /**
    * Constructor for BaseService
    * @param db - Prisma database client
    */
-  constructor(db: PrismaClientType) {
+  constructor(db: PrismaClient) {
     this.db = db;
   }
 
@@ -162,7 +161,7 @@ export abstract class BaseService {
    * });
    */
   protected async withTransaction<T>(
-    operation: (tx: any) => Promise<T>
+    operation: (tx: Prisma.TransactionClient) => Promise<T>
   ): Promise<T> {
     return this.db.$transaction(operation);
   }

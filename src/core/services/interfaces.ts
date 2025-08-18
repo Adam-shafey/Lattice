@@ -9,8 +9,10 @@
  * - Consistent API patterns
  */
 
-import type { User, Role, Permission, Context, UserRole, RolePermission, UserPermission } from '../db/db-client';
+import type { User, Role, Permission, Context, UserRole, RolePermission, UserPermission, AbacPolicy } from '../db/db-client';
 import type { ServiceContext } from './base-service';
+
+export type SafeUser = Omit<User, 'passwordHash'>;
 
 /**
  * User Service Interface
@@ -41,7 +43,7 @@ export interface IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  getUserById(id: string, context?: ServiceContext): Promise<User | null>;
+  getUserById(id: string, context?: ServiceContext): Promise<SafeUser | null>;
 
   /**
    * Retrieves a user by their email address
@@ -49,7 +51,7 @@ export interface IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  getUserByEmail(email: string, context?: ServiceContext): Promise<User | null>;
+  getUserByEmail(email: string, context?: ServiceContext): Promise<SafeUser | null>;
 
   /**
    * Updates a user's profile information
@@ -61,7 +63,7 @@ export interface IUserService {
   updateUser(id: string, updates: {
     email?: string;
     password?: string;
-  }, context?: ServiceContext): Promise<User>;
+  }, context?: ServiceContext): Promise<SafeUser>;
 
   /**
    * Permanently deletes a user and all associated data
@@ -82,7 +84,7 @@ export interface IUserService {
     limit?: number;
     offset?: number;
     context?: ServiceContext;
-  }): Promise<{ users: User[]; total: number }>;
+  }): Promise<{ users: SafeUser[]; total: number }>;
 
   /**
    * Changes a user's password with old password verification
@@ -378,13 +380,41 @@ export interface IPermissionService {
 }
 
 /**
+ * ABAC Policy Service Interface
+ *
+ * Defines CRUD operations for managing attribute-based access control policies.
+ */
+export interface IPolicyService {
+  createPolicy(params: {
+    action: string;
+    resource: string;
+    condition: string;
+    effect: 'permit' | 'deny';
+    context?: ServiceContext;
+  }): Promise<AbacPolicy>;
+
+  getPolicy(id: string, context?: ServiceContext): Promise<AbacPolicy | null>;
+
+  listPolicies(context?: ServiceContext): Promise<AbacPolicy[]>;
+
+  updatePolicy(id: string, data: {
+    action?: string;
+    resource?: string;
+    condition?: string;
+    effect?: 'permit' | 'deny';
+    context?: ServiceContext;
+  }): Promise<AbacPolicy>;
+
+  deletePolicy(id: string, context?: ServiceContext): Promise<void>;
+}
+
+/**
  * Context Service Interface
  * 
  * Defines operations for context management including:
  * - Context resolution from requests
  * - Context creation and management
  * - User membership in contexts
- * - Context hierarchy management
  */
 export interface IContextService {
   /**
@@ -520,10 +550,16 @@ export interface IServiceFactory {
    * @returns IPermissionService instance
    */
   getPermissionService(): IPermissionService;
-  
+
   /**
    * Gets the context service instance
    * @returns IContextService instance
    */
   getContextService(): IContextService;
+
+  /**
+   * Gets the ABAC policy service instance
+   * @returns IPolicyService instance
+   */
+  getPolicyService(): IPolicyService;
 }

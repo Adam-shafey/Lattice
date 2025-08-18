@@ -39,7 +39,7 @@ describe('Auth Service', () => {
 
   describe('JWT utilities', () => {
     it('signs and verifies access tokens', async () => {
-      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
+      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' }, db);
       const token = jwt.signAccess({ sub: 'user_1' });
       const payload = await jwt.verify(token);
       expect(payload.sub).toBe('user_1');
@@ -47,7 +47,7 @@ describe('Auth Service', () => {
     });
 
     it('signs and verifies refresh tokens', async () => {
-      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
+      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' }, db);
       const token = jwt.signRefresh({ sub: 'user_1' });
       const payload = await jwt.verify(token);
       expect(payload.sub).toBe('user_1');
@@ -55,7 +55,7 @@ describe('Auth Service', () => {
     });
 
     it('includes JTI in tokens', async () => {
-      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
+      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' }, db);
       const token = jwt.signAccess({ sub: 'user_1' });
       const payload = await jwt.verify(token);
       expect(payload.jti).toBeDefined();
@@ -63,13 +63,13 @@ describe('Auth Service', () => {
     });
 
     it('rejects invalid tokens', async () => {
-      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
+      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' }, db);
       await expect(jwt.verify('invalid-token')).rejects.toThrow();
     });
 
     it('rejects tokens with wrong secret', async () => {
-      const jwt1 = createJwtUtil({ secret: 'secret1', accessTTL: '15m', refreshTTL: '7d' });
-      const jwt2 = createJwtUtil({ secret: 'secret2', accessTTL: '15m', refreshTTL: '7d' });
+      const jwt1 = createJwtUtil({ secret: 'secret1', accessTTL: '15m', refreshTTL: '7d' }, db);
+      const jwt2 = createJwtUtil({ secret: 'secret2', accessTTL: '15m', refreshTTL: '7d' }, db);
       const token = jwt1.signAccess({ sub: 'user_1' });
       await expect(jwt2.verify(token)).rejects.toThrow();
     });
@@ -151,7 +151,7 @@ describe('Auth Service', () => {
         context: { actorId: 'system' }
       });
 
-      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' });
+      const jwt = createJwtUtil({ secret: 'test', accessTTL: '15m', refreshTTL: '7d' }, db);
       const token = jwt.signAccess({ sub: user.id });
       const payload = await jwt.verify(token);
       const jti = payload.jti;

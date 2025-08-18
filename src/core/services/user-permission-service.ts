@@ -29,7 +29,8 @@
 
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IPermissionService } from './interfaces';
-import type { Permission, UserPermission } from '../db/db-client';
+import type { PrismaClient, Prisma, Permission, UserPermission } from '../db/db-client';
+import { PermissionRegistry } from '../permissions/permission-registry';
 
 /**
  * UserPermissionService Class
@@ -39,9 +40,11 @@ import type { Permission, UserPermission } from '../db/db-client';
  * validation and transaction management.
  */
 export class UserPermissionService extends BaseService implements IPermissionService {
+  private readonly permissionRegistry: PermissionRegistry;
 
-  constructor(db: any) {
+  constructor(db: PrismaClient, permissionRegistry: PermissionRegistry) {
     super(db);
+    this.permissionRegistry = permissionRegistry;
   }
   
   /**
@@ -85,17 +88,11 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before granting permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         // Verify the context exists if a specific context ID is provided
         if (contextId) {
-          const context = await this.db.context.findUnique({ where: { id: contextId } });
-          if (!context) {
-            throw ServiceError.notFound('Context', contextId);
-          }
+          await this.ensureContextExists(contextId);
         }
 
         // Create or find the permission record
@@ -176,10 +173,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before revoking permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         // Find the permission record
         const permission = await this.db.permission.findUnique({ where: { key: permissionKey } });
@@ -256,13 +250,10 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before querying permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         // Build the where clause based on the provided context parameters
-        const where: any = { userId };
+        const where: Prisma.UserPermissionWhereInput = { userId };
         if (contextId) {
           // Context-specific permissions
           where.contextId = contextId;
@@ -277,13 +268,14 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         }
 
         // Query user permissions with included permission details
-        const userPermissions = await this.db.userPermission.findMany({
-          where,
-          include: { permission: true },
-        });
+        const userPermissions: Prisma.UserPermissionGetPayload<{ include: { permission: true } }>[] =
+          await this.db.userPermission.findMany({
+            where,
+            include: { permission: true },
+          });
 
         // Extract and return just the permission objects
-        return userPermissions.map((up: any) => up.permission);
+        return userPermissions.map((up) => up.permission);
       },
       {
         action: 'permission.user.list',
@@ -338,7 +330,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         }
 
         // Build the where clause based on the provided context parameters
-        const where: any = { roleId };
+        const where: Prisma.RolePermissionWhereInput = { roleId };
         if (contextId) {
           // Context-specific permissions
           where.contextId = contextId;
@@ -353,13 +345,14 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         }
 
         // Query role permissions with included permission details
-        const rolePermissions = await this.db.rolePermission.findMany({
-          where,
-          include: { permission: true },
-        });
+        const rolePermissions: Prisma.RolePermissionGetPayload<{ include: { permission: true } }>[] =
+          await this.db.rolePermission.findMany({
+            where,
+            include: { permission: true },
+          });
 
         // Extract and return just the permission objects
-        return rolePermissions.map((rp: any) => rp.permission);
+        return rolePermissions.map((rp) => rp.permission);
       },
       {
         action: 'permission.role.list',
@@ -410,10 +403,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before calculating permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         // Get direct user permissions
         const userPermissions = await this.getUserPermissions({
@@ -436,14 +426,30 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         });
 
         // Collect all permissions from user's roles
-        const rolePermissions: Permission[] = [];
-        for (const userRole of userRoles) {
-          const permissions = await this.getRolePermissions({
-            roleId: userRole.roleId,
-            contextId,
-            contextType,
+        let rolePermissions: Permission[] = [];
+        const roleIds = userRoles.map((userRole) => userRole.roleId);
+
+        if (roleIds.length > 0) {
+          const where: Prisma.RolePermissionWhereInput = {
+            roleId: { in: roleIds },
+          };
+
+          if (contextId) {
+            where.contextId = contextId;
+          } else if (contextType) {
+            where.contextId = null;
+            where.contextType = contextType;
+          } else {
+            where.contextId = null;
+            where.contextType = null;
+          }
+
+          const rolePermissionRecords = await this.db.rolePermission.findMany({
+            where,
+            include: { permission: true },
           });
-          rolePermissions.push(...permissions);
+
+          rolePermissions = rolePermissionRecords.map((rp: any) => rp.permission);
         }
 
         // Combine and deduplicate permissions
@@ -517,10 +523,8 @@ export class UserPermissionService extends BaseService implements IPermissionSer
         // Convert permissions to a Set of permission keys for wildcard matching
         const permissionKeys = new Set(permissions.map(p => p.key));
 
-        // Use the permission registry to check for wildcard matches
-        // We need to access the permission registry through the app instance
-        // For now, we'll implement a simple wildcard check here
-        const hasPermission = this.checkPermissionWithWildcards(permissionKey, permissionKeys);
+        // Use the shared permission registry for wildcard checks
+        const hasPermission = this.permissionRegistry.isAllowed(permissionKey, permissionKeys);
 
         return hasPermission;
       },
@@ -537,74 +541,18 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     );
   }
 
-  /**
-   * Checks if a permission matches any pattern in a set of granted permissions
-   * 
-   * This method supports wildcard matching using the same logic as the PermissionRegistry.
-   * 
-   * @param required - The permission key being checked
-   * @param granted - Set of permission keys the user has (may include wildcards)
-   * @returns Boolean indicating if the required permission is allowed
-   */
-  private checkPermissionWithWildcards(required: string, granted: Set<string>): boolean {
-    // Check for exact match first
-    if (granted.has(required)) {
-      return true;
+  private async ensureUserExists(userId: string, client: any = this.db): Promise<void> {
+    const user = await client.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw ServiceError.notFound('User', userId);
     }
-    
-    // Check for wildcard matches
-    for (const pattern of granted) {
-      if (pattern.includes('*') && this.permissionMatches(pattern, required)) {
-        return true;
-      }
-    }
-    
-    return false;
   }
 
-  /**
-   * Checks if a permission matches a pattern with wildcard support
-   * 
-   * @param pattern - The pattern to match against (may contain '*' wildcards)
-   * @param permission - The permission string to check
-   * @returns Boolean indicating if the permission matches the pattern
-   */
-  private permissionMatches(pattern: string, permission: string): boolean {
-    // Exact match
-    if (pattern === permission) {
-      return true;
+  private async ensureContextExists(contextId: string, client: any = this.db): Promise<void> {
+    const context = await client.context.findUnique({ where: { id: contextId } });
+    if (!context) {
+      throw ServiceError.notFound('Context', contextId);
     }
-    
-    const patternParts = pattern.split(':');
-    const permParts = permission.split(':');
-
-    // Check each part of the permission
-    for (let i = 0; i < Math.max(patternParts.length, permParts.length); i++) {
-      const patternPart = patternParts[i];
-      const permPart = permParts[i];
-      
-      // If pattern part is undefined, no match
-      if (patternPart === undefined) {
-        return false;
-      }
-      
-      // If pattern part is wildcard, match everything
-      if (patternPart === '*') {
-        return true;
-      }
-      
-      // If permission part is undefined, no match
-      if (permPart === undefined) {
-        return false;
-      }
-      
-      // If parts don't match exactly, no match
-      if (patternPart !== permPart) {
-        return false;
-      }
-    }
-    
-    return true;
   }
 
   /**
@@ -651,10 +599,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
     return this.execute(
       async () => {
         // Verify the user exists before granting permissions
-        const user = await this.db.user.findUnique({ where: { id: userId } });
-        if (!user) {
-          throw ServiceError.notFound('User', userId);
-        }
+        await this.ensureUserExists(userId);
 
         const results: UserPermission[] = [];
 
@@ -666,10 +611,7 @@ export class UserPermissionService extends BaseService implements IPermissionSer
 
             // Verify context exists if provided
             if (perm.contextId) {
-              const context = await tx.context.findUnique({ where: { id: perm.contextId } });
-              if (!context) {
-                throw ServiceError.notFound('Context', perm.contextId);
-              }
+              await this.ensureContextExists(perm.contextId, tx);
             }
 
             // Create or find the permission

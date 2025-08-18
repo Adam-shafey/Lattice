@@ -1,4 +1,4 @@
-import { db } from '../db/db-client';
+import type { PrismaClient } from '../db/db-client';
 import { logger } from '../logger';
 
 export interface EffectivePermissionsQuery {
@@ -19,7 +19,10 @@ export interface EffectivePermissionsQuery {
  * @param params.context - Optional context with type and id for scoped permissions
  * @returns Promise resolving to a Set of permission keys
  */
-export async function fetchEffectivePermissions({ userId, context }: EffectivePermissionsQuery): Promise<Set<string>> {
+export async function fetchEffectivePermissions(
+  db: PrismaClient,
+  { userId, context }: EffectivePermissionsQuery
+): Promise<Set<string>> {
   logger.log('📋 [FETCH_EFFECTIVE] Starting fetchEffectivePermissions');
   logger.log('📋 [FETCH_EFFECTIVE] userId:', userId);
   logger.log('📋 [FETCH_EFFECTIVE] context:', context);
@@ -121,11 +124,12 @@ export async function fetchEffectivePermissions({ userId, context }: EffectivePe
  * @returns Promise resolving to boolean indicating if user has the permission
  */
 export async function checkUserPermission(
-  userId: string, 
-  permissionKey: string, 
+  db: PrismaClient,
+  userId: string,
+  permissionKey: string,
   context?: { type: string; id: string } | null
 ): Promise<boolean> {
-  const effectivePermissions = await fetchEffectivePermissions({ userId, context });
+  const effectivePermissions = await fetchEffectivePermissions(db, { userId, context });
   return effectivePermissions.has(permissionKey);
 }
 

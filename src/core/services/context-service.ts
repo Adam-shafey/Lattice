@@ -1,6 +1,6 @@
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IContextService } from './interfaces';
-import type { Context, User } from '../db/db-client';
+import type { PrismaClient, Context, User } from '../db/db-client';
 
 export interface ResolveContextInput {
   routeParam?: string | null;
@@ -16,7 +16,7 @@ export interface ContextObject {
 
 export class ContextService extends BaseService implements IContextService {
 
-  constructor(db: any) {
+  constructor(db: PrismaClient) {
     super(db);
   }
   
@@ -275,11 +275,10 @@ export class ContextService extends BaseService implements IContextService {
           throw ServiceError.notFound('Context', contextId);
         }
 
-        // Remove user from context
-        await this.db.userContext.delete({
-          where: { userId_contextId: { userId, contextId } },
-        }).catch(() => {
-          // User wasn't in context, which is fine
+        // Remove user from context. Using deleteMany keeps the operation
+        // idempotent and quietly succeeds if the record doesn't exist.
+        await this.db.userContext.deleteMany({
+          where: { userId, contextId },
         });
       },
       {
@@ -322,37 +321,6 @@ export class ContextService extends BaseService implements IContextService {
 
       },
       serviceContext
-    );
-  }
-
-  async getContextHierarchy(contextId: string, context?: ServiceContext): Promise<{
-    current: Context;
-    parents: Context[];
-    children: Context[];
-  }> {
-    this.validateString(contextId, 'context id');
-
-    return this.execute(
-      async () => {
-        const current = await this.db.context.findUnique({ where: { id: contextId } });
-        if (!current) {
-          throw ServiceError.notFound('Context', contextId);
-        }
-
-        // For now, return empty arrays for parents and children
-        // This can be extended when hierarchical contexts are implemented
-        return {
-          current,
-          parents: [],
-          children: [],
-        };
-      },
-      {
-        action: 'context.hierarchy.read',
-        success: true,
-        contextId,
-      },
-      context
     );
   }
 }

@@ -8,10 +8,12 @@ import { registerUserRoutes } from './core/http/api/users';
 import { registerPermissionRoutes } from './core/http/api/permissions';
 import { registerContextRoutes } from './core/http/api/contexts';
 import { registerRoleRoutes } from './core/http/api/roles';
+import { registerPolicyRoutes } from './core/http/api/policies';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
 import { ServiceFactory, setServiceFactory } from './core/services';
-import { db } from './core/db/db-client';
+import { db as dbClient, type PrismaClient } from './core/db/db-client';
 import { logger } from './core/logger';
+import { evaluateAbac, DefaultAttributeProvider } from './core/abac/abac';
 
 export type SupportedAdapter = 'fastify' | 'express';
 
@@ -19,6 +21,16 @@ export interface CoreConfig {
   db: { provider: 'postgres' | 'sqlite'; url?: string };
   adapter: SupportedAdapter;
   jwt: { accessTTL: string; refreshTTL: string; secret?: string };
+  /**
+   * Enable route-level authentication (JWT verification)
+   * Defaults to true
+   */
+  authn?: boolean;
+  /**
+   * Enable route-level authorization checks
+   * Defaults to true
+   */
+  authz?: boolean;
   policy?: RoutePermissionPolicy;
   apiPrefix?: string;
 }
@@ -71,25 +83,34 @@ export class LatticeCore {
   private readonly serviceFactory: ServiceFactory;
   private readonly config: CoreConfig;
   private readonly apiPrefix: string;
+  private readonly enableAuthn: boolean;
+  private readonly enableAuthz: boolean;
+  private readonly dbClient: PrismaClient;
 
   constructor(config: CoreConfig) {
     this.config = config;
     this.apiPrefix = config.apiPrefix ?? '';
-    this.permissionRegistry = new PermissionRegistry();
+    this.dbClient = dbClient;
+    this.permissionRegistry = new PermissionRegistry(this.dbClient);
     this.adapterKind = config.adapter;
     this.httpAdapter =
       config.adapter === 'fastify'
         ? createFastifyAdapter(this)
         : createExpressAdapter(this);
     this.policy = {
+      roles: { ...defaultRoutePermissionPolicy.roles, ...(config.policy?.roles ?? {}) },
       users: { ...defaultRoutePermissionPolicy.users, ...(config.policy?.users ?? {}) },
       permissions: { ...defaultRoutePermissionPolicy.permissions, ...(config.policy?.permissions ?? {}) },
       contexts: { ...defaultRoutePermissionPolicy.contexts, ...(config.policy?.contexts ?? {}) },
     } as Required<RoutePermissionPolicy>;
 
-    // Initialize service factory with configuration
+    this.enableAuthn = config.authn !== false;
+    this.enableAuthz = config.authz !== false;
+
+    // Initialize service factory with shared permission registry
     this.serviceFactory = new ServiceFactory({
-      db,
+      db: this.dbClient,
+      permissionRegistry: this.permissionRegistry,
     });
 
     // Set global service factory for application-wide access
@@ -104,10 +125,52 @@ export class LatticeCore {
   }
 
   /**
+   * Whether route authentication (JWT verification) is enabled
+   */
+  public get authnEnabled(): boolean {
+    return this.enableAuthn;
+  }
+
+  /**
+   * Whether route authorization is enabled
+   */
+  public get authzEnabled(): boolean {
+    return this.enableAuthz;
+  }
+
+  /**
+   * Get the route permission policy
+   */
+  public get routePolicy(): Required<RoutePermissionPolicy> {
+    return this.policy as Required<RoutePermissionPolicy>;
+  }
+
+  /**
+   * Build pre-handlers for authentication and authorization based on config
+   */
+  public routeAuth(permission?: string, options?: AuthorizeOptions) {
+    const handlers: any[] = [];
+    if (this.enableAuthn) {
+      handlers.push(this.requireAuth());
+    }
+    if (permission && this.enableAuthz) {
+      handlers.push(this.authorize(permission, options));
+    }
+    return handlers.length > 0 ? handlers : undefined;
+  }
+
+  /**
    * Get the service factory instance
    */
   public get services(): ServiceFactory {
     return this.serviceFactory;
+  }
+
+  /**
+   * Get the underlying database client
+   */
+  public get db(): PrismaClient {
+    return this.dbClient;
   }
 
   public get apiBase(): string {
@@ -140,6 +203,13 @@ export class LatticeCore {
    */
   public get permissionService() {
     return this.serviceFactory.getPermissionService();
+  }
+
+  /**
+   * Get the ABAC policy service instance
+   */
+  public get policyService() {
+    return this.serviceFactory.getPolicyService();
   }
 
   public get express(): ReturnType<ExpressHttpAdapter['getUnderlying']> | undefined {
@@ -187,15 +257,32 @@ export class LatticeCore {
 
     try {
       logger.log('🔍 [CHECK_ACCESS] Calling fetchEffectivePermissions');
-      const effective = await fetchEffectivePermissions({ userId, context: lookupContext });
+      const effective = await fetchEffectivePermissions(this.dbClient, { userId, context: lookupContext });
       logger.log('🔍 [CHECK_ACCESS] fetchEffectivePermissions result - permissions count:', effective.size);
       logger.log('🔍 [CHECK_ACCESS] Effective permissions:', Array.from(effective));
       
       logger.log('🔍 [CHECK_ACCESS] Calling permissionRegistry.isAllowed');
-      const result = this.permissionRegistry.isAllowed(permission, effective);
-      logger.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', result);
-      
-      return result;
+      const rbacAllowed = this.permissionRegistry.isAllowed(permission, effective);
+      logger.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', rbacAllowed);
+
+      if (!rbacAllowed) {
+        return false;
+      }
+
+      logger.log('🔍 [CHECK_ACCESS] Evaluating ABAC policies');
+      const abacAllowed = await evaluateAbac(
+        this.policyService,
+        new DefaultAttributeProvider(),
+        {
+          action: permission,
+          resource: lookupContext?.type ?? contextType ?? 'unknown',
+          resourceId: lookupContext?.id ?? null,
+          userId,
+        }
+      );
+      logger.log('🔍 [CHECK_ACCESS] ABAC evaluation result:', abacAllowed);
+
+      return abacAllowed;
     } catch (error) {
       logger.error('🔍 [CHECK_ACCESS] ❌ Error during checkAccess:', error);
       logger.error('Failed to fetch effective permissions:', error);
@@ -223,10 +310,11 @@ export class LatticeCore {
     // Global request context middleware (only for adapters that support preHandler arrays at route-level)
     // Developers should add it before their own routes if using adapter directly.
     createAuthRoutes(this, this.apiPrefix);
-    registerUserRoutes(this, this.policy, this.apiPrefix);
-    registerPermissionRoutes(this, this.policy, this.apiPrefix);
-    registerContextRoutes(this, this.policy, this.apiPrefix);
-    registerRoleRoutes(this, this.policy, this.apiPrefix);
+    registerUserRoutes(this, this.apiPrefix);
+    registerPermissionRoutes(this, this.apiPrefix);
+    registerContextRoutes(this, this.apiPrefix);
+    registerRoleRoutes(this, this.apiPrefix);
+    registerPolicyRoutes(this, this.apiPrefix);
     
     await this.httpAdapter.listen(port, host);
   }

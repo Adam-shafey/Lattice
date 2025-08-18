@@ -13,12 +13,14 @@
  * - Testing support with reset capabilities
  */
 
-import type { PrismaClient as PrismaClientType } from '../../../prisma/generated/client';
+import type { PrismaClient } from '../db/db-client';
 import { ContextService } from './context-service';
 import { RoleService } from './role-service';
 import { UserPermissionService } from './user-permission-service';
 import { UserService } from './user-service';
-import { IServiceFactory, type IUserService, type IRoleService, type IPermissionService, type IContextService } from './interfaces';
+import { PermissionRegistry } from '../permissions/permission-registry';
+import { PolicyService } from './policy-service';
+import { IServiceFactory, type IUserService, type IRoleService, type IPermissionService, type IContextService, type IPolicyService } from './interfaces';
 
 /**
  * Configuration interface for ServiceFactory
@@ -28,7 +30,9 @@ import { IServiceFactory, type IUserService, type IRoleService, type IPermission
  */
 export interface ServiceFactoryConfig {
   /** Database client instance for all services */
-  db: PrismaClientType;
+  db: PrismaClient;
+  /** Shared permission registry instance */
+  permissionRegistry: PermissionRegistry;
 }
 
 /**
@@ -39,14 +43,16 @@ export interface ServiceFactoryConfig {
  * memory usage and startup time.
  * 
  * Usage:
- * const factory = new ServiceFactory({ db: prismaClient });
+ * const factory = new ServiceFactory({ db: prismaClient, permissionRegistry });
  * const roleService = factory.getRoleService();
  */
 export class ServiceFactory implements IServiceFactory {
-  /** Database client shared across all services */
-  private readonly db: PrismaClientType;
-
   
+  /** Database client shared across all services */
+  private readonly db: PrismaClient;
+  /** Permission registry shared across services */
+  private readonly permissionRegistry: PermissionRegistry;
+
   /** Lazy-loaded context service instance */
   private _contextService?: ContextService;
   
@@ -55,9 +61,12 @@ export class ServiceFactory implements IServiceFactory {
   
   /** Lazy-loaded user permission service instance */
   private _userPermissionService?: UserPermissionService;
-  
+
   /** Lazy-loaded user service instance */
   private _userService?: UserService;
+
+  /** Lazy-loaded ABAC policy service instance */
+  private _policyService?: PolicyService;
 
   /**
    * Constructor for ServiceFactory
@@ -65,6 +74,7 @@ export class ServiceFactory implements IServiceFactory {
    */
   constructor(config: ServiceFactoryConfig) {
     this.db = config.db;
+    this.permissionRegistry = config.permissionRegistry;
   }
 
   /**
@@ -110,7 +120,7 @@ export class ServiceFactory implements IServiceFactory {
    */
   getPermissionService(): IPermissionService {
     if (!this._userPermissionService) {
-      this._userPermissionService = new UserPermissionService(this.db);
+      this._userPermissionService = new UserPermissionService(this.db, this.permissionRegistry);
     }
     return this._userPermissionService;
   }
@@ -132,6 +142,17 @@ export class ServiceFactory implements IServiceFactory {
   }
 
   /**
+   * Gets the ABAC policy service instance (lazy-loaded)
+   * @returns IPolicyService instance
+   */
+  getPolicyService(): IPolicyService {
+    if (!this._policyService) {
+      this._policyService = new PolicyService(this.db);
+    }
+    return this._policyService;
+  }
+
+  /**
    * Gets all service instances at once
    * 
    * Convenience method to retrieve all available services in a single call.
@@ -145,6 +166,7 @@ export class ServiceFactory implements IServiceFactory {
       role: this.getRoleService(),
       permission: this.getPermissionService(),
       user: this.getUserService(),
+      policy: this.getPolicyService(),
     };
   }
 
@@ -173,6 +195,7 @@ export class ServiceFactory implements IServiceFactory {
     this._roleService = undefined;
     this._userPermissionService = undefined;
     this._userService = undefined;
+    this._policyService = undefined;
   }
 }
 
