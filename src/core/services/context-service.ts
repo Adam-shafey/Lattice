@@ -324,37 +324,6 @@ export class ContextService extends BaseService implements IContextService {
       serviceContext
     );
   }
-
-  async getContextHierarchy(contextId: string, context?: ServiceContext): Promise<{
-    current: Context;
-    parents: Context[];
-    children: Context[];
-  }> {
-    this.validateString(contextId, 'context id');
-
-    return this.execute(
-      async () => {
-        const current = await this.db.context.findUnique({ where: { id: contextId } });
-        if (!current) {
-          throw ServiceError.notFound('Context', contextId);
-        }
-
-        // For now, return empty arrays for parents and children
-        // This can be extended when hierarchical contexts are implemented
-        return {
-          current,
-          parents: [],
-          children: [],
-        };
-      },
-      {
-        action: 'context.hierarchy.read',
-        success: true,
-        contextId,
-      },
-      context
-    );
-  }
 }
 
 
