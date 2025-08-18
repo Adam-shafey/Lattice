@@ -9,6 +9,7 @@ import { registerPermissionRoutes } from './core/http/api/permissions';
 import { registerContextRoutes } from './core/http/api/contexts';
 import { registerRoleRoutes } from './core/http/api/roles';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
+import { AbacEngine, type AbacPolicy } from './core/policy/abac';
 import { ServiceFactory, setServiceFactory } from './core/services';
 import { db } from './core/db/db-client';
 import { logger } from './core/logger';
@@ -31,6 +32,10 @@ export interface CoreConfig {
   authz?: boolean;
   policy?: RoutePermissionPolicy;
   apiPrefix?: string;
+  abac?: {
+    policies?: AbacPolicy[];
+    defaultDecision?: 'permit' | 'deny';
+  };
 }
 
 export interface RouteDefinition<Body = unknown> {
@@ -83,6 +88,7 @@ export class LatticeCore {
   private readonly apiPrefix: string;
   private readonly enableAuthn: boolean;
   private readonly enableAuthz: boolean;
+  private readonly abac: AbacEngine;
 
   constructor(config: CoreConfig) {
     this.config = config;
@@ -102,6 +108,11 @@ export class LatticeCore {
 
     this.enableAuthn = config.authn !== false;
     this.enableAuthz = config.authz !== false;
+
+    this.abac = new AbacEngine(
+      config.abac?.policies ?? [],
+      config.abac?.defaultDecision ?? 'permit',
+    );
 
     // Initialize service factory with configuration
     this.serviceFactory = new ServiceFactory({
@@ -193,6 +204,10 @@ export class LatticeCore {
     return this.serviceFactory.getPermissionService();
   }
 
+  public get abacEngine(): AbacEngine {
+    return this.abac;
+  }
+
   public get express(): ReturnType<ExpressHttpAdapter['getUnderlying']> | undefined {
     return this.adapterKind === 'express'
       ? (this.httpAdapter as ExpressHttpAdapter).getUnderlying()
@@ -245,8 +260,22 @@ export class LatticeCore {
       logger.log('🔍 [CHECK_ACCESS] Calling permissionRegistry.isAllowed');
       const result = this.permissionRegistry.isAllowed(permission, effective);
       logger.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', result);
-      
-      return result;
+      if (!result) {
+        return false;
+      }
+
+      if (this.abac.hasPolicies()) {
+        logger.log('🔍 [CHECK_ACCESS] Running ABAC evaluation');
+        const abacResult = this.abac.evaluate(permission, lookupContext?.type ?? '*', {
+          user: { id: userId },
+          resource: lookupContext ? { ...lookupContext } : undefined,
+          env: { time: new Date().toISOString() }
+        });
+        logger.log('🔍 [CHECK_ACCESS] ABAC decision:', abacResult);
+        return abacResult.decision === 'permit';
+      }
+
+      return true;
     } catch (error) {
       logger.error('🔍 [CHECK_ACCESS] ❌ Error during checkAccess:', error);
       logger.error('Failed to fetch effective permissions:', error);
