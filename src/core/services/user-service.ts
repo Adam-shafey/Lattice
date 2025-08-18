@@ -17,6 +17,15 @@ import type { User } from '../db/db-client';
 import { hash, compare } from 'bcryptjs';
 import { randomUUID } from 'crypto';
 
+type SafeUser = Omit<User, 'passwordHash'>;
+
+const safeUserSelect = {
+  id: true,
+  email: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 /**
  * UserService Class
  * 
@@ -94,12 +103,12 @@ export class UserService extends BaseService implements IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  async getUserById(id: string, context?: ServiceContext): Promise<User | null> {
+  async getUserById(id: string, context?: ServiceContext): Promise<SafeUser | null> {
     this.validateString(id, 'user id');
 
     return this.execute(
       async () => {
-        return this.db.user.findUnique({ where: { id } });
+        return this.db.user.findUnique({ where: { id }, select: safeUserSelect });
       },
       {
         action: 'user.read',
@@ -118,12 +127,12 @@ export class UserService extends BaseService implements IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  async getUserByEmail(email: string, context?: ServiceContext): Promise<User | null> {
+  async getUserByEmail(email: string, context?: ServiceContext): Promise<SafeUser | null> {
     this.validateEmail(email);
 
     return this.execute(
       async () => {
-        return this.db.user.findUnique({ where: { email } });
+        return this.db.user.findUnique({ where: { email }, select: safeUserSelect });
       },
       {
         action: 'user.read',
@@ -150,7 +159,7 @@ export class UserService extends BaseService implements IUserService {
   async updateUser(id: string, updates: {
     email?: string;
     password?: string;
-  }, context?: ServiceContext): Promise<User> {
+  }, context?: ServiceContext): Promise<SafeUser> {
     this.validateString(id, 'user id');
     
     if (updates.email !== undefined) {
@@ -190,6 +199,7 @@ export class UserService extends BaseService implements IUserService {
         const user = await this.db.user.update({
           where: { id },
           data: updateData,
+          select: safeUserSelect,
         });
 
         return user;
@@ -269,7 +279,7 @@ export class UserService extends BaseService implements IUserService {
     limit?: number;
     offset?: number;
     context?: ServiceContext;
-  }): Promise<{ users: User[]; total: number }> {
+  }): Promise<{ users: SafeUser[]; total: number }> {
     const { limit = 100, offset = 0, context: serviceContext } = params || {};
 
     // Validate pagination parameters
@@ -287,13 +297,7 @@ export class UserService extends BaseService implements IUserService {
             take: limit,
             skip: offset,
             orderBy: { createdAt: 'desc' },
-            select: {
-              id: true,
-              email: true,
-              passwordHash: true,
-              createdAt: true,
-              updatedAt: true,
-            },
+            select: safeUserSelect,
           }),
           this.db.user.count(),
         ]);

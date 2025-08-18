@@ -24,6 +24,7 @@ export type {
   IPermissionService,
   IContextService,
   IServiceFactory,
+  SafeUser,
 } from './interfaces';
 
 // Service implementations

@@ -12,6 +12,8 @@
 import type { User, Role, Permission, Context, UserRole, RolePermission, UserPermission } from '../db/db-client';
 import type { ServiceContext } from './base-service';
 
+export type SafeUser = Omit<User, 'passwordHash'>;
+
 /**
  * User Service Interface
  * 
@@ -41,7 +43,7 @@ export interface IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  getUserById(id: string, context?: ServiceContext): Promise<User | null>;
+  getUserById(id: string, context?: ServiceContext): Promise<SafeUser | null>;
 
   /**
    * Retrieves a user by their email address
@@ -49,7 +51,7 @@ export interface IUserService {
    * @param context - Optional service context
    * @returns Promise resolving to User or null if not found
    */
-  getUserByEmail(email: string, context?: ServiceContext): Promise<User | null>;
+  getUserByEmail(email: string, context?: ServiceContext): Promise<SafeUser | null>;
 
   /**
    * Updates a user's profile information
@@ -61,7 +63,7 @@ export interface IUserService {
   updateUser(id: string, updates: {
     email?: string;
     password?: string;
-  }, context?: ServiceContext): Promise<User>;
+  }, context?: ServiceContext): Promise<SafeUser>;
 
   /**
    * Permanently deletes a user and all associated data
@@ -82,7 +84,7 @@ export interface IUserService {
     limit?: number;
     offset?: number;
     context?: ServiceContext;
-  }): Promise<{ users: User[]; total: number }>;
+  }): Promise<{ users: SafeUser[]; total: number }>;
 
   /**
    * Changes a user's password with old password verification
