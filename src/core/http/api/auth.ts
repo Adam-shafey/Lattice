@@ -1,14 +1,13 @@
 import { LatticeCore } from '../../../index';
 import { createJwtUtil } from '../../auth/jwt';
 import { z } from 'zod';
-import { db } from '../../db/db-client';
 import { logger } from '../../logger';
 
 function getJwt(app: LatticeCore) {
   const secret = app.jwtConfig?.secret || process.env.JWT_SECRET || 'dev-secret';
   const accessTTL = app.jwtConfig?.accessTTL || '15m';
   const refreshTTL = app.jwtConfig?.refreshTTL || '7d';
-  return createJwtUtil({ secret, accessTTL, refreshTTL });
+  return createJwtUtil({ secret, accessTTL, refreshTTL }, app.db);
 }
 
 export function requireAuthMiddleware(app: LatticeCore) {
@@ -117,7 +116,7 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
         
         // Revoke old refresh token if JTI present
         if (jti) {
-          await db.revokedToken.upsert({
+          await app.db.revokedToken.upsert({
             where: { jti },
             update: {},
             create: { jti, userId }
@@ -155,7 +154,7 @@ export function createAuthRoutes(app: LatticeCore, prefix: string = '') {
         if (!jti) return { ok: true };
         
         // Revoke token
-        const revokedToken = await db.revokedToken.upsert({ 
+        const revokedToken = await app.db.revokedToken.upsert({
           where: { jti }, 
           update: {}, 
           create: { jti, userId: payload?.sub ?? null } 

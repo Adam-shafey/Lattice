@@ -1,6 +1,6 @@
 import jwt, { type SignOptions, type Secret } from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
-import { db } from '../db/db-client';
+import type { PrismaClient } from '../db/db-client';
 
 export interface TokenPayload {
   sub: string;
@@ -14,7 +14,7 @@ export interface JwtConfig {
   refreshTTL: string;
 }
 
-export function createJwtUtil(config: JwtConfig) {
+export function createJwtUtil(config: JwtConfig, db: PrismaClient) {
   const algorithm: SignOptions['algorithm'] = 'HS256';
 
   return {

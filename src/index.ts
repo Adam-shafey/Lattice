@@ -11,7 +11,7 @@ import { registerRoleRoutes } from './core/http/api/roles';
 import { registerPolicyRoutes } from './core/http/api/policies';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
 import { ServiceFactory, setServiceFactory } from './core/services';
-import { db } from './core/db/db-client';
+import { db as dbClient, type PrismaClient } from './core/db/db-client';
 import { logger } from './core/logger';
 import { evaluateAbac, DefaultAttributeProvider } from './core/abac/abac';
 
@@ -85,11 +85,13 @@ export class LatticeCore {
   private readonly apiPrefix: string;
   private readonly enableAuthn: boolean;
   private readonly enableAuthz: boolean;
+  private readonly dbClient: PrismaClient;
 
   constructor(config: CoreConfig) {
     this.config = config;
     this.apiPrefix = config.apiPrefix ?? '';
-    this.permissionRegistry = new PermissionRegistry();
+    this.dbClient = dbClient;
+    this.permissionRegistry = new PermissionRegistry(this.dbClient);
     this.adapterKind = config.adapter;
     this.httpAdapter =
       config.adapter === 'fastify'
@@ -107,7 +109,7 @@ export class LatticeCore {
 
     // Initialize service factory with shared permission registry
     this.serviceFactory = new ServiceFactory({
-      db,
+      db: this.dbClient,
       permissionRegistry: this.permissionRegistry,
     });
 
@@ -162,6 +164,13 @@ export class LatticeCore {
    */
   public get services(): ServiceFactory {
     return this.serviceFactory;
+  }
+
+  /**
+   * Get the underlying database client
+   */
+  public get db(): PrismaClient {
+    return this.dbClient;
   }
 
   public get apiBase(): string {
@@ -248,7 +257,7 @@ export class LatticeCore {
 
     try {
       logger.log('🔍 [CHECK_ACCESS] Calling fetchEffectivePermissions');
-      const effective = await fetchEffectivePermissions({ userId, context: lookupContext });
+      const effective = await fetchEffectivePermissions(this.dbClient, { userId, context: lookupContext });
       logger.log('🔍 [CHECK_ACCESS] fetchEffectivePermissions result - permissions count:', effective.size);
       logger.log('🔍 [CHECK_ACCESS] Effective permissions:', Array.from(effective));
       
