@@ -21,19 +21,25 @@ export function createFastifyAdapter(app: LatticeCore): FastifyHttpAdapter {
     trustProxy: true
   });
 
-  // CORS (from main)
+  // Configure CORS
+  // Allowed origins can be specified via the LatticeCore config
+  // (`allowedOrigins`) or the CORS_ALLOWED_ORIGINS environment variable
+  // (comma-separated).
+  // Example: CORS_ALLOWED_ORIGINS="https://app.example.com,https://admin.example.com"
+  // Defaults to an empty array to disallow all cross-origin requests unless
+  // explicitly configured.
+  const allowedOrigins =
+    ((app as any)?.config?.allowedOrigins as string[] | undefined) ??
+    process.env.CORS_ALLOWED_ORIGINS?.split(',')
+      .map((o) => o.trim())
+      .filter(Boolean) ??
+    [];
+
   instance.register(fastifyCors, {
-    origin: [
-      'http://localhost:5173', // Vite dev server
-      'http://localhost:3000', // Production admin UI
-      'http://localhost:8080', // Swagger UI
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:8080'
-    ],
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
 
   // Read the generated swagger spec
