@@ -99,6 +99,22 @@ app.route({
 
 That's it! Your app now has enterprise-grade authorization without the enterprise complexity.
 
+## 🛡 Authorization Flow
+
+Every protected route goes through a consistent series of checks:
+
+1. **Route middleware** – `app.routeAuth` (or the lower level `authorize` middleware) pulls the user ID and context information from headers, params, query or body. It can enforce that a request is global, type-wide or scoped to an exact context. If any requirement fails the request is rejected before it reaches your handler.
+2. **`checkAccess`** – The app gathers the user's *effective permissions* (direct grants plus those from roles) for the lookup context. The `PermissionRegistry` matches the required permission, honoring wildcard patterns such as `users:*`.
+3. **ABAC policies** – After the RBAC check passes, any Attribute‑Based Access Control policies are evaluated. Access is granted only when both RBAC and ABAC succeed.
+
+Roles are always tied to a context type; assigning a role to a different type is rejected. This ensures your permission model stays consistent across organizations, teams and other boundaries.
+
+### Example scenarios
+
+- **Context-specific role vs. user grant** – A `viewer` role with `example:read` in `ctx_1` allows reading only in that context, while a direct grant of `example:write` in `ctx_2` allows writes there.
+- **Context-type validation** – Assigning a role defined for `org` to a `team` context raises an error.
+- **Global and type-wide permissions** – A global permission works everywhere, whereas a type-wide permission (e.g. `team:read`) covers all contexts of that type.
+
 ## 🧠 Mental Model
 
 In Lattice, every authorization check boils down to:
