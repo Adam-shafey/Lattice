@@ -45,7 +45,7 @@ Get Lattice running in 3 steps:
 ### 1. Install & Setup
 
 ```bash
-npm install @yourorg/lattice-core
+npm install lattice-core
 
 # Set up your environment
 export DATABASE_URL="postgresql://user:password@localhost:5432/lattice"
@@ -59,7 +59,7 @@ npx prisma db push
 ### 2. Create Your App
 
 ```typescript
-import { Lattice } from '@yourorg/lattice-core';
+import { Lattice } from 'lattice-core';
 
 const app = Lattice({
   db: { provider: 'postgres', url: process.env.DATABASE_URL },
@@ -101,15 +101,23 @@ That's it! Your app now has enterprise-grade authorization without the enterpris
 
 ## 🧠 Mental Model
 
-Lattice's mental model is simple but powerful:
+In Lattice, every authorization check boils down to:
+**(PermissionType\:PermissionId, ContextType\:ContextId)**
 
-- **Users** are people (you, your customers, your team)
-- **Permissions** are verbs (`users:read`, `projects:create`, `expenses:approve`)
-- **Roles** are bundles of permissions (`admin`, `manager`, `viewer`)
-- **Contexts** are where actions happen (`org_123`, `team_456`, `project_789`)
-- **Policies** are business rules ("only managers can approve expenses during business hours")
+* **Permissions** → the smallest building block. Tuples like `users:read`, `projects:create`, `expenses:approve`.
+* **Roles** → named bundles of permissions. Example: `admin = [users:manage, roles:manage]`. Roles by themselves aren’t scoped, they gain meaning when tied to a context.
+* **Contexts** → the *where*. A scope like `org_123`, `team_456`, `project_789`. A user’s role always lives *inside* a context.
+* **Context Types** → the shape of the scope. Examples: `Organization`, `Team`, `Project`. Each can have its own relevant permissions.
+* **Policies** → business rules that go beyond static permissions. Example: “only managers can approve expenses *during business hours*.”
 
-Think of it like this: **Permissions are verbs, Roles are bundles, Contexts are where those actions live.**
+---
+
+🔑 Think of it like this:
+
+* **Permissions** are bricks.
+* **Roles** are building blueprints.
+* **Contexts** are towns where those buildings live.
+* **Policies** are house rules that decide *when* and *how* those buildings can be used.
 
 ## 💡 Usage Examples
 
@@ -258,19 +266,9 @@ JWT_SECRET="your-super-secret-jwt-key"
 CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173"
 PORT="3000"
 ```
-
-## 📚 Documentation
-
-- **[Core Concepts](docs/README.md)** - Deep dive into Lattice's mental model
-- **[API Reference](docs/SERVICE_USAGE_GUIDE.md)** - Complete service layer documentation
-- **[Developer Guide](docs/DEV_GUIDE.md)** - Setup, testing, and development workflow
-- **[Sample Usage](docs/SampleUsage.md)** - Real-world examples and patterns
-
 ## 🤝 Contributing
 
-We're building something special here, and we'd love for you to be part of it! 
-
-Lattice is more than just another auth library - it's a new way of thinking about permissions in SaaS applications. Whether you're fixing a bug, adding a feature, or just sharing ideas, your contributions help shape the future of access control.
+We’re building Lattice to simplify access control and help devs move faster. This only works with community input so whether you’re reporting a bug, requesting a feature or sharing feedback we’d love to have you involved.
 
 **How to contribute:**
 1. Fork the repository
@@ -296,19 +294,18 @@ Lattice is evolving from a solid RBAC foundation to a comprehensive ABAC platfor
 - ✅ Plugin architecture
 - ✅ Production-ready service layer
 
-**Next (v0.2.x):**
-- 🔄 Advanced ABAC with custom attribute providers
+**Next:**
+- 🔄 Enterprise features (SSO, audit trails, compliance)
+- 🔄 Advanced ABAC
 - 🔄 Policy versioning and rollback
 - 🔄 Performance optimizations and caching
-- 🔄 More built-in plugins (Teams, Billing, Analytics)
 
-**Future (v1.0.x):**
+**Future:**
+- 🚀 Plugins! (Teams, Billing, Analytics)
 - 🚀 Visual policy editor
-- 🚀 Machine learning for policy optimization
-- 🚀 Enterprise features (SSO, audit trails, compliance)
 - 🚀 Cloud-hosted Lattice service
 
-**The goal:** From RBAC today to ABAC tomorrow — building a flexible, open framework for access control that developers actually love to use.
+**The goal:** building a flexible, open framework for access control that developers actually love to use.
 
 ## 📄 License
 
@@ -316,7 +313,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## 🙏 Acknowledgments
 
-Built with love by the open source community. Special thanks to:
 - [Prisma](https://www.prisma.io/) for type-safe database access
 - [Fastify](https://www.fastify.io/) and [Express](https://expressjs.com/) for HTTP frameworks
 - [CEL](https://github.com/google/cel-js) for policy evaluation
