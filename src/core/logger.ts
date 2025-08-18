@@ -1,39 +1,42 @@
+import pino, { Logger as PinoLogger } from 'pino';
+
 class Logger {
-  private enabled: boolean;
+  private logger: PinoLogger;
 
   constructor() {
-    this.enabled = process.env.NODE_ENV !== 'production';
+    const level = process.env.NODE_ENV === 'production' ? 'info' : 'debug';
+    this.logger = pino({ level });
+  }
+
+  get pino() {
+    return this.logger;
   }
 
   enable() {
-    this.enabled = true;
+    this.logger.level = 'debug';
   }
 
   disable() {
-    this.enabled = false;
+    this.logger.level = 'silent';
   }
 
   isEnabled() {
-    return this.enabled;
+    return this.logger.level !== 'silent';
   }
 
   log(...args: any[]) {
-    if (this.enabled) {
-      console.log(...args);
-    }
+    this.logger.info(...args);
   }
 
   warn(...args: any[]) {
-    if (this.enabled) {
-      console.warn(...args);
-    }
+    this.logger.warn(...args);
   }
 
   error(...args: any[]) {
-    console.error(...args);
+    this.logger.error(...args);
   }
 }
 
 export const logger = new Logger();
 
-logger.log(`📝 [LOGGER] Initialized. Enabled: ${logger.isEnabled()}`);
+logger.log(`📝 [LOGGER] Initialized. Level: ${logger.pino.level}`);
