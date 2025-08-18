@@ -9,7 +9,7 @@
  * - Consistent API patterns
  */
 
-import type { User, Role, Permission, Context, UserRole, RolePermission, UserPermission } from '../db/db-client';
+import type { User, Role, Permission, Context, UserRole, RolePermission, UserPermission, AbacPolicy } from '../db/db-client';
 import type { ServiceContext } from './base-service';
 
 export type SafeUser = Omit<User, 'passwordHash'>;
@@ -380,6 +380,35 @@ export interface IPermissionService {
 }
 
 /**
+ * ABAC Policy Service Interface
+ *
+ * Defines CRUD operations for managing attribute-based access control policies.
+ */
+export interface IPolicyService {
+  createPolicy(params: {
+    action: string;
+    resource: string;
+    condition: string;
+    effect: 'permit' | 'deny';
+    context?: ServiceContext;
+  }): Promise<AbacPolicy>;
+
+  getPolicy(id: string, context?: ServiceContext): Promise<AbacPolicy | null>;
+
+  listPolicies(context?: ServiceContext): Promise<AbacPolicy[]>;
+
+  updatePolicy(id: string, data: {
+    action?: string;
+    resource?: string;
+    condition?: string;
+    effect?: 'permit' | 'deny';
+    context?: ServiceContext;
+  }): Promise<AbacPolicy>;
+
+  deletePolicy(id: string, context?: ServiceContext): Promise<void>;
+}
+
+/**
  * Context Service Interface
  * 
  * Defines operations for context management including:
@@ -521,10 +550,16 @@ export interface IServiceFactory {
    * @returns IPermissionService instance
    */
   getPermissionService(): IPermissionService;
-  
+
   /**
    * Gets the context service instance
    * @returns IContextService instance
    */
   getContextService(): IContextService;
+
+  /**
+   * Gets the ABAC policy service instance
+   * @returns IPolicyService instance
+   */
+  getPolicyService(): IPolicyService;
 }

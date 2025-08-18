@@ -18,7 +18,8 @@ import { ContextService } from './context-service';
 import { RoleService } from './role-service';
 import { UserPermissionService } from './user-permission-service';
 import { UserService } from './user-service';
-import { IServiceFactory, type IUserService, type IRoleService, type IPermissionService, type IContextService } from './interfaces';
+import { PolicyService } from './policy-service';
+import { IServiceFactory, type IUserService, type IRoleService, type IPermissionService, type IContextService, type IPolicyService } from './interfaces';
 
 /**
  * Configuration interface for ServiceFactory
@@ -55,9 +56,12 @@ export class ServiceFactory implements IServiceFactory {
   
   /** Lazy-loaded user permission service instance */
   private _userPermissionService?: UserPermissionService;
-  
+
   /** Lazy-loaded user service instance */
   private _userService?: UserService;
+
+  /** Lazy-loaded ABAC policy service instance */
+  private _policyService?: PolicyService;
 
   /**
    * Constructor for ServiceFactory
@@ -132,6 +136,17 @@ export class ServiceFactory implements IServiceFactory {
   }
 
   /**
+   * Gets the ABAC policy service instance (lazy-loaded)
+   * @returns IPolicyService instance
+   */
+  getPolicyService(): IPolicyService {
+    if (!this._policyService) {
+      this._policyService = new PolicyService(this.db);
+    }
+    return this._policyService;
+  }
+
+  /**
    * Gets all service instances at once
    * 
    * Convenience method to retrieve all available services in a single call.
@@ -145,6 +160,7 @@ export class ServiceFactory implements IServiceFactory {
       role: this.getRoleService(),
       permission: this.getPermissionService(),
       user: this.getUserService(),
+      policy: this.getPolicyService(),
     };
   }
 
@@ -173,6 +189,7 @@ export class ServiceFactory implements IServiceFactory {
     this._roleService = undefined;
     this._userPermissionService = undefined;
     this._userService = undefined;
+    this._policyService = undefined;
   }
 }
 

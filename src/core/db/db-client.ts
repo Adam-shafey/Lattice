@@ -35,5 +35,6 @@ export type {
   Context,
   UserContext,
   RevokedToken,
-  PasswordResetToken
+  PasswordResetToken,
+  AbacPolicy
 } from '../../../prisma/generated/client';

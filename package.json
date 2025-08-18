@@ -38,6 +38,7 @@
     "jsonwebtoken": "^9.0.2",
     "minimist": "^1.2.8",
     "pino": "^9.9.0",
+    "cel-js": "^0.8.2",
     "swagger-autogen": "^2.23.7",
     "zod": "^3.23.8"
   },

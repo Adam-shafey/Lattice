@@ -8,10 +8,12 @@ import { registerUserRoutes } from './core/http/api/users';
 import { registerPermissionRoutes } from './core/http/api/permissions';
 import { registerContextRoutes } from './core/http/api/contexts';
 import { registerRoleRoutes } from './core/http/api/roles';
+import { registerPolicyRoutes } from './core/http/api/policies';
 import { defaultRoutePermissionPolicy, type RoutePermissionPolicy } from './core/policy/policy';
 import { ServiceFactory, setServiceFactory } from './core/services';
 import { db } from './core/db/db-client';
 import { logger } from './core/logger';
+import { evaluateAbac, DefaultAttributeProvider } from './core/abac/abac';
 
 export type SupportedAdapter = 'fastify' | 'express';
 
@@ -193,6 +195,13 @@ export class LatticeCore {
     return this.serviceFactory.getPermissionService();
   }
 
+  /**
+   * Get the ABAC policy service instance
+   */
+  public get policyService() {
+    return this.serviceFactory.getPolicyService();
+  }
+
   public get express(): ReturnType<ExpressHttpAdapter['getUnderlying']> | undefined {
     return this.adapterKind === 'express'
       ? (this.httpAdapter as ExpressHttpAdapter).getUnderlying()
@@ -243,10 +252,27 @@ export class LatticeCore {
       logger.log('🔍 [CHECK_ACCESS] Effective permissions:', Array.from(effective));
       
       logger.log('🔍 [CHECK_ACCESS] Calling permissionRegistry.isAllowed');
-      const result = this.permissionRegistry.isAllowed(permission, effective);
-      logger.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', result);
-      
-      return result;
+      const rbacAllowed = this.permissionRegistry.isAllowed(permission, effective);
+      logger.log('🔍 [CHECK_ACCESS] permissionRegistry.isAllowed result:', rbacAllowed);
+
+      if (!rbacAllowed) {
+        return false;
+      }
+
+      logger.log('🔍 [CHECK_ACCESS] Evaluating ABAC policies');
+      const abacAllowed = await evaluateAbac(
+        this.policyService,
+        new DefaultAttributeProvider(),
+        {
+          action: permission,
+          resource: lookupContext?.type ?? contextType ?? 'unknown',
+          resourceId: lookupContext?.id ?? null,
+          userId,
+        }
+      );
+      logger.log('🔍 [CHECK_ACCESS] ABAC evaluation result:', abacAllowed);
+
+      return abacAllowed;
     } catch (error) {
       logger.error('🔍 [CHECK_ACCESS] ❌ Error during checkAccess:', error);
       logger.error('Failed to fetch effective permissions:', error);
@@ -278,6 +304,7 @@ export class LatticeCore {
     registerPermissionRoutes(this, this.apiPrefix);
     registerContextRoutes(this, this.apiPrefix);
     registerRoleRoutes(this, this.apiPrefix);
+    registerPolicyRoutes(this, this.apiPrefix);
     
     await this.httpAdapter.listen(port, host);
   }
