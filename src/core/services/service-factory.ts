@@ -19,6 +19,7 @@ import { RoleService } from './role-service';
 import { UserPermissionService } from './user-permission-service';
 import { UserService } from './user-service';
 import { IServiceFactory, type IUserService, type IRoleService, type IPermissionService, type IContextService } from './interfaces';
+import { PermissionRegistry } from '../permissions/permission-registry';
 
 /**
  * Configuration interface for ServiceFactory
@@ -29,6 +30,8 @@ import { IServiceFactory, type IUserService, type IRoleService, type IPermission
 export interface ServiceFactoryConfig {
   /** Database client instance for all services */
   db: PrismaClientType;
+  /** Shared permission registry instance */
+  permissionRegistry: PermissionRegistry;
 }
 
 /**
@@ -39,12 +42,14 @@ export interface ServiceFactoryConfig {
  * memory usage and startup time.
  * 
  * Usage:
- * const factory = new ServiceFactory({ db: prismaClient });
+ * const factory = new ServiceFactory({ db: prismaClient, permissionRegistry });
  * const roleService = factory.getRoleService();
  */
 export class ServiceFactory implements IServiceFactory {
   /** Database client shared across all services */
   private readonly db: PrismaClientType;
+  /** Permission registry shared across services */
+  private readonly permissionRegistry: PermissionRegistry;
 
   
   /** Lazy-loaded context service instance */
@@ -65,6 +70,7 @@ export class ServiceFactory implements IServiceFactory {
    */
   constructor(config: ServiceFactoryConfig) {
     this.db = config.db;
+    this.permissionRegistry = config.permissionRegistry;
   }
 
   /**
@@ -110,7 +116,7 @@ export class ServiceFactory implements IServiceFactory {
    */
   getPermissionService(): IPermissionService {
     if (!this._userPermissionService) {
-      this._userPermissionService = new UserPermissionService(this.db);
+      this._userPermissionService = new UserPermissionService(this.db, this.permissionRegistry);
     }
     return this._userPermissionService;
   }
