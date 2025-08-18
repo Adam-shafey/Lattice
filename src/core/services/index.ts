@@ -26,12 +26,6 @@ export type {
   IServiceFactory,
 } from './interfaces';
 
-// Email adapters
-// Export email adapter interfaces and implementations
-export type { EmailAdapter, EmailMessage } from './email-adapter';
-export { ConsoleEmailAdapter } from './email-adapter';
-export { ResendEmailAdapter, type ResendConfig } from './resend-email-adapter';
-
 // Service implementations
 // Exports the concrete service classes that implement the interfaces
 // Each service extends BaseService and provides specific business logic
