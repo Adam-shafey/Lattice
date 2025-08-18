@@ -8,12 +8,17 @@
  * 
  * Usage:
  * import { ServiceFactory, RoleService, ServiceError } from './services';
- * import type { IRoleService, ServiceContext } from './services';
+ * import type { IRoleService, ServiceContext, IServiceError } from './services';
  */
 
 // Base service infrastructure
 // Exports the foundational classes and interfaces that all services extend
-export { BaseService, ServiceError, type ServiceContext } from './base-service';
+export {
+  BaseService,
+  ServiceError,
+  type ServiceContext,
+  type IServiceError,
+} from './base-service';
 
 // Service interfaces
 // Exports TypeScript interfaces that define contracts for all services
