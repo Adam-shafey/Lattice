@@ -13,7 +13,7 @@
  * - Testing support with reset capabilities
  */
 
-import type { PrismaClient as PrismaClientType } from '../../../prisma/generated/client';
+import type { PrismaClient } from '../db/db-client';
 import { ContextService } from './context-service';
 import { RoleService } from './role-service';
 import { UserPermissionService } from './user-permission-service';
@@ -29,7 +29,7 @@ import { IServiceFactory, type IUserService, type IRoleService, type IPermission
  */
 export interface ServiceFactoryConfig {
   /** Database client instance for all services */
-  db: PrismaClientType;
+  db: PrismaClient;
 }
 
 /**
@@ -44,10 +44,10 @@ export interface ServiceFactoryConfig {
  * const roleService = factory.getRoleService();
  */
 export class ServiceFactory implements IServiceFactory {
-  /** Database client shared across all services */
-  private readonly db: PrismaClientType;
-
   
+  /** Database client shared across all services */
+  private readonly db: PrismaClient;
+
   /** Lazy-loaded context service instance */
   private _contextService?: ContextService;
   

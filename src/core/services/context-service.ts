@@ -1,6 +1,6 @@
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IContextService } from './interfaces';
-import type { Context, User } from '../db/db-client';
+import type { PrismaClient, Context, User } from '../db/db-client';
 
 export interface ResolveContextInput {
   routeParam?: string | null;
@@ -16,7 +16,7 @@ export interface ContextObject {
 
 export class ContextService extends BaseService implements IContextService {
 
-  constructor(db: any) {
+  constructor(db: PrismaClient) {
     super(db);
   }
   

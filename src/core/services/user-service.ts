@@ -13,7 +13,7 @@
 
 import { BaseService, ServiceError, type ServiceContext } from './base-service';
 import { IUserService } from './interfaces';
-import type { User } from '../db/db-client';
+import type { PrismaClient, Prisma, User } from '../db/db-client';
 import { hash, compare } from 'bcryptjs';
 import { randomUUID } from 'crypto';
 type SafeUser = Omit<User, 'passwordHash'>;
@@ -32,7 +32,7 @@ const safeUserSelect = {
  * operations. Extends BaseService to inherit common functionality.
  */
 export class UserService extends BaseService implements IUserService {
-  constructor(db: any) {
+  constructor(db: PrismaClient) {
     super(db);
   }
   
@@ -188,7 +188,7 @@ export class UserService extends BaseService implements IUserService {
         }
 
         // Prepare update data
-        const updateData: any = {};
+        const updateData: Prisma.UserUpdateInput = {};
         if (updates.email) updateData.email = updates.email;
         if (updates.password) {
           updateData.passwordHash = await hash(updates.password, 12);
