@@ -1,6 +1,6 @@
 import { evaluate } from 'cel-js';
 import { logger } from '../logger';
-import type { PolicyService } from '../services/policy-service';
+import type { IPolicyService } from '../services/interfaces';
 import type { AbacPolicy } from '../db/db-client';
 
 export interface AttributeProvider {
@@ -27,7 +27,7 @@ export function invalidatePolicyCache() {
   cache = null;
 }
 
-async function loadPolicies(service: PolicyService): Promise<AbacPolicy[]> {
+async function loadPolicies(service: IPolicyService): Promise<AbacPolicy[]> {
   const now = Date.now();
   if (!cache || now > cache.expiry) {
     const policies = await service.listPolicies();
@@ -37,7 +37,7 @@ async function loadPolicies(service: PolicyService): Promise<AbacPolicy[]> {
 }
 
 export async function evaluateAbac(
-  service: PolicyService,
+  service: IPolicyService,
   attributeProvider: AttributeProvider,
   params: {
     action: string;
