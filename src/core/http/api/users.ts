@@ -1,14 +1,15 @@
 import { LatticeCore } from '../../../index';
-import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 import { logger } from '../../logger';
 
-export function registerUserRoutes(app: LatticeCore, policy: RoutePermissionPolicy, prefix: string = '') {
+export function registerUserRoutes(app: LatticeCore, prefix: string = '') {
   const p = prefix;
+  const policy = app.routePolicy;
+  const createPre = app.routeAuth(policy.users.create, { scope: 'global' });
   app.route({
     method: 'POST',
     path: `${p}/users`,
-    preHandler: [app.requireAuth(), app.authorize(policy.users!.create, { scope: 'global' })],
+    ...(createPre && { preHandler: createPre }),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         email: z.string().email(), 
@@ -33,10 +34,11 @@ export function registerUserRoutes(app: LatticeCore, policy: RoutePermissionPoli
     },
   });
 
+  const listPre = app.routeAuth(policy.users.list, { scope: 'global' });
   app.route({
     method: 'GET',
     path: `${p}/users`,
-    preHandler: [app.requireAuth(), app.authorize(policy.users!.list, { scope: 'global' })],
+    ...(listPre && { preHandler: listPre }),
     handler: async ({ query, req }) => {
       logger.log('👥 [USERS_ROUTE] ===== GET /users ROUTE HANDLER CALLED =====');
       logger.log('👥 [USERS_ROUTE] Query params:', query);
@@ -63,10 +65,11 @@ export function registerUserRoutes(app: LatticeCore, policy: RoutePermissionPoli
     },
   });
 
+  const getPre = app.routeAuth(policy.users.get, { scope: 'global' });
   app.route({
     method: 'GET',
     path: `${p}/users/:id`,
-    preHandler: [app.requireAuth(), app.authorize(policy.users!.get, { scope: 'global' })],
+    ...(getPre && { preHandler: getPre }),
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
@@ -87,10 +90,11 @@ export function registerUserRoutes(app: LatticeCore, policy: RoutePermissionPoli
     },
   });
 
+  const updatePre = app.routeAuth(policy.users.update, { scope: 'global' });
   app.route({
     method: 'PUT',
     path: `${p}/users/:id`,
-    preHandler: [app.requireAuth(), app.authorize(policy.users!.update, { scope: 'global' })],
+    ...(updatePre && { preHandler: updatePre }),
     handler: async ({ params, body, req }) => {
       const schema = z.object({ 
         email: z.string().email().optional(),
@@ -114,10 +118,11 @@ export function registerUserRoutes(app: LatticeCore, policy: RoutePermissionPoli
     },
   });
 
+  const deletePre = app.routeAuth(policy.users.delete, { scope: 'global' });
   app.route({
     method: 'DELETE',
     path: `${p}/users/:id`,
-    preHandler: [app.requireAuth(), app.authorize(policy.users!.delete, { scope: 'global' })],
+    ...(deletePre && { preHandler: deletePre }),
     handler: async ({ params, req }) => {
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
@@ -131,26 +136,27 @@ export function registerUserRoutes(app: LatticeCore, policy: RoutePermissionPoli
     },
   });
 
+  const changePre = app.routeAuth(policy.users.update);
   app.route({
     method: 'POST',
     path: '/users/:id/password/change',
-    preHandler: app.authorize(policy.users!.update),
+    ...(changePre && { preHandler: changePre }),
     handler: async ({ params, body, req }) => {
-      const schema = z.object({ 
-        oldPassword: z.string().min(6), 
-        newPassword: z.string().min(6) 
+      const schema = z.object({
+        oldPassword: z.string().min(6),
+        newPassword: z.string().min(6)
       });
-      
+
       try {
         const { id } = z.object({ id: z.string().min(1) }).parse(params);
         const parsed = schema.safeParse(body);
         if (!parsed.success) return { error: 'Invalid input', issues: parsed.error.issues };
-        
+
         const { oldPassword, newPassword } = parsed.data;
         await app.userService.changePassword(id, oldPassword, newPassword, {
           actorId: req?.user?.id || 'system'
         });
-        
+
         return { ok: true };
       } catch (error: any) {
         return { error: error.message || 'Failed to change password' };

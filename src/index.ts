@@ -19,6 +19,16 @@ export interface CoreConfig {
   db: { provider: 'postgres' | 'sqlite'; url?: string };
   adapter: SupportedAdapter;
   jwt: { accessTTL: string; refreshTTL: string; secret?: string };
+  /**
+   * Enable route-level authentication (JWT verification)
+   * Defaults to true
+   */
+  authn?: boolean;
+  /**
+   * Enable route-level authorization checks
+   * Defaults to true
+   */
+  authz?: boolean;
   policy?: RoutePermissionPolicy;
   apiPrefix?: string;
 }
@@ -71,6 +81,8 @@ export class LatticeCore {
   private readonly serviceFactory: ServiceFactory;
   private readonly config: CoreConfig;
   private readonly apiPrefix: string;
+  private readonly enableAuthn: boolean;
+  private readonly enableAuthz: boolean;
 
   constructor(config: CoreConfig) {
     this.config = config;
@@ -82,10 +94,14 @@ export class LatticeCore {
         ? createFastifyAdapter(this)
         : createExpressAdapter(this);
     this.policy = {
+      roles: { ...defaultRoutePermissionPolicy.roles, ...(config.policy?.roles ?? {}) },
       users: { ...defaultRoutePermissionPolicy.users, ...(config.policy?.users ?? {}) },
       permissions: { ...defaultRoutePermissionPolicy.permissions, ...(config.policy?.permissions ?? {}) },
       contexts: { ...defaultRoutePermissionPolicy.contexts, ...(config.policy?.contexts ?? {}) },
     } as Required<RoutePermissionPolicy>;
+
+    this.enableAuthn = config.authn !== false;
+    this.enableAuthz = config.authz !== false;
 
     // Initialize service factory with configuration
     this.serviceFactory = new ServiceFactory({
@@ -101,6 +117,41 @@ export class LatticeCore {
    */
   public get jwtConfig() {
     return this.config.jwt;
+  }
+
+  /**
+   * Whether route authentication (JWT verification) is enabled
+   */
+  public get authnEnabled(): boolean {
+    return this.enableAuthn;
+  }
+
+  /**
+   * Whether route authorization is enabled
+   */
+  public get authzEnabled(): boolean {
+    return this.enableAuthz;
+  }
+
+  /**
+   * Get the route permission policy
+   */
+  public get routePolicy(): Required<RoutePermissionPolicy> {
+    return this.policy as Required<RoutePermissionPolicy>;
+  }
+
+  /**
+   * Build pre-handlers for authentication and authorization based on config
+   */
+  public routeAuth(permission?: string, options?: AuthorizeOptions) {
+    const handlers: any[] = [];
+    if (this.enableAuthn) {
+      handlers.push(this.requireAuth());
+    }
+    if (permission && this.enableAuthz) {
+      handlers.push(this.authorize(permission, options));
+    }
+    return handlers.length > 0 ? handlers : undefined;
   }
 
   /**
@@ -223,10 +274,10 @@ export class LatticeCore {
     // Global request context middleware (only for adapters that support preHandler arrays at route-level)
     // Developers should add it before their own routes if using adapter directly.
     createAuthRoutes(this, this.apiPrefix);
-    registerUserRoutes(this, this.policy, this.apiPrefix);
-    registerPermissionRoutes(this, this.policy, this.apiPrefix);
-    registerContextRoutes(this, this.policy, this.apiPrefix);
-    registerRoleRoutes(this, this.policy, this.apiPrefix);
+    registerUserRoutes(this, this.apiPrefix);
+    registerPermissionRoutes(this, this.apiPrefix);
+    registerContextRoutes(this, this.apiPrefix);
+    registerRoleRoutes(this, this.apiPrefix);
     
     await this.httpAdapter.listen(port, host);
   }

@@ -22,7 +22,8 @@
     "prisma:seed": "prisma db seed",
     "test": "vitest run",
     "test:minimal": "vitest run --reporter=basic --silent",
-    "swagger": "ts-node swagger.ts"
+    "swagger": "ts-node swagger.ts",
+    "policymanager": "ts-node src/scripts/policymanager.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",

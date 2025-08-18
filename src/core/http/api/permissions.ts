@@ -1,13 +1,14 @@
 import { LatticeCore } from '../../../index';
-import { type RoutePermissionPolicy } from '../../policy/policy';
 import { z } from 'zod';
 
-export function registerPermissionRoutes(app: LatticeCore, policy: RoutePermissionPolicy, prefix: string = '') {
+export function registerPermissionRoutes(app: LatticeCore, prefix: string = '') {
   const p = prefix;
+  const policy = app.routePolicy;
+  const grantPre = app.routeAuth(policy.permissions.grantUser, { scope: 'global' });
   app.route({
     method: 'POST',
     path: `${p}/permissions/user/grant`,
-    preHandler: [app.requireAuth(), app.authorize(policy.permissions!.grantUser, { scope: 'global' })],
+    ...(grantPre && { preHandler: grantPre }),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         userId: z.string().min(1), 
@@ -37,10 +38,11 @@ export function registerPermissionRoutes(app: LatticeCore, policy: RoutePermissi
     },
   });
 
+  const revokePre = app.routeAuth(policy.permissions.revokeUser, { scope: 'global' });
   app.route({
     method: 'POST',
     path: `${p}/permissions/user/revoke`,
-    preHandler: [app.requireAuth(), app.authorize(policy.permissions!.revokeUser, { scope: 'global' })],
+    ...(revokePre && { preHandler: revokePre }),
     handler: async ({ body, req }) => {
       const schema = z.object({ 
         userId: z.string().min(1), 
@@ -70,10 +72,11 @@ export function registerPermissionRoutes(app: LatticeCore, policy: RoutePermissi
     },
   });
 
+  const userPermsPre = app.routeAuth(policy.permissions.grantUser, { scope: 'global' });
   app.route({
     method: 'GET',
     path: `${p}/permissions/user/:userId`,
-    preHandler: [app.requireAuth(), app.authorize(policy.permissions!.grantUser, { scope: 'global' })],
+    ...(userPermsPre && { preHandler: userPermsPre }),
     handler: async ({ params, query, req }) => {
       try {
         const { userId } = z.object({ userId: z.string().min(1) }).parse(params);
@@ -93,10 +96,11 @@ export function registerPermissionRoutes(app: LatticeCore, policy: RoutePermissi
     },
   });
 
+  const effectivePre = app.routeAuth(policy.permissions.grantUser, { scope: 'global' });
   app.route({
     method: 'GET',
     path: `${p}/permissions/user/:userId/effective`,
-    preHandler: [app.requireAuth(), app.authorize(policy.permissions!.grantUser, { scope: 'global' })],
+    ...(effectivePre && { preHandler: effectivePre }),
     handler: async ({ params, query, req }) => {
       try {
         const { userId } = z.object({ userId: z.string().min(1) }).parse(params);

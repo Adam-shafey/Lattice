@@ -16,7 +16,6 @@ import { IUserService } from './interfaces';
 import type { User } from '../db/db-client';
 import { hash, compare } from 'bcryptjs';
 import { randomUUID } from 'crypto';
-
 type SafeUser = Omit<User, 'passwordHash'>;
 
 const safeUserSelect = {
