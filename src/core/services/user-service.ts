@@ -16,8 +16,6 @@ import { IUserService } from './interfaces';
 import type { User } from '../db/db-client';
 import { hash, compare } from 'bcryptjs';
 import { randomUUID } from 'crypto';
-import { logger } from '../logger';
-import type { EmailAdapter } from './email-adapter';
 
 /**
  * UserService Class
@@ -26,11 +24,8 @@ import type { EmailAdapter } from './email-adapter';
  * operations. Extends BaseService to inherit common functionality.
  */
 export class UserService extends BaseService implements IUserService {
-  private readonly emailAdapter?: EmailAdapter;
-
-  constructor(db: any, emailAdapter?: EmailAdapter) {
+  constructor(db: any) {
     super(db);
-    this.emailAdapter = emailAdapter;
   }
   
   /**
@@ -392,60 +387,4 @@ export class UserService extends BaseService implements IUserService {
     );
   }
 
-  /**
-   * Initiates a password reset for a user by email
-   * 
-   * @param email - The user's email address
-   * @param context - Optional service context
-   * @returns Promise that resolves when reset email is sent
-   * 
-   * @throws ServiceError.notFound if user doesn't exist
-   */
-  async resetPassword(email: string, context?: ServiceContext): Promise<void> {
-    this.validateEmail(email);
-
-    return this.execute(
-      async () => {
-        // Check if user exists
-        const user = await this.db.user.findUnique({ where: { email } });
-        if (!user) {
-          throw ServiceError.notFound('User', email);
-        }
-
-        // Generate reset token
-        const resetToken = randomUUID();
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-        // Store reset token
-        await this.db.passwordResetToken.create({
-          data: {
-            token: resetToken,
-            userId: user.id,
-            expiresAt,
-          },
-        });
-
-        // Send email with reset link
-        if (this.emailAdapter) {
-          const resetLink = `${process.env.APP_BASE_URL ?? ''}/reset-password?token=${resetToken}`;
-          await this.emailAdapter.send({
-            to: email,
-            subject: 'Password Reset',
-            html: `<p>Click <a href="${resetLink}">here</a> to reset your password.</p>`,
-            text: `Reset your password: ${resetLink}`,
-          });
-        } else {
-          logger.log(`Password reset token for ${email}: ${resetToken}`);
-        }
-      },
-      {
-        action: 'user.password_reset_initiated',
-        success: true,
-        resourceType: 'user',
-        resourceId: email,
-        targetUserId: email,
-      },
-      context
-    );
-  }
 }

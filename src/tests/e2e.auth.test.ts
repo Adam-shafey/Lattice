@@ -177,50 +177,6 @@ describe('E2E: Authentication', () => {
       // No manual cleanup needed - beforeEach handles it
     });
 
-    it('handles password reset flow', async () => {
-      const email = `e2e_reset_${Date.now()}@example.com`;
-      
-      // Create user
-      const user = await app.userService.createUser({
-        email,
-        password: 'oldpassword123',
-        context: { actorId: 'system' }
-      });
-
-      const f = app.fastify!;
-
-      // Request password reset
-      const requestRes = await f.inject({ 
-        method: 'POST', 
-        url: '/auth/password/reset/request', 
-        payload: { email } 
-      });
-      
-      expect(requestRes.statusCode).toBe(200);
-      const { token } = requestRes.json() as any;
-      expect(typeof token).toBe('string');
-
-      // Confirm password reset
-      const confirmRes = await f.inject({ 
-        method: 'POST', 
-        url: '/auth/password/reset/confirm', 
-        payload: { token, newPassword: 'newpassword123' } 
-      });
-      
-      expect(confirmRes.statusCode).toBe(200);
-
-      // Verify new password works
-      const loginRes = await f.inject({ 
-        method: 'POST', 
-        url: '/auth/login', 
-        payload: { email, password: 'newpassword123' } 
-      });
-      
-      expect(loginRes.statusCode).toBe(200);
-      expect(loginRes.json()).toHaveProperty('accessToken');
-
-      // No manual cleanup needed - beforeEach handles it
-    });
 
     it('handles token revocation', async () => {
       const email = `e2e_revoke_${Date.now()}@example.com`;
