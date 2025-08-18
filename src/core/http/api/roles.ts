@@ -306,7 +306,11 @@ export function registerRoleRoutes(app: LatticeCore, prefix: string = '') {
       });
       
       const parsed = schema.safeParse(body);
-      logger.log('Validation result:', { success: parsed.success, body, issues: parsed.error?.issues });
+      logger.log('Validation result:', {
+        success: parsed.success,
+        issueCount: parsed.error?.issues?.length ?? 0,
+        userId: req?.user?.id,
+      });
       if (!parsed.success) {
         const error = new Error('Validation failed');
         (error as any).statusCode = 400;
