@@ -14,7 +14,6 @@ async function main() {
     db: { provider: 'sqlite' },
     adapter: 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'demo-secret' },
-    exposeAPI: true,
   });
 
   await app.listen(3000);

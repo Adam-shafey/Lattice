@@ -17,10 +17,12 @@ import { evaluateAbac, DefaultAttributeProvider } from './core/abac/abac';
 
 export type SupportedAdapter = 'fastify' | 'express';
 
-export interface CoreConfig {
-  db: { provider: 'postgres' | 'sqlite'; url?: string };
-  adapter: SupportedAdapter;
-  jwt: { accessTTL: string; refreshTTL: string; secret?: string };
+export interface ApiConfig {
+  /**
+   * Automatically register built-in API routes when listening
+   * Defaults to true
+   */
+  exposeAPI?: boolean;
   /**
    * Enable route-level authentication (JWT verification)
    * Defaults to true
@@ -31,13 +33,22 @@ export interface CoreConfig {
    * Defaults to true
    */
   authz?: boolean;
-  policy?: RoutePermissionPolicy;
-  apiPrefix?: string;
   /**
-   * Automatically register built-in API routes when listening
-   * Defaults to false
+   * Prefix to apply to all built-in API routes
+   * Defaults to ''
    */
-  exposeAPI?: boolean;
+  apiPrefix?: string;
+}
+
+export interface CoreConfig {
+  db: { provider: 'postgres' | 'sqlite'; url?: string };
+  adapter: SupportedAdapter;
+  jwt: { accessTTL: string; refreshTTL: string; secret?: string };
+  policy?: RoutePermissionPolicy;
+  /**
+   * API related configuration including exposure and auth settings
+   */
+  apiConfig?: ApiConfig;
 }
 
 export interface RouteDefinition<Body = unknown> {
@@ -95,7 +106,6 @@ export class LatticeCore {
 
   constructor(config: CoreConfig) {
     this.config = config;
-    this.apiPrefix = config.apiPrefix ?? '';
     this.dbClient = dbClient;
     this.permissionRegistry = new PermissionRegistry(this.dbClient);
     this.adapterKind = config.adapter;
@@ -110,8 +120,10 @@ export class LatticeCore {
       contexts: { ...defaultRoutePermissionPolicy.contexts, ...(config.policy?.contexts ?? {}) },
     } as Required<RoutePermissionPolicy>;
 
-    this.enableAuthn = config.authn !== false;
-    this.enableAuthz = config.authz !== false;
+    const api = config.apiConfig ?? {};
+    this.apiPrefix = api.apiPrefix ?? '';
+    this.enableAuthn = api.authn !== false;
+    this.enableAuthz = api.authz !== false;
 
     // Initialize service factory with shared permission registry
     this.serviceFactory = new ServiceFactory({
@@ -313,7 +325,7 @@ export class LatticeCore {
     await this.permissionRegistry.initFromDatabase();
     await this.permissionRegistry.syncToDatabase();
 
-    if (this.config.exposeAPI) {
+    if (this.config.apiConfig?.exposeAPI) {
       // Global request context middleware (only for adapters that support preHandler arrays at route-level)
       // Developers should add it before their own routes if using adapter directly.
       createAuthRoutes(this, this.apiPrefix);
@@ -339,7 +351,7 @@ const defaultConfig: CoreConfig = {
   db: { provider: 'sqlite' },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'dev-secret' },
-  exposeAPI: false,
+  apiConfig: { exposeAPI: true, authn: true, authz: true, apiPrefix: '' },
 };
 
 export function Lattice(config: Partial<CoreConfig> = {}): LatticeCore {
@@ -348,6 +360,7 @@ export function Lattice(config: Partial<CoreConfig> = {}): LatticeCore {
     ...config,
     db: { ...defaultConfig.db, ...(config.db ?? {}) },
     jwt: { ...defaultConfig.jwt, ...(config.jwt ?? {}) },
+    apiConfig: { ...defaultConfig.apiConfig, ...(config.apiConfig ?? {}) },
   };
   return new LatticeCore(finalConfig);
 }

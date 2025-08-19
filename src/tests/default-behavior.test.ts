@@ -6,11 +6,11 @@ describe('Lattice default configuration', () => {
     process.env.DATABASE_URL = process.env.DATABASE_URL || 'file:./dev.db';
   });
 
-  it('allows instantiation without config and does not expose API routes by default', async () => {
+  it('allows instantiation without config and exposes API routes by default', async () => {
     const app = Lattice();
     await app.listen(0);
     const res = await app.fastify!.inject({ method: 'POST', url: '/auth/login', payload: {} });
-    expect(res.statusCode).toBe(404);
+    expect(res.statusCode).toBe(200);
     await app.fastify!.close();
     await app.shutdown();
   });

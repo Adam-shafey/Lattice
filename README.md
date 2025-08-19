@@ -67,7 +67,7 @@ const app = Lattice({
   db: { provider: 'postgres', url: process.env.DATABASE_URL },
   adapter: 'fastify',
   jwt: { accessTTL: '15m', refreshTTL: '7d' },
-  exposeAPI: true
+  apiConfig: { apiPrefix: '/api' }
 });
 
 await app.listen(3000);

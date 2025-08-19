@@ -283,13 +283,12 @@ const app = Lattice({
     url: process.env.DATABASE_URL 
   },
   adapter: 'fastify', // or 'express'
-  jwt: { 
-    accessTTL: '15m', 
+  jwt: {
+    accessTTL: '15m',
     refreshTTL: '7d',
-    secret: process.env.JWT_SECRET 
+    secret: process.env.JWT_SECRET
   },
-  apiPrefix: '/api/v1',
-  exposeAPI: true // Enable built-in REST APIs
+  apiConfig: { apiPrefix: '/api/v1' } // Built-in REST APIs exposed by default
 });
 
 await app.listen(3000);

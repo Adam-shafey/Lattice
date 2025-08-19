@@ -6,8 +6,7 @@ async function bootstrap() {
     db: { provider: 'sqlite' },
     adapter: (process.env.ADAPTER as 'fastify' | 'express') || 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' },
-    apiPrefix: '/api',
-    exposeAPI: true,
+    apiConfig: { apiPrefix: '/api' },
   });
 
   app.route({
@@ -33,7 +32,7 @@ async function bootstrap() {
   
   logger.log(`🚀 Lattice server running on http://localhost:${port}`);
   logger.log(`📊 Admin UI available at http://localhost:${port}/admin`);
-  logger.log(`🔌 API available at http://localhost:${port}/api`);
+  logger.log(`🔌 API available at http://localhost:${port}${app.apiBase}`);
   logger.log(`📚 API Documentation available at http://localhost:${port}/docs`);
 }
 
