@@ -49,10 +49,10 @@ Every check = `(ActionType:ActionId, ContextType:ContextId)`
 
 🔑 Think of it like this:
 
-* Permissions = bricks
-* Roles = blueprints
-* Contexts = towns
-* Policies = house rules
+* Permissions = building blocks
+* Roles = buildings consisting of blocks
+* Contexts = towns of buildings
+* Policies = traffice rules
 
 ---
 
