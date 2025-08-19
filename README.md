@@ -102,9 +102,4 @@ app.route({
 ## 🤝 Contributing
 
 We’re aiming to make access control less painful and more fun to work with.
-Whether it’s a bug, feature, or idea → contributions are welcome.
-
----
-
-This trims the fat and keeps things **straightforward, MECE, and chill**.
-Would you like me to apply the same treatment to the **Authorization Flow + Usage Examples** sections so they’re more digestible too?
+Whether it’s a bug, feature, or idea contributions are welcome.
