@@ -39,7 +39,7 @@ Traditional patterns often lead to:
 
 ## 🧠 Mental Model
 
-Every check = `(PermissionType:PermissionId, ContextType:ContextId)`
+Every check = `(ActionType:ActionId, ContextType:ContextId)`
 
 * **Permissions** → atomic actions (`users:read`, `projects:create`)
 * **Roles** → bundles of permissions, scoped by context
