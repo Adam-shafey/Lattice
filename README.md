@@ -1,66 +1,68 @@
-# 🏗️ Lattice
+# Lattice
 
 > **Lego blocks for access control**
 
-> ⚠️ **Beta Notice:** Lattice is currently in beta. A production-ready release is planned for the future, and APIs or features may change.
+⚠️ **Beta:** Lattice is still evolving. Expect changes in APIs and features before a stable release.
 
-Ever built a SaaS app and got lost in a maze of roles and permissions? Lattice is here to save you from auth spaghetti.
-
-Lattice is a permission-first backend framework that makes complex authorization feel simple. Think of it as the foundation that handles all your "who can do what where" logic, so you can focus on building features that matter.
+---
 
 ## Why Lattice?
 
-Building SaaS apps means dealing with complex permission scenarios:
-- Users who belong to multiple organizations
-- Roles that change based on context (team vs org vs project)
-- Business rules like "only managers can approve expenses during business hours"
-- The inevitable "just one more role" that breaks your entire auth system
+Building SaaS apps usually means wrestling with:
 
-Traditional approaches lead to:
-- 🔴 Hard-coded permission checks scattered throughout your codebase
-- 🔴 Complex role hierarchies that become impossible to maintain
-- 🔴 Security vulnerabilities from inconsistent authorization logic
-- 🔴 Hours spent debugging "why can't this user access that?"
+* Users in multiple orgs
+* Roles that shift across teams, projects, or orgs
+* Rules like *“only managers can approve expenses during business hours”*
+* That *one extra role* that breaks everything
 
-Lattice solves this by putting permissions at the center of your architecture, not as an afterthought.
+Traditional patterns often lead to:
 
-## ✨ What Makes Lattice Great
+* ❌ Hard-coded permission checks everywhere
+* ❌ Role hierarchies too messy to maintain
+* ❌ Inconsistent security holes
+* ❌ Debugging rabbit holes
 
-🔑 **Permission-first design** - Every action flows through a unified permission system
+**Lattice simplifies the model**: permissions are the building block, everything else builds on top.
 
-🌐 **Context-aware** - Permissions that adapt to organizations, teams, and projects
+---
 
-⚡️ **Pluggable modules** - Add features without touching core auth logic
+## What You Get
 
-🧩 **Works with your stack** - Fastify, Express, PostgreSQL, SQLite - your choice
+* 🔑 **Permission-first** → one consistent entry point for access decisions
+* 🌐 **Context-aware** → orgs, teams, projects, or any custom scope
+* ⚡ **Pluggable** → extend with modules, no core rewrites
+* 🧩 **Stack-agnostic** → Fastify, Express, Postgres, SQLite
+* 🔍 **RBAC + ABAC** → start simple, add complexity only when you need it
+* 🚀 **DX-focused** → CLI, TypeScript types, hot reload
 
-🔍 **RBAC + ABAC** - Start simple with roles, add complex policies when needed
+---
 
-🚀 **Developer experience** - CLI tools, TypeScript types, hot-reloadable permissions
+## 🧠 Mental Model
 
-📚 **Built-in APIs** - Complete REST API with OpenAPI documentation
+Every check = `(PermissionType:PermissionId, ContextType:ContextId)`
+
+* **Permissions** → atomic actions (`users:read`, `projects:create`)
+* **Roles** → bundles of permissions, scoped by context
+* **Contexts** → the “where” (`org_123`, `team_456`)
+* **Context Types** → the shape of the scope (`Organization`, `Team`, `Project`)
+* **Policies** → business rules layered on top (e.g. *approve only during business hours*)
+
+🔑 Think of it like this:
+
+* Permissions = bricks
+* Roles = blueprints
+* Contexts = towns
+* Policies = house rules
+
+---
 
 ## 🚀 Quick Start
 
-Get Lattice running in 3 steps:
-
-### 1. Install & Setup
-
 ```bash
 npm install lattice-core
-
-# Set up your environment
-export DATABASE_URL="postgresql://user:password@localhost:5432/lattice"
-export JWT_SECRET="your-super-secret-key"
-
-# Initialize database
-npx prisma generate
-npx prisma db push
 ```
 
-### 2. Create Your App
-
-```typescript
+```ts
 import { Lattice } from 'lattice-core';
 
 const app = Lattice({
@@ -71,273 +73,38 @@ const app = Lattice({
 });
 
 await app.listen(3000);
-console.log('🚀 Lattice running on port 3000');
 ```
 
-### 3. Use Authorization in Your Routes
+---
 
-```typescript
-// Simple permission check
+## 💡 Example
+
+```ts
+// Route with a simple permission
 app.route({
   method: 'GET',
   path: '/users/:id',
   preHandler: app.routeAuth('users:read'),
-  handler: async ({ params }) => {
-    return { id: params.id, name: 'John Doe' };
-  }
+  handler: async ({ params }) => ({ id: params.id })
 });
 
-// Context-aware permission check
+// Context-aware rule
 app.route({
   method: 'POST',
   path: '/teams/:teamId/users',
   preHandler: app.routeAuth('users:create', { scope: 'exact' }),
-  handler: async ({ params }) => {
-    // User can only create users in their team
-    return { success: true };
-  }
+  handler: async () => ({ success: true })
 });
 ```
-
-That's it! Your app now has enterprise-grade authorization without the enterprise complexity.
-
-## 🛡 Authorization Flow
-
-Every protected route goes through a consistent series of checks:
-
-1. **Route middleware** – `app.routeAuth` (or the lower level `authorize` middleware) pulls the user ID and context information from headers, params, query or body. It can enforce that a request is global, type-wide or scoped to an exact context. If any requirement fails the request is rejected before it reaches your handler.
-2. **`checkAccess`** – The app gathers the user's *effective permissions* (direct grants plus those from roles) for the lookup context. The `PermissionRegistry` matches the required permission, honoring wildcard patterns such as `users:*`.
-3. **ABAC policies** – After the RBAC check passes, any Attribute‑Based Access Control policies are evaluated. Access is granted only when both RBAC and ABAC succeed.
-
-Roles are always tied to a context type; assigning a role to a different type is rejected. This ensures your permission model stays consistent across organizations, teams and other boundaries.
-
-### Example scenarios
-
-- **Context-specific role vs. user grant** – A `viewer` role with `example:read` in `ctx_1` allows reading only in that context, while a direct grant of `example:write` in `ctx_2` allows writes there.
-- **Context-type validation** – Assigning a role defined for `org` to a `team` context raises an error.
-- **Global and type-wide permissions** – A global permission works everywhere, whereas a type-wide permission (e.g. `team:read`) covers all contexts of that type.
-
-## 🧠 Mental Model
-
-In Lattice, every authorization check boils down to:
-**(PermissionType\:PermissionId, ContextType\:ContextId)**
-
-* **Permissions** → the smallest building block. Tuples like `users:read`, `projects:create`, `expenses:approve`.
-* **Roles** → named bundles of permissions. Example: `admin = [users:manage, roles:manage]`. Roles by themselves aren’t scoped, they gain meaning when tied to a context.
-* **Contexts** → the *where*. A scope like `org_123`, `team_456`, `project_789`. A user’s role always lives *inside* a context.
-* **Context Types** → the shape of the scope. Examples: `Organization`, `Team`, `Project`. Each can have its own relevant permissions.
-* **Policies** → business rules that go beyond static permissions. Example: “only managers can approve expenses *during business hours*.”
 
 ---
 
-🔑 Think of it like this:
-
-* **Permissions** are bricks.
-* **Roles** are building blueprints.
-* **Contexts** are towns where those buildings live.
-* **Policies** are house rules that decide *when* and *how* those buildings can be used.
-
-## 💡 Usage Examples
-
-### Basic Permission Check
-
-```typescript
-// Check if user can read a specific user
-const canRead = await app.checkAccess({
-  userId: 'alice',
-  context: { type: 'organization', id: 'org_123' },
-  permission: 'users:read',
-  scope: 'exact'
-});
-```
-
-### Complex Business Rules
-
-```typescript
-// Create a policy: "Only managers can approve expenses during business hours"
-await app.policyService.createPolicy({
-  action: 'expenses:approve',
-  resource: 'expense',
-  condition: 'user.role == "manager" && time.hour >= 9 && time.hour <= 17',
-  effect: 'permit'
-});
-
-// The policy automatically applies to all expense approval requests
-```
-
-### Multi-tenant Contexts
-
-```typescript
-// Grant permissions in different contexts
-await app.permissionService.grantToUser({
-  userId: 'alice',
-  permissionKey: 'users:read',
-  contextId: 'org_123'  // Can read users in org_123
-});
-
-await app.permissionService.grantToUser({
-  userId: 'alice',
-  permissionKey: 'projects:create',
-  contextId: 'team_456'  // Can create projects in team_456
-});
-```
-
-## 🔧 Core Features
-
-### Built-in REST APIs
-
-Lattice comes with complete APIs for user management, roles, permissions, and contexts:
-
-```bash
-# Create a user
-curl -X POST http://localhost:3000/api/users \
-  -H "Content-Type: application/json" \
-  -d '{"email": "alice@company.com", "password": "secure123"}'
-
-# Grant permission
-curl -X POST http://localhost:3000/api/permissions/user/grant \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{"userId": "alice", "permissionKey": "users:read", "contextId": "org_123"}'
-```
-
-### CLI Tools
-
-Manage your authorization system from the command line:
-
-```bash
-# List all permissions
-npx lattice list-permissions
-
-# Create a user
-npx lattice users:create --email alice@company.com --password secure123
-
-# Grant permission
-npx lattice permissions:grant --userId alice --permission users:read --contextId org_123
-
-# Check access
-npx lattice check-access --userId alice --contextId org_123 --permission users:read
-```
-
-### Plugin System
-
-Extend Lattice with domain-specific functionality:
-
-```typescript
-const TeamsPlugin = {
-  name: 'teams',
-  permissions: [
-    { key: 'teams:create', label: 'Create teams' },
-    { key: 'teams:join', label: 'Join teams' }
-  ],
-  register: (app) => {
-    // Add your team management logic
-  }
-};
-
-app.registerPlugin(TeamsPlugin);
-```
-
-## 🛡️ Security Features
-
-- **JWT-based authentication** with refresh tokens
-- **Password hashing** with bcrypt
-- **Token revocation** for secure logout
-- **Rate limiting** on authentication endpoints
-- **CORS protection** with configurable origins
-- **Input validation** with Zod schemas
-- **Audit logging** for all authorization decisions
-
-## 🚀 Getting Started with Your Project
-
-### 1. Choose Your Database
-
-```typescript
-// PostgreSQL (recommended for production)
-const app = Lattice({
-  db: { provider: 'postgres', url: process.env.DATABASE_URL }
-});
-
-// SQLite (great for development)
-const app = Lattice({
-  db: { provider: 'sqlite', url: 'file:./dev.db' }
-});
-```
-
-### 2. Pick Your HTTP Framework
-
-```typescript
-// Fastify (recommended)
-const app = Lattice({ adapter: 'fastify' });
-
-// Express
-const app = Lattice({ adapter: 'express' });
-```
-
-### 3. Configure Your Environment
-
-```env
-# Required
-DATABASE_URL="postgresql://user:password@localhost:5432/lattice"
-JWT_SECRET="your-super-secret-jwt-key"
-
-# Optional
-CORS_ALLOWED_ORIGINS="http://localhost:3000,http://localhost:5173"
-PORT="3000"
-```
 ## 🤝 Contributing
 
-We’re building Lattice to simplify access control and help devs move faster. This only works with community input so whether you’re reporting a bug, requesting a feature or sharing feedback we’d love to have you involved.
-
-**How to contribute:**
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests (`npm test`)
-5. Submit a pull request
-
-**We welcome:**
-- 🐛 Bug reports and fixes
-- ✨ New features and improvements
-- 📚 Documentation improvements
-- 💡 Ideas and suggestions
-- 🌟 Star the repo if you find it useful!
-
-## 🗺️ Vision & Roadmap
-
-Lattice is evolving from a solid RBAC foundation to a comprehensive ABAC platform. Here's where we're headed:
-
-**Now (v0.1.x):**
-- ✅ Core RBAC with context awareness
-- ✅ Basic ABAC policy engine
-- ✅ Plugin architecture
-- ✅ Production-ready service layer
-
-**Next:**
-- 🔄 Enterprise features (SSO, audit trails, compliance)
-- 🔄 Advanced ABAC
-- 🔄 Policy versioning and rollback
-- 🔄 Performance optimizations and caching
-
-**Future:**
-- 🚀 Plugins! (Teams, Billing, Analytics)
-- 🚀 Visual policy editor
-- 🚀 Cloud-hosted Lattice service
-
-**The goal:** building a flexible, open framework for access control that developers actually love to use.
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details.
-
-## 🙏 Acknowledgments
-
-- [Prisma](https://www.prisma.io/) for type-safe database access
-- [Fastify](https://www.fastify.io/) and [Express](https://expressjs.com/) for HTTP frameworks
-- [CEL](https://github.com/google/cel-js) for policy evaluation
-- [OpenAPI](https://swagger.io/specification/) for API documentation
+We’re aiming to make access control less painful and more fun to work with.
+Whether it’s a bug, feature, or idea → contributions are welcome.
 
 ---
 
-<div align="center">
-  <strong>Built with ❤️ for developers who deserve better auth</strong>
-</div>
+This trims the fat and keeps things **straightforward, MECE, and chill**.
+Would you like me to apply the same treatment to the **Authorization Flow + Usage Examples** sections so they’re more digestible too?
