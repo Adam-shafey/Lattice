@@ -12,38 +12,36 @@ function getJwt(app: LatticeCore) {
 }
 
 export function requireAuthMiddleware(app: LatticeCore) {
+  function sendUnauthorized(res: any, next?: (err?: any) => void) {
+    const err = { statusCode: 401, message: 'Unauthorized' };
+    if (res?.sent) return;
+    if (res?.status) return res.status(401).send(err);
+    if (res?.code) return res.code(401).send(err);
+    if (next) return next(err);
+  }
+
   return async function (req: any, res: any, next?: (err?: any) => void) {
     logger.log('🔑 [REQUIRE_AUTH] Middleware invoked');
 
     try {
       const auth = req?.headers?.authorization as string | undefined;
-      
+
       if (!auth || !auth.startsWith('Bearer ')) {
         logger.log('🔑 [REQUIRE_AUTH] ❌ No Bearer token found');
-        const err = { statusCode: 401, message: 'Unauthorized' };
-        if (res?.sent) return;
-        if (res?.status) return res.status(401).send(err);
-        if (res?.code) return res.code(401).send(err);
-        if (next) return next(err);
-        return;
+        return sendUnauthorized(res, next);
       }
-      
+
       const token = auth.substring('Bearer '.length);
 
       const jwt = getJwt(app);
       const payload = await jwt.verify(token);
       (req as any).user = { id: payload.sub };
       logger.log('🔑 [REQUIRE_AUTH] ✅ Authenticated user', { userId: payload.sub });
-      
+
       if (next) return next();
     } catch (e) {
       logger.error('🔑 [REQUIRE_AUTH] ❌ Error during auth:', e);
-      const err = { statusCode: 401, message: 'Unauthorized' };
-      if (res?.sent) return;
-      if (res?.status) return res.status(401).send(err);
-      if (res?.code) return res.code(401).send(err);
-      if (next) return next(err);
-      return; // Don't continue to handler
+      return sendUnauthorized(res, next); // Don't continue to handler
     }
   };
 }
