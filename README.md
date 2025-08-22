@@ -99,6 +99,45 @@ app.route({
 
 ---
 
+## 🛡️ Policy Management
+
+Lattice protects every built‑in route with a permission rule.  
+The `defaultRoutePermissionPolicy` maps common actions to the permissions they require, like:
+
+```ts
+defaultRoutePermissionPolicy = {
+  roles: { create: 'roles:{type}:create', assign: 'roles:assign:{type}' },
+  users: { list: 'users:read', delete: 'users:delete' },
+  contexts: { create: 'contexts:create', addUser: 'contexts:assign' }
+};
+```
+
+To customize these requirements, pass a partial policy when creating the app.  
+Any fields you provide override the defaults:
+
+```ts
+import { Lattice } from 'lattice-core';
+
+const app = Lattice({
+  /* ... */
+  policy: {
+    users: { list: 'users:list' }
+  }
+});
+```
+
+You can also build a complete policy separately:
+
+```ts
+import { createRoutePermissionPolicy } from 'lattice-core';
+
+const policy = createRoutePermissionPolicy({
+  users: { delete: 'users:terminate' }
+});
+```
+
+---
+
 ## 🤝 Contributing
 
 We’re aiming to make access control less painful and more fun to work with.
