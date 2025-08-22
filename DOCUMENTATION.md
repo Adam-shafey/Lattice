@@ -157,6 +157,83 @@ Roles are context-aware. Assigning a role in a context whose type doesn't match 
 
 ## Policy Management
 
+### Route Permission Policy
+
+Every HTTP endpoint exposed by Lattice requires a specific permission.  
+The `defaultRoutePermissionPolicy` describes these defaults:
+
+```ts
+export const defaultRoutePermissionPolicy = {
+  roles: {
+    create: 'roles:{type}:create',
+    list: 'roles:{type}:list',
+    get: 'roles:{type}:read',
+    delete: 'roles:{type}:delete',
+    manage: 'roles:{type}:manage',
+    assign: 'roles:assign:{type}',
+    remove: 'roles:remove:{type}',
+    addPerm: {
+      roleManage: 'roles:{type}:manage',
+      permissionGrant: 'permissions:{perm}:grant:{type}',
+    },
+    removePerm: {
+      roleManage: 'roles:{type}:manage',
+      permissionRevoke: 'permissions:{perm}:revoke:{type}',
+    },
+  },
+  users: {
+    create: 'users:create',
+    list: 'users:read',
+    get: 'users:read',
+    update: 'users:update',
+    delete: 'users:delete',
+  },
+  permissions: {
+    grantUser: 'permissions:grant',
+    revokeUser: 'permissions:revoke',
+  },
+  contexts: {
+    create: 'contexts:create',
+    get: 'contexts:read',
+    update: 'contexts:update',
+    delete: 'contexts:delete',
+    addUser: 'contexts:assign',
+    removeUser: 'contexts:assign',
+  },
+};
+```
+
+You can replace parts of this policy when instantiating `Lattice`:
+
+```ts
+import { Lattice } from 'lattice-core';
+
+const app = Lattice({
+  /* other config */, 
+  policy: {
+    users: { delete: 'users:terminate' }
+  }
+});
+```
+
+For composition outside of the constructor, use the helpers:
+
+```ts
+import {
+  createRoutePermissionPolicy,
+  validateRoutePermissionPolicy,
+} from 'lattice-core';
+
+const policy = createRoutePermissionPolicy({
+  roles: { create: 'roles:{type}:make' }
+});
+
+const errors = validateRoutePermissionPolicy(policy); // []
+```
+
+These helpers merge your overrides with the defaults and check for missing
+permissions, giving you full control over how routes are secured.
+
 ### How Policies Work
 
 Policies in Lattice follow a clear lifecycle:
