@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const index_1 = require("./index");
 async function bootstrap() {
-    const app = (0, index_1.CoreSaaS)({
+    const app = (0, index_1.Lattice)({
         db: { provider: 'sqlite' },
         adapter: process.env.ADAPTER || 'fastify',
         jwt: { accessTTL: '15m', refreshTTL: '7d', secret: process.env.JWT_SECRET || 'dev-secret' },
