@@ -20,6 +20,12 @@ scripts/
 *.sqlite
 *.sqlite3
 
+# Prisma generated files (users should generate these themselves)
+prisma/generated/
+prisma/dev.db
+prisma/prod.db
+prisma/test.db
+
 # Environment files
 .env
 .env.local
