@@ -87,8 +87,21 @@ const app = Lattice({
   apiConfig: { apiPrefix: '/api' }
 });
 
-await app.listen(3000);
+  await app.listen(3000);
 ```
+
+## 🐳 Docker
+
+Use the included `Dockerfile` and `docker-compose.yml` to run Lattice in containers.
+
+1. Copy `.env.example` to `.env` and adjust values as needed.
+2. Build and start the services:
+
+```bash
+docker compose up --build
+```
+
+This launches the app on `http://localhost:3000` with Postgres on `5432` and Redis on `6379`. Remove the `redis` service from `docker-compose.yml` if you don't need it.
 
 ---
 
