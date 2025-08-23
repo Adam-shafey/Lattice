@@ -62,8 +62,24 @@ Every check = `(ActionType:ActionId, ContextType:ContextId)`
 npm install @adamelshafei/lattice-core
 ```
 
+### Setup Database
+
+```bash
+# Copy the Prisma schema to your project
+cp node_modules/@adamelshafei/lattice-core/prisma/schema.prisma ./prisma/
+
+# Generate Prisma client
+npx prisma generate
+
+# Push schema to database
+npx prisma db push
+```
+
+### Use in Your App
+
 ```ts
-import { Lattice } from '@adamelshafei/lattice-core
+import { Lattice } from '@adamelshafei/lattice-core'
+
 const app = Lattice({
   db: { provider: 'postgres', url: process.env.DATABASE_URL },
   adapter: 'fastify',
