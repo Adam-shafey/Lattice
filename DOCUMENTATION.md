@@ -335,11 +335,11 @@ app.registerPlugin(TeamsPlugin);
 
 ```bash
 # Install Lattice
-npm install @yourorg/lattice-core
+npm install @adam-elshafei/lattice-core
 
 # Set up environment
 export DATABASE_URL="postgresql://user:password@localhost:5432/lattice"
-export JWT_SECRET="your-super-secret-jwt-key"
+export JWT_SECRET="your-secret-jwt-key"
 
 # Initialize database
 npx prisma generate

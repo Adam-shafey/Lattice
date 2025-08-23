@@ -59,12 +59,11 @@ Every check = `(ActionType:ActionId, ContextType:ContextId)`
 ## 🚀 Quick Start
 
 ```bash
-npm install lattice-core
+npm install @adamelshafei/lattice-core
 ```
 
 ```ts
-import { Lattice } from 'lattice-core';
-
+import { Lattice } from '@adamelshafei/lattice-core
 const app = Lattice({
   db: { provider: 'postgres', url: process.env.DATABASE_URL },
   adapter: 'fastify',
@@ -116,7 +115,7 @@ To customize these requirements, pass a partial policy when creating the app.
 Any fields you provide override the defaults:
 
 ```ts
-import { Lattice } from 'lattice-core';
+import { Lattice } from '@adamelshafei/lattice-core';
 
 const app = Lattice({
   /* ... */
@@ -129,7 +128,7 @@ const app = Lattice({
 You can also build a complete policy separately:
 
 ```ts
-import { createRoutePermissionPolicy } from 'lattice-core';
+import { createRoutePermissionPolicy } from '@adamelshafei/lattice-core';
 
 const policy = createRoutePermissionPolicy({
   users: { delete: 'users:terminate' }
