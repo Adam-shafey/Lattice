@@ -12,6 +12,7 @@
     "dist/core",
     "dist/index.js",
     "dist/index.d.ts",
+    "prisma/schema.prisma",
     "README.md",
     "LICENSE"
   ],
