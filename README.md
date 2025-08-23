@@ -95,7 +95,7 @@ await app.listen(3000);
 ## 💡 Example
 
 ```ts
-// Route with a simple permission
+// Simple RBAC permission check
 app.route({
   method: 'GET',
   path: '/users/:id',
@@ -103,12 +103,25 @@ app.route({
   handler: async ({ params }) => ({ id: params.id })
 });
 
-// Context-aware rule
+// ABAC policy: Only resource owners can edit
+await app.policyService.createPolicy({
+  action: 'documents:edit',
+  resource: 'document',
+  condition: 'user.id == resource.ownerId',
+  effect: 'permit'
+});
+
+// Context-aware rule with ABAC
 app.route({
-  method: 'POST',
-  path: '/teams/:teamId/users',
-  preHandler: app.routeAuth('users:create', { scope: 'exact' }),
-  handler: async () => ({ success: true })
+  method: 'PUT',
+  path: '/teams/:teamId/documents/:docId',
+  preHandler: app.routeAuth('documents:edit', { scope: 'exact' }),
+  handler: async ({ params }) => {
+    // This automatically checks:
+    // 1. Does user have 'documents:edit' permission? (RBAC)
+    // 2. Does user own this document? (ABAC policy)
+    return { updated: params.docId };
+  }
 });
 ```
 
@@ -116,8 +129,35 @@ app.route({
 
 ## 🛡️ Policy Management
 
-Lattice protects every built‑in route with a permission rule.  
-The `defaultRoutePermissionPolicy` maps common actions to the permissions they require, like:
+### RBAC + ABAC in Action
+
+Lattice combines **Role-Based** and **Attribute-Based** access control:
+
+```ts
+// RBAC: Grant permission to role
+await app.roleService.assignPermissionToRole('editor', 'documents:edit');
+
+// ABAC: Add business rules on top
+await app.policyService.createPolicy({
+  action: 'documents:edit',
+  resource: 'document',
+  condition: 'user.department == resource.department && time.hour >= 9',
+  effect: 'permit'
+});
+
+// Result: Users need BOTH the permission AND meet the business rules
+```
+
+**Built-in Policy Examples:**
+
+* **Resource ownership**: `user.id == resource.ownerId`
+* **Business hours**: `time.hour >= 9 && time.hour <= 17`
+* **Department access**: `user.department == resource.department`
+* **Manager approval**: `user.role == "manager" && resource.amount <= user.approvalLimit`
+
+### Route Permissions
+
+Lattice protects every built‑in route with a permission rule:
 
 ```ts
 defaultRoutePermissionPolicy = {
@@ -127,27 +167,13 @@ defaultRoutePermissionPolicy = {
 };
 ```
 
-To customize these requirements, pass a partial policy when creating the app.  
-Any fields you provide override the defaults:
+Override defaults when creating the app:
 
 ```ts
-import { Lattice } from '@adamelshafei/lattice-core';
-
 const app = Lattice({
-  /* ... */
   policy: {
-    users: { list: 'users:list' }
+    users: { list: 'users:list' }  // Custom permission
   }
-});
-```
-
-You can also build a complete policy separately:
-
-```ts
-import { createRoutePermissionPolicy } from '@adamelshafei/lattice-core';
-
-const policy = createRoutePermissionPolicy({
-  users: { delete: 'users:terminate' }
 });
 ```
 
