@@ -21,7 +21,6 @@ const abac_1 = require("./core/abac/abac");
 class LatticeCore {
     constructor(config) {
         this.config = config;
-        this.apiPrefix = config.apiPrefix ?? '';
         this.dbClient = db_client_1.db;
         this.permissionRegistry = new permission_registry_1.PermissionRegistry(this.dbClient);
         this.adapterKind = config.adapter;
@@ -35,8 +34,10 @@ class LatticeCore {
             permissions: { ...policy_1.defaultRoutePermissionPolicy.permissions, ...(config.policy?.permissions ?? {}) },
             contexts: { ...policy_1.defaultRoutePermissionPolicy.contexts, ...(config.policy?.contexts ?? {}) },
         };
-        this.enableAuthn = config.authn !== false;
-        this.enableAuthz = config.authz !== false;
+        const api = config.apiConfig ?? {};
+        this.apiPrefix = api.apiPrefix ?? '';
+        this.enableAuthn = api.authn !== false;
+        this.enableAuthz = api.authz !== false;
         // Initialize service factory with shared permission registry
         this.serviceFactory = new services_1.ServiceFactory({
             db: this.dbClient,
@@ -204,7 +205,7 @@ class LatticeCore {
     async listen(port, host = '0.0.0.0') {
         await this.permissionRegistry.initFromDatabase();
         await this.permissionRegistry.syncToDatabase();
-        if (this.config.exposeAPI) {
+        if (this.config.apiConfig?.exposeAPI) {
             // Global request context middleware (only for adapters that support preHandler arrays at route-level)
             // Developers should add it before their own routes if using adapter directly.
             (0, auth_1.createAuthRoutes)(this, this.apiPrefix);
@@ -228,7 +229,7 @@ const defaultConfig = {
     db: { provider: 'sqlite' },
     adapter: 'fastify',
     jwt: { accessTTL: '15m', refreshTTL: '7d', secret: 'dev-secret' },
-    exposeAPI: false,
+    apiConfig: { exposeAPI: true, authn: true, authz: true, apiPrefix: '' },
 };
 function Lattice(config = {}) {
     const finalConfig = {
@@ -236,6 +237,7 @@ function Lattice(config = {}) {
         ...config,
         db: { ...defaultConfig.db, ...(config.db ?? {}) },
         jwt: { ...defaultConfig.jwt, ...(config.jwt ?? {}) },
+        apiConfig: { ...defaultConfig.apiConfig, ...(config.apiConfig ?? {}) },
     };
     return new LatticeCore(finalConfig);
 }

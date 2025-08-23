@@ -305,9 +305,12 @@ async function main() {
       const action = String(argv.action || argv.a);
       const resource = String(argv.resource || argv.r);
       const condition = String(argv.condition || argv.c);
-      const effect = String(argv.effect || argv.e);
+      const effect = String(argv.effect || argv.e) as 'permit' | 'deny';
       if (!action || !resource || !condition || !effect) {
         throw new Error('Usage: policies:create --action <action> --resource <resource> --condition <expr> --effect <permit|deny>');
+      }
+      if (effect !== 'permit' && effect !== 'deny') {
+        throw new Error('Effect must be either "permit" or "deny"');
       }
       const policy = await policyService.createPolicy({ action, resource, condition, effect });
       logger.log(policy);
@@ -343,7 +346,13 @@ async function main() {
       if (argv.action || argv.a) data.action = String(argv.action || argv.a);
       if (argv.resource || argv.r) data.resource = String(argv.resource || argv.r);
       if (argv.condition || argv.c) data.condition = String(argv.condition || argv.c);
-      if (argv.effect || argv.e) data.effect = String(argv.effect || argv.e);
+      if (argv.effect || argv.e) {
+        const effect = String(argv.effect || argv.e) as 'permit' | 'deny';
+        if (effect !== 'permit' && effect !== 'deny') {
+          throw new Error('Effect must be either "permit" or "deny"');
+        }
+        data.effect = effect;
+      }
       if (Object.keys(data).length === 0) {
         throw new Error('Provide at least one field to update');
       }

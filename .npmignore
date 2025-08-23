@@ -1,0 +1,65 @@
+# Source files (not needed in published package)
+src/
+tests/
+docs/
+
+# Development files
+tsconfig.json
+vitest.config.ts
+*.test.ts
+*.spec.ts
+
+# Build artifacts (except dist)
+*.tsbuildinfo
+
+# Development scripts
+scripts/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (keep README.md and LICENSE)
+DOCUMENTATION.md
+docs/
+
+# Swagger output (generated)
+src/swagger-output.json
+
+# Test files in dist
+dist/tests/
+dist/**/*.test.js
+dist/**/*.test.d.ts
+dist/**/*.spec.js
+dist/**/*.spec.d.ts

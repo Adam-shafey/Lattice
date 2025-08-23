@@ -283,6 +283,80 @@ async function main() {
                 });
                 break;
             }
+            case 'policies:create': {
+                const policyService = app.policyService;
+                const action = String(argv.action || argv.a);
+                const resource = String(argv.resource || argv.r);
+                const condition = String(argv.condition || argv.c);
+                const effect = String(argv.effect || argv.e);
+                if (!action || !resource || !condition || !effect) {
+                    throw new Error('Usage: policies:create --action <action> --resource <resource> --condition <expr> --effect <permit|deny>');
+                }
+                if (effect !== 'permit' && effect !== 'deny') {
+                    throw new Error('Effect must be either "permit" or "deny"');
+                }
+                const policy = await policyService.createPolicy({ action, resource, condition, effect });
+                logger_1.logger.log(policy);
+                break;
+            }
+            case 'policies:list': {
+                const policyService = app.policyService;
+                const policies = await policyService.listPolicies();
+                policies.forEach(p => {
+                    logger_1.logger.log(`${p.id}: ${p.effect} ${p.action} on ${p.resource} when ${p.condition}`);
+                });
+                break;
+            }
+            case 'policies:get': {
+                const policyService = app.policyService;
+                const id = String(argv.id || argv.i);
+                if (!id)
+                    throw new Error('Usage: policies:get --id <id>');
+                const policy = await policyService.getPolicy(id);
+                if (!policy) {
+                    logger_1.logger.log('Policy not found');
+                }
+                else {
+                    logger_1.logger.log(policy);
+                }
+                break;
+            }
+            case 'policies:update': {
+                const policyService = app.policyService;
+                const id = String(argv.id || argv.i);
+                if (!id) {
+                    throw new Error('Usage: policies:update --id <id> [--action <action>] [--resource <resource>] [--condition <expr>] [--effect <permit|deny>]');
+                }
+                const data = {};
+                if (argv.action || argv.a)
+                    data.action = String(argv.action || argv.a);
+                if (argv.resource || argv.r)
+                    data.resource = String(argv.resource || argv.r);
+                if (argv.condition || argv.c)
+                    data.condition = String(argv.condition || argv.c);
+                if (argv.effect || argv.e) {
+                    const effect = String(argv.effect || argv.e);
+                    if (effect !== 'permit' && effect !== 'deny') {
+                        throw new Error('Effect must be either "permit" or "deny"');
+                    }
+                    data.effect = effect;
+                }
+                if (Object.keys(data).length === 0) {
+                    throw new Error('Provide at least one field to update');
+                }
+                const policy = await policyService.updatePolicy(id, data);
+                logger_1.logger.log(policy);
+                break;
+            }
+            case 'policies:delete': {
+                const policyService = app.policyService;
+                const id = String(argv.id || argv.i);
+                if (!id)
+                    throw new Error('Usage: policies:delete --id <id>');
+                await policyService.deletePolicy(id);
+                logger_1.logger.log('Policy deleted successfully');
+                break;
+            }
             case 'contexts:create': {
                 const contextService = app.contextService;
                 const id = String(argv.id);
@@ -338,6 +412,11 @@ async function main() {
                 logger_1.logger.log('  permissions:revoke --permission <key> (--userId <id> | --email <email>) [--contextId <ctx>]');
                 logger_1.logger.log('  permissions:user (--userId <id> | --email <email>) [--contextId <ctx>] [--contextType <type>]');
                 logger_1.logger.log('  permissions:effective (--userId <id> | --email <email>) [--contextId <ctx>]');
+                logger_1.logger.log('  policies:create --action <action> --resource <resource> --condition <expr> --effect <permit|deny>');
+                logger_1.logger.log('  policies:list');
+                logger_1.logger.log('  policies:get --id <id>');
+                logger_1.logger.log('  policies:update --id <id> [--action <action>] [--resource <resource>] [--condition <expr>] [--effect <permit|deny>]');
+                logger_1.logger.log('  policies:delete --id <id>');
                 logger_1.logger.log('  contexts:create --id <id> --type <type> --name <name>');
                 logger_1.logger.log('  contexts:list [--type <type>] [--limit <n>] [--offset <n>]');
         }

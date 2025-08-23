@@ -6,6 +6,28 @@ import { type RoutePermissionPolicy } from './core/policy/policy';
 import { ServiceFactory } from './core/services';
 import { type PrismaClient } from './core/db/db-client';
 export type SupportedAdapter = 'fastify' | 'express';
+export interface ApiConfig {
+    /**
+     * Automatically register built-in API routes when listening
+     * Defaults to true
+     */
+    exposeAPI?: boolean;
+    /**
+     * Enable route-level authentication (JWT verification)
+     * Defaults to true
+     */
+    authn?: boolean;
+    /**
+     * Enable route-level authorization checks
+     * Defaults to true
+     */
+    authz?: boolean;
+    /**
+     * Prefix to apply to all built-in API routes
+     * Defaults to ''
+     */
+    apiPrefix?: string;
+}
 export interface CoreConfig {
     db: {
         provider: 'postgres' | 'sqlite';
@@ -17,23 +39,11 @@ export interface CoreConfig {
         refreshTTL: string;
         secret?: string;
     };
-    /**
-     * Enable route-level authentication (JWT verification)
-     * Defaults to true
-     */
-    authn?: boolean;
-    /**
-     * Enable route-level authorization checks
-     * Defaults to true
-     */
-    authz?: boolean;
     policy?: RoutePermissionPolicy;
-    apiPrefix?: string;
     /**
-     * Automatically register built-in API routes when listening
-     * Defaults to false
+     * API related configuration including exposure and auth settings
      */
-    exposeAPI?: boolean;
+    apiConfig?: ApiConfig;
 }
 export interface RouteDefinition<Body = unknown> {
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';

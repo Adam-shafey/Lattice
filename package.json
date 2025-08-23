@@ -1,5 +1,5 @@
 {
-  "name": "@yourorg/lattice-core",
+  "name": "lattice-core",
   "version": "0.1.1",
   "private": false,
   "type": "commonjs",
@@ -9,7 +9,9 @@
     "lattice": "dist/core/cli/index.js"
   },
   "files": [
-    "dist",
+    "dist/core",
+    "dist/index.js",
+    "dist/index.d.ts",
     "README.md",
     "LICENSE"
   ],
@@ -17,7 +19,20 @@
   "repository": "github:Adam-shafey/lattice",
   "author": "Adam Elshafei <abdoshafey1@gmail.com>",
   "homepage": "https://github.com/Adam-shafey/Lattice#readme",
-  "bugs": "https://github.com/yourorg/lattice/issues",
+  "bugs": "https://github.com/Adam-shafey/lattice/issues",
+  "keywords": [
+    "authorization",
+    "rbac",
+    "abac",
+    "permissions",
+    "access-control",
+    "saas",
+    "multi-tenant",
+    "typescript",
+    "fastify",
+    "express"
+  ],
+  "description": "Permission-first backend framework for SaaS applications. Lego blocks for access control.",
   "scripts": {
     "swagger:gen": "ts-node src/scripts/swagger.ts",
     "build": "npm run swagger:gen && tsc -p tsconfig.json",

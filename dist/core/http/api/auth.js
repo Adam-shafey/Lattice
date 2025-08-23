@@ -16,22 +16,24 @@ function getJwt(app) {
     return (0, jwt_1.createJwtUtil)({ secret, accessTTL, refreshTTL }, app.db);
 }
 function requireAuthMiddleware(app) {
+    function sendUnauthorized(res, next) {
+        const err = { statusCode: 401, message: 'Unauthorized' };
+        if (res?.sent)
+            return;
+        if (res?.status)
+            return res.status(401).send(err);
+        if (res?.code)
+            return res.code(401).send(err);
+        if (next)
+            return next(err);
+    }
     return async function (req, res, next) {
         logger_1.logger.log('🔑 [REQUIRE_AUTH] Middleware invoked');
         try {
             const auth = req?.headers?.authorization;
             if (!auth || !auth.startsWith('Bearer ')) {
                 logger_1.logger.log('🔑 [REQUIRE_AUTH] ❌ No Bearer token found');
-                const err = { statusCode: 401, message: 'Unauthorized' };
-                if (res?.sent)
-                    return;
-                if (res?.status)
-                    return res.status(401).send(err);
-                if (res?.code)
-                    return res.code(401).send(err);
-                if (next)
-                    return next(err);
-                return;
+                return sendUnauthorized(res, next);
             }
             const token = auth.substring('Bearer '.length);
             const jwt = getJwt(app);
@@ -43,16 +45,7 @@ function requireAuthMiddleware(app) {
         }
         catch (e) {
             logger_1.logger.error('🔑 [REQUIRE_AUTH] ❌ Error during auth:', e);
-            const err = { statusCode: 401, message: 'Unauthorized' };
-            if (res?.sent)
-                return;
-            if (res?.status)
-                return res.status(401).send(err);
-            if (res?.code)
-                return res.code(401).send(err);
-            if (next)
-                return next(err);
-            return; // Don't continue to handler
+            return sendUnauthorized(res, next); // Don't continue to handler
         }
     };
 }
