@@ -40,7 +40,7 @@
     "build:admin": "cd AccessControlUI && npm install && npm run build",
     "dev": "npm run swagger:gen && ts-node-dev --respawn --transpile-only src/scripts/dev.ts",
     "dev:with-admin": "npm run build:admin && npm run dev",
-    "start": "node dist/dev.js",
+    "start": "ts-node src/scripts/start-cluster.ts",
     "cli": "node dist/core/cli/index.js --help",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
